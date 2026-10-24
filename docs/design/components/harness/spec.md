@@ -136,11 +136,11 @@ type HarnessQuery = {
 
 ## 6 预算与运行
 
-- 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 5 KB，实现后核算。
-- 单独验证命令（实现后）：`bun test tests/components/harness`。
+- 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 5 KB。
+- 单独验证命令：`bun test tests/components/harness`。
 - 当前状态：`current`；已实现并通过契约测试，验证入口见 [`result.md`](../../../works/2026-10-24-db-backend-infra/result.md)。
 
-## 7 未决
+## 7 B1 实现口径
 
-- `health=overloaded` 是否保留在 B1 枚举中（UI 有「高负载」展示），表级设计确认。
-- `harness_tag` 数量上限无 UI 依据，暂不设业务上限。
+- 保留 `health=overloaded` 枚举，用于 UI 的「高负载」展示。
+- `harness_tag` 不设业务数量上限，只做字段级长度与请求体校验。

@@ -153,12 +153,12 @@ type ExpertReference = { id: string; name: string };
 
 ## 6 预算与运行
 
-- 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 6 KB，实现后核算。
-- 单独验证命令（实现后）：`bun test tests/components/expert`。
+- 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 6 KB。
+- 单独验证命令：`bun test tests/components/expert`。
 - 当前状态：`current`；已实现并通过契约测试，验证入口见 [`result.md`](../../../works/2026-10-24-db-backend-infra/result.md)。
 
-## 7 未决
+## 7 B1 实现口径
 
-- 专家「关注视角」是否独立字段；当前由 `role` / `notes` 承接。
-- 人设/引用数量上限无 UI 依据，暂不设业务上限。
-- B1 专家删除直接允许；后续节点引用保护另立设计。
+- 不新增「关注视角」字段，当前由 `role` / `notes` 承接。
+- 人设/引用数量不设业务上限，只做字段级长度与请求体校验。
+- B1 专家没有引用方，允许直接删除；后续出现工作流节点引用时另立保护设计。

@@ -143,11 +143,11 @@ type ToolRef = { id: string; name: string };
 
 ## 6 预算与运行
 
-- 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 5 KB，实现后核算。
-- 单独验证命令（实现后）：`bun test tests/components/tool`。
+- 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 5 KB。
+- 单独验证命令：`bun test tests/components/tool`。
 - 当前状态：`current`；已实现并通过契约测试，验证入口见 [`result.md`](../../../works/2026-10-24-db-backend-infra/result.md)。
 
-## 7 未决
+## 7 B1 实现口径
 
-- `tool.status` 的种子演示值是否允许 `available` / `unavailable`，在种子设计确认。
-- 参数数量上限无 UI 依据，暂不设业务上限。
+- 种子允许写 `available` / `unavailable` 作为 UI 夹具演示值；通过 API 新建的工具保持 `unverified`。
+- 参数不设业务数量上限，只做字段级长度与请求体校验。

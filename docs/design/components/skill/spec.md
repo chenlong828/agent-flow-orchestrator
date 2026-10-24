@@ -162,12 +162,12 @@ type SkillQuery = {
 
 ## 6 预算与运行
 
-- 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 6 KB，实现后核算。
-- 单独验证命令（实现后）：`bun test tests/components/skill`。
+- 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 6 KB。
+- 单独验证命令：`bun test tests/components/skill`。
 - 当前状态：`current`；已实现并通过契约测试，验证入口见 [`result.md`](../../../works/2026-10-24-db-backend-infra/result.md)。
 
-## 7 未决
+## 7 B1 实现口径
 
-- `skill_category` 的 4 个代码与中文标签在表级设计确认。
-- `ref_type` 是否固定枚举，还是先按 UI 夹具存文本；API 契约先按字符串。
-- 标签/触发词/踩坑/引用数量上限无 UI 依据，暂不设业务上限。
+- `skill_category` 固定为 `coding/retrieval/review/testing` 四个代码与中文标签。
+- `ref_type` 先按字符串存储，不固定枚举。
+- 标签/触发词/踩坑/引用不设业务数量上限，只做字段级长度与请求体校验。

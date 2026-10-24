@@ -78,11 +78,11 @@ type Health = { check(): Promise<{ status: "ok" | "degraded"; database: "up" | "
 
 ## 6 预算与运行
 
-- 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 4 KB，实现后核算。
-- 单独验证命令（实现后）：`bun test tests/components/platform`。
+- 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 4 KB。
+- 单独验证命令：`bun test tests/components/platform`。
 - 当前状态：`current`；平台命令已可执行，验证入口见 [`result.md`](../../../works/2026-10-24-db-backend-infra/result.md)。
 
-## 7 未决
+## 7 B1 实现口径
 
-- `Bun.sql` 事务与动态 SQL 的具体写法在 `T-B1-I02` 开头验证。
-- 测试库创建/销毁放平台测试工具还是独立测试脚本，在表级设计后定。
+- `Bun.sql` 的事务、动态 SQL 与错误映射已在 `T-B1-I02` 验证，实现继续使用 `Bun.sql`。
+- 测试库按进程独立命名（`agentflow_test_<pid>`，可用 `TEST_DATABASE_URL` 覆盖），由测试基座自动创建并迁移；不单独提供销毁脚本。

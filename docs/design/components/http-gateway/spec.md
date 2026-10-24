@@ -433,13 +433,13 @@ UI 侧验证建议：
 
 ## 9 预算与运行
 
-- 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 21 KB，OpenAPI 派生文档约 55 KB（不计入组件预算），实现后核算。
-- 单独验证命令（实现后）：`bun test tests/components/http-gateway`。
+- 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 21 KB，OpenAPI 派生文档约 55 KB（不计入组件预算）。
+- 单独验证命令：`bun test tests/components/http-gateway`。
 - 当前状态：`current`；已实现并通过契约测试，验证入口见 [`result.md`](../../../works/2026-10-24-db-backend-infra/result.md)。
 
-## 10 未决
+## 10 B1 实现口径与剩余问题
 
-- `API-21` 分类端点是否保留独立资源，还是在 `GET /skills` 的 meta 中返回；当前按独立只读端点设计，便于 UI 下拉。
-- `API-28` / `API-29` 是否合并为一个装配端点；当前分开，避免一次保存两类关系时互相覆盖。
-- 错误体是否增加 `traceId` 之外的可选 `fieldErrors` 数组；当前用 `details` 兼容。
-- B1 是否加 CORS 或同源代理，待 UI 侧验证方式确认；默认不加 CORS，契约本身不依赖 CORS。
+- `API-21` 保留为独立只读资源 `GET /skill-categories`，便于 UI 下拉直接消费。
+- `API-28` / `API-29` 保持分开，避免一次保存两类装配关系时互相覆盖。
+- 错误体不新增顶层 `fieldErrors`，字段级错误仍放在 `details`：单字段为 `details.field` / `details.reason`，多字段为 `details.fieldErrors` 数组。
+- B1 不加 CORS，也不假设同源代理；剩余问题：UI 侧采用何种方式验证跨源调用，确认后再决定是否加同源代理或 CORS。
