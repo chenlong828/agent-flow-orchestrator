@@ -142,5 +142,5 @@ type HarnessQuery = {
 
 ## 7 B1 实现口径
 
-- 保留 `health=overloaded` 枚举，用于 UI 的「高负载」展示。
+- 保留 `health=overloaded` 枚举，用于外部界面的「高负载」展示。
 - `harness_tag` 不设业务数量上限，只做字段级长度与请求体校验。

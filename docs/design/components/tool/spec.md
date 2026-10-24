@@ -149,5 +149,5 @@ type ToolRef = { id: string; name: string };
 
 ## 7 B1 实现口径
 
-- 种子允许写 `available` / `unavailable` 作为 UI 夹具演示值；通过 API 新建的工具保持 `unverified`。
+- 种子允许写 `available` / `unavailable` 作为外部夹具演示值；通过 API 新建的工具保持 `unverified`。
 - 参数不设业务数量上限，只做字段级长度与请求体校验。

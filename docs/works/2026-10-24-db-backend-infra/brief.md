@@ -131,17 +131,17 @@ updated: 2026-10-25
 
 ## 追溯方式
 
-- B1 是基础设施工序：不改 UI，`OQ-2` 未裁定，**默认按旁路处理**：不建 `REQ`/`SCN`，`brief.md` + `implementation-plan.md` 为锚点；若你要求追溯，先补 `REQ`/`SCN` 再开工。
+- B1 是基础设施工序：不改 UI（UI 为独立项目），**默认按旁路处理**：不建 `REQ`/`SCN`，`brief.md` + `implementation-plan.md` 为锚点；若你要求追溯，先补 `REQ`/`SCN` 再开工。
 - commit 绑定 `T-B1-Dxx` / `T-B1-Ixx` 与本工单目录；默认不绑定 `SCN`，不伪造场景 ID。
-- 若 `OQ-2` 后续裁定 UI 为需求来源，再为之后的批次补 `REQ`/`SCN`，不回写历史 commit。
+- 后续批次按实际需求补 `REQ`/`SCN`，不回写历史 commit。
 
 ## 领取的开放问题
 
 | 编号 | 与本工序的关系 | 本工序的处理 |
 |---|---|---|
-| `OQ-2` | UI 是否是需求来源与验收蓝本 | 按用户指令把 UI 当作数据契约与界面行为参考；正式裁定仍待确认 |
-| `OQ-3` | 对外形态与契约归属 | 2026-10-25 确认仅对外提供 HTTP API；UI 是否直接消费、契约版本归属仍待定。B1 按 HTTP JSON `/api/v1` 实现 |
-| `OQ-4` | 首个交付范围 | **部分解决（2026-10-24）**：先做 B1；M4 端到端业务流仍待 `OQ-2` 裁定后另选 |
+| `OQ-2` | UI 是否是需求来源与验收蓝本 | 已关闭（2026-10-25）：UI 为独立项目，本仓库不提供 UI，不以其为需求来源；见[归档记录](../../history/decisions/2026-10-25-project-boundary-and-open-questions.md) |
+| `OQ-3` | 对外形态与契约归属 | 已关闭（2026-10-25）：仅提供 HTTP API，不提供 CLI、库或 UI；契约由本仓库维护。B1 按 HTTP JSON `/api/v1` 实现；见[归档记录](../../history/decisions/2026-10-25-project-boundary-and-open-questions.md) |
+| `OQ-4` | 首个交付范围 | 已关闭（2026-10-25）：B1 已完成；后续端到端流程等实际需求出现后另立 `REQ`/工序；见[归档记录](../../history/decisions/2026-10-25-project-boundary-and-open-questions.md) |
 
 ## 定级与门禁
 

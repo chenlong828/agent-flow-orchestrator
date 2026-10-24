@@ -63,11 +63,10 @@ updated: 2026-10-24
 
 ## 关联
 
-- [`OQ-1`](../../plan/open-questions.md)：技术栈与运行形态；
-- [`OQ-2`](../../plan/open-questions.md)：与 `agent-flow-ui` 的关系。
+- [`OQ-1`](../../plan/open-questions.md) / [`OQ-2`](../../plan/open-questions.md)：已于 2026-10-25 关闭归档；本工作只保留概念材料，不构成开放问题。
 
 ## 决策来源
 
 - D0（Bun + PostgreSQL）和 D11（直接重跑）是早前已锁定的基础决策；D1-D10 是本轮确认的执行决策，其中 D1 的 ACP 能力边界由本轮实测确认。
-- Bun + PostgreSQL 是早前已锁定的基础决策；`OQ-1` 已于 2026-10-24 同步（技术栈已定，运行形态仍在 M2 设计）。
+- Bun + PostgreSQL 是早前已锁定的基础决策；`OQ-1` 已关闭归档，运行形态等实际需求出现时另立设计。
 - 本工作项目是调研/概念设计工序，当前没有对应的 `REQ-xxxx`；不把概念稿提前写成 `design/` 的“现行真相”。

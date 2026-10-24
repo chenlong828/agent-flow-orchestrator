@@ -30,7 +30,7 @@ updated: 2026-10-25
 
 - `name` 大小写不敏感唯一；`category_code` 必须存在。
 - `summary` ≤200 字。
-- `version` 形如 `vX.Y`；API 新建 `v1.0`；每次保存 minor+1；若 minor 超过 9，则 major+1、minor=0（如 `v1.9` → `v2.0`）；客户端不可写；种子保留 UI 版本。
+- `version` 形如 `vX.Y`；API 新建 `v1.0`；每次保存 minor+1；若 minor 超过 9，则 major+1、minor=0（如 `v1.9` → `v2.0`）；客户端不可写；种子保留演示版本。
 - 五章齐全：`overview / steps / examples / scripts / verification`。
 - 标签/触发词/踩坑/引用有序；标签与触发词各自唯一；章节主键 `(skill_id, kind)`。
 - 有专家引用时不可删除；删除前调用 `ReferenceGuard`，非空抛 `ReferencedError`。

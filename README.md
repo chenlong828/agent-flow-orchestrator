@@ -2,7 +2,8 @@
 
 AgentFlow 研发智能体工作流编排服务的编排侧工程：目标是把「工作流定义 → 专家 / Skill / 工具装配 → 运行实例 → 效能数据」这条链路落成可运行、可验证的服务。
 
-- 同族项目（关系待确认，见 [`docs/plan/open-questions.md`](docs/plan/open-questions.md) OQ-2）：[`../agent-flow-ui`](../agent-flow-ui) —— 同一「研发智能体工作流编排服务」的 UE 高保真原型
+- 对外形态：只提供 HTTP API（`/api/v1` + `/healthz`），不提供 CLI、SDK/库或 UI。
+- UI 是独立项目（不在本仓库内）：[`../agent-flow-ui`](../agent-flow-ui)；跨项目只按 REST 契约交互，本仓库不包含、不启动、不修改 UI。
 - 文档树：[`docs/`](docs/README.md)（五态分离，导航与阅读顺序见该页）
 - 协作与门禁：[`AGENTS.md`](AGENTS.md)
 - 技能：`.agents/skills/`（af-dev-skill v0.1，随仓库安装）
@@ -17,7 +18,7 @@ AgentFlow 研发智能体工作流编排服务的编排侧工程：目标是把�
 - 演示种子：5 Harness / 10 工具 / 12 Skill / 8 专家，Skill 与工具装配边各 23 条。
 - 实现结果与验证记录：[`result.md`](docs/works/2026-10-24-db-backend-infra/result.md)。
 
-B2 Key/工作区、B3 工作流、B4 实例/看板、ACP 执行模型未实现；运行形态仍在 M2 设计，见 [`docs/plan/roadmap.md`](docs/plan/roadmap.md) 与 [`docs/plan/open-questions.md`](docs/plan/open-questions.md)。
+B2 Key/工作区、B3 工作流、B4 实例/看板、ACP 执行模型未实现；后续运行形态按实际需求另立工序，见 [`docs/plan/roadmap.md`](docs/plan/roadmap.md)。早期开放问题已关闭，当前无开放问题，见 [`docs/plan/open-questions.md`](docs/plan/open-questions.md)。
 
 ## 运行
 

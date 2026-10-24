@@ -7,7 +7,8 @@ info:
     AgentFlow B1 控制面的 HTTP JSON 契约，覆盖 Harness、工具、Skill、专家、
     引用页与健康检查。业务端点统一以 `/api/v1` 为前缀，`/healthz` 不参与版本。
 
-    本文件由 `spec.md` 导出，供 `agent-flow-ui` 与接口调试工具对照使用。
+    本文件由 `spec.md` 导出，供外部 HTTP 客户端与接口调试工具对照使用。
+    本仓库只提供 HTTP API，不提供 CLI、库或 UI。
     `spec.md` 是契约权威版本；若两者冲突，以 `spec.md` 为准。
 
     通用约定：

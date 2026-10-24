@@ -39,7 +39,8 @@ docs/
 └── history/                                ← 记忆：怎么走到这里（冻结只读）
     └── decisions/
         ├── 2026-10-23-project-init.md
-        └── 2026-10-24-component-boundary-and-naming.md
+        ├── 2026-10-24-component-boundary-and-naming.md
+        └── 2026-10-25-project-boundary-and-open-questions.md
 ```
 
 其余内容在诞生时创建，**不预建空目录、不预建索引行**：
@@ -56,12 +57,13 @@ docs/
 1. [`../README.md`](../README.md) —— 项目定位与当前阶段
 2. [`../AGENTS.md`](../AGENTS.md) —— 技能加载、门禁与文档纪律
 3. [`plan/roadmap.md`](plan/roadmap.md) —— 里程碑、工序与依赖
-4. [`plan/open-questions.md`](plan/open-questions.md) —— 未决的跨工序问题
+4. [`plan/open-questions.md`](plan/open-questions.md) —— 开放问题登记；当前无开放问题，历史条目已关闭归档
 5. [`design/architecture.md`](design/architecture.md) —— 现行组件边界、依赖与数据所有权
 6. [`design/components/kernel/spec.md`](design/components/kernel/spec.md) —— 共享错误、分页与端口契约
-7. [`design/components/http-gateway/spec.md`](design/components/http-gateway/spec.md) 与 [`openapi.yaml`](design/components/http-gateway/openapi.yaml) —— 对外 REST 契约，UI 侧按此印证
+7. [`design/components/http-gateway/spec.md`](design/components/http-gateway/spec.md) 与 [`openapi.yaml`](design/components/http-gateway/openapi.yaml) —— 对外 REST 契约；UI 为独立项目，若接入按此消费
 8. [`works/2026-10-24-db-backend-infra/result.md`](works/2026-10-24-db-backend-infra/result.md) —— B1 实现结果、验证命令与偏差
 9. [`history/decisions/2026-10-23-project-init.md`](history/decisions/2026-10-23-project-init.md) —— 初始化时的取舍与被否决方案
+10. [`history/decisions/2026-10-25-project-boundary-and-open-questions.md`](history/decisions/2026-10-25-project-boundary-and-open-questions.md) —— 仅 HTTP API、无 CLI/库/UI，以及早期开放问题归档
 
 ## 维护纪律（速记）
 

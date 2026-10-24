@@ -4,7 +4,7 @@
 
 ## 项目定位
 
-AgentFlow 研发智能体工作流编排服务的编排侧（职责按目录名推断，待架构选型时确认）。相关项目 [`../agent-flow-ui`](../agent-flow-ui) 是同一编排服务的 UE 高保真原型；两个项目的关系、需求是否以原型为来源，均未确认，记于 `docs/plan/open-questions.md` OQ-2，确认前不作为事实引用。
+AgentFlow 研发智能体工作流编排服务的编排侧：只提供 HTTP API（`/api/v1` + `/healthz`），不提供 CLI、SDK/库或 UI。UI 是独立项目 [`../agent-flow-ui`](../agent-flow-ui)，不在本仓库内；本仓库不包含、不启动、不修改 UI，也不以 UI 作为需求来源或验收前置。跨项目只按 REST 契约交互。
 
 ## 语言
 
@@ -29,7 +29,7 @@ AgentFlow 研发智能体工作流编排服务的编排侧（职责按目录名�
 ## 门禁与纪律
 
 - 改动级别与人工确认门按 `arch-design-spec` 的 P0–P3 执行；未达到对应级别的要求，停在设计与确认，不抢先动手。
-- 技术栈 D0 已定 Bun + PostgreSQL；运行形态与 ACP 执行模型在 M2 设计。环境/工具类工序按本次改动定级，不按系统重要性套 P1 模板。
+- 技术栈 D0 已定 Bun + PostgreSQL；运行形态与 ACP 执行模型等实际需求出现时另立设计，不预置。环境/工具类工序按本次改动定级，不按系统重要性套 P1 模板。
 - 密钥只进 `.env`（已 ignore），不进 README、日志、注释、commit；提交前过 `git status` 与 `git diff --cached`。
 - 一个 commit 一件事，绑定任务与场景 ID；不夹带无关重构、依赖升级或格式化。
 - 删除、覆盖工作区、`git reset --hard`、`git clean`、对外发布，执行前必须确认。
