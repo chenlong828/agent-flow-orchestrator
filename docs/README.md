@@ -60,10 +60,11 @@ docs/
 4. [`plan/open-questions.md`](plan/open-questions.md) —— 开放问题登记；当前无开放问题，历史条目已关闭归档
 5. [`design/architecture.md`](design/architecture.md) —— 现行组件边界、依赖与数据所有权
 6. [`design/components/kernel/spec.md`](design/components/kernel/spec.md) —— 共享错误、分页与端口契约
-7. [`design/components/http-gateway/spec.md`](design/components/http-gateway/spec.md) 与 [`openapi.yaml`](design/components/http-gateway/openapi.yaml) —— 对外 REST 契约；UI 为独立项目，若接入按此消费
+7. [`design/components/http-gateway/spec.md`](design/components/http-gateway/spec.md) 与 [`openapi.yaml`](design/components/http-gateway/openapi.yaml) —— 对外 REST 契约；Swagger UI 在 `/docs`；UI 为独立项目，若接入按此消费
 8. [`works/2026-10-24-db-backend-infra/result.md`](works/2026-10-24-db-backend-infra/result.md) —— B1 实现结果、验证命令与偏差
-9. [`history/decisions/2026-10-23-project-init.md`](history/decisions/2026-10-23-project-init.md) —— 初始化时的取舍与被否决方案
-10. [`history/decisions/2026-10-25-project-boundary-and-open-questions.md`](history/decisions/2026-10-25-project-boundary-and-open-questions.md) —— 仅 HTTP API、无 CLI/库/UI，以及早期开放问题归档
+9. [`works/2026-10-25-api-swagger/result.md`](works/2026-10-25-api-swagger/result.md) —— Swagger UI、OpenAPI 端点与验证结果
+10. [`history/decisions/2026-10-23-project-init.md`](history/decisions/2026-10-23-project-init.md) —— 初始化时的取舍与被否决方案
+11. [`history/decisions/2026-10-25-project-boundary-and-open-questions.md`](history/decisions/2026-10-25-project-boundary-and-open-questions.md) —— 仅 HTTP API、无 CLI/库/产品 UI，以及早期开放问题归档
 
 ## 维护纪律（速记）
 

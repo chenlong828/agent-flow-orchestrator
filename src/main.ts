@@ -19,7 +19,7 @@ import {
   createExpertService,
 } from "./components/expert/index.ts";
 import { createCatalog } from "./components/catalog/index.ts";
-import { createHttpApp } from "./components/http-gateway/index.ts";
+import { createApiDocs, createHttpApp } from "./components/http-gateway/index.ts";
 
 const config = loadConfig();
 
@@ -70,6 +70,24 @@ const expertService = createExpertService({
 
 const health = createHealth(db);
 
+const docs = await createApiDocs({
+  specFile: join(
+    process.cwd(),
+    "docs",
+    "design",
+    "components",
+    "http-gateway",
+    "openapi.yaml",
+  ),
+  assetsDirectory: join(
+    process.cwd(),
+    "src",
+    "components",
+    "http-gateway",
+    "docs-assets",
+  ),
+});
+
 const app = createHttpApp({
   catalog,
   harnessService,
@@ -78,6 +96,7 @@ const app = createHttpApp({
   expertService,
   health,
   actor: config.actor,
+  docs,
 });
 
 const server = Bun.serve({
@@ -87,6 +106,7 @@ const server = Bun.serve({
 });
 
 console.log(`AgentFlow B1 编排服务已启动：http://${config.host}:${server.port}`);
+console.log(`API 文档：http://${config.host}:${server.port}/docs`);
 
 async function shutdown(): Promise<void> {
   server.stop();

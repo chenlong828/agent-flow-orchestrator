@@ -1,13 +1,13 @@
 ---
 layer: works
 module: global
-status: active
+status: closed
 updated: 2026-10-25
 ---
 
 # API Swagger 文档实施计划
 
-> 状态：分析完成，待确认后编码。本轮不修改 `src/`、`package.json`、`bun.lock` 或数据库。
+> 状态：已实施；结果见 [`result.md`](result.md)。本文件保留实施前的计划，不再作为待办清单。
 > 决策依据见 [`analysis.md`](analysis.md)。改动级别 **P2**；实现前需要用户确认本计划。
 
 ## 1 固定决策
@@ -291,19 +291,17 @@ git diff --check
 - 数据回滚：无数据库变更，不需要迁移回滚。
 - 文档回滚：删除本工序目录或按流程归档；不改 B1 的历史文档。
 
-## 10 提交拆分
+## 10 提交
 
-1. `docs(T-DOC-01): 增加 Swagger 文档分析与实施计划`
-   - `brief.md`、`analysis.md`、`implementation-plan.md`。
-2. `feat(T-DOC-02..03): 增加 /docs 与 /openapi.yaml`
-   - `docs.ts`、`app.ts`、`index.ts`、`main.ts`、`docs-assets/`、`.gitattributes`、`openapi.yaml`、`spec.md`、`README.md`。
-3. `test(T-DOC-04): 验证 Swagger 文档端点`
-   - 测试、`result.md`、README 测试数。
+- `docs(T-DOC-01)`：分析计划，已单独提交。
+- 实现提交：`feat(T-DOC-02..04): 增加 Swagger UI 与 OpenAPI 文档端点`，包含代码、静态资源、契约/README、测试与 `result.md`；这三项属于同一个交付，不拆成“先功能后测试”的中间状态。
 
-## 11 待确认
+## 11 已确认的决策
 
-- 是否接受 vendor 2.1 MB 静态资源，而不是引入 `swagger-ui-dist` 依赖。
-- 是否接受“不新增组件”，把文档作为 `http-gateway` 子模块。
-- 是否接受 `/docs` 默认随服务开启、无独立开关；生产访问控制不在本次范围。
+2026-10-25 用户确认执行，实际落地与验证见 [`result.md`](result.md)：
 
-确认后按本文实施；若选择新增 `CMP-api-docs` 组件、改用 npm 依赖或加 `DOCS_ENABLED` 开关，需要回到 `analysis.md` 重新定级与调整计划。
+- 接受 vendor 约 2.14 MB 静态资源，不引入 `swagger-ui-dist` 依赖。
+- 接受“不新增组件”，文档作为 `http-gateway` 子模块。
+- 接受 `/docs` 默认随服务开启、无独立开关；生产访问控制不在本次范围。
+
+若以后改为新增 `CMP-api-docs` 组件、引入 npm 依赖或增加 `DOCS_ENABLED` 开关，需要重新定级并调整计划。

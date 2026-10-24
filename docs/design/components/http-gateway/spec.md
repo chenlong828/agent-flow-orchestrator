@@ -8,19 +8,19 @@ updated: 2026-10-25
 
 # `CMP-http-gateway` 组件规格与 REST API 契约
 
-> 本文是本仓库的外部 HTTP 契约。本仓库只提供 HTTP API，不提供 CLI、库或 UI；UI 是独立项目，若接入只按本文调用，双方互不进入对方项目改代码。
+> 本文是本仓库的外部 HTTP 契约。本仓库只提供 HTTP API，不提供 CLI、库或产品 UI；UI 是独立项目，若接入只按本文调用，双方互不进入对方项目改代码。Swagger UI 是开发者文档，不是产品 UI。
 
 ## 1 主目标
 
-把 HTTP 请求翻译为 B1 用例调用，校验传输层形状，映射 DTO 与错误；是唯一对外暴露 REST API 的组件。
+把 HTTP 请求翻译为 B1 用例调用，校验传输层形状，映射 DTO 与错误；同时托管开发者 API 文档。是唯一对外暴露 HTTP 面的组件。
 
-**不负责**：业务规则、SQL、读模型拼装、状态推进、B1 之外的端点。
+**不负责**：业务规则、SQL、读模型拼装、状态推进、B1 之外的业务端点。文档子模块只读取静态文件，不接触业务数据。
 
 **方法归属**：领域方法、领域输入/输出类型与不变量在各组件规格；本文只定义端点、DTO 与错误映射。
 
 **数据所有权**：无表、无缓存、不写数据库。
 
-**机器可读契约**：[`openapi.yaml`](openapi.yaml)。它由本文导出，供 Swagger UI、Postman 或前端适配层导入；两者冲突时以本文为准。
+**机器可读契约**：[`openapi.yaml`](openapi.yaml)。它由本文导出，供 Swagger UI、Postman 或前端适配层导入；两者冲突时以本文为准。运行时通过 `/openapi.yaml` 提供该文件，Swagger UI 页面在 `/docs`。
 
 ## 2 契约原则
 
@@ -99,7 +99,7 @@ updated: 2026-10-25
 
 ## 4 端点总表
 
-29 个 B1 业务端点；`/healthz` 单独列在 §4.2。
+29 个 B1 业务端点；`/healthz` 单独列在 §4.2；开发者文档端点见 §4.3，不计入业务端点。
 
 ### 4.1 业务端点
 
@@ -140,6 +140,22 @@ updated: 2026-10-25
 | ID | 方法 | 路径 | 用途 | 成功 | 失败 |
 |---|---|---|---|---|---|
 | `API-H` | GET | `/healthz` | 进程与数据库健康 | 200 `{status:"ok",database:"up"}` | 503 `{status:"degraded",database:"down"}` |
+
+### 4.3 开发者文档端点（非业务 API）
+
+| 方法 | 路径 | 用途 | 成功 |
+|---|---|---|---|
+| GET | `/docs`、`/docs/` | Swagger UI 页面 | 200 `text/html` |
+| GET | `/docs/swagger-ui.css` | Swagger UI 样式 | 200 `text/css` |
+| GET | `/docs/swagger-ui-bundle.js` | Swagger UI 主包 | 200 JavaScript |
+| GET | `/docs/swagger-ui-standalone-preset.js` | Swagger UI standalone preset | 200 JavaScript |
+| GET | `/docs/favicon-32x32.png` | 页面图标 | 200 `image/png` |
+| GET | `/openapi.yaml` | 机器可读契约 | 200 `application/yaml` |
+
+- 这些端点不属于业务 API，不进入 `/api/v1` 版本，也不写入 `openapi.yaml` 的 `paths`。
+- 无鉴权、无 CORS；与业务 API 一样只应监听本机或受控网络。
+- Swagger UI 只引用本地 `/docs/*` 资源，不依赖 CDN；`Try it out` 使用当前文档所在 host/port（`servers: /`）。
+- 静态资源只从固定白名单读取，未知 `/docs/*` 返回 404，不拼接用户输入到文件路径。
 
 ## 5 资源 DTO
 
@@ -426,15 +442,16 @@ B1 不提供的页面动作：Harness 连接测试/心跳刷新、工具调试/�
 
 ## 8 依赖与边界
 
-- 允许：`catalog` 读契约；四类资产写服务；`platform` 的 `Health`；`kernel` 的错误、分页、ID/时钟类型。
-- 禁止：导入任何 store；执行 SQL；在路由层实现名称唯一、引用保护、版本递增等业务规则；直接序列化领域实体。
+- 允许：`catalog` 读契约；四类资产写服务；`platform` 的 `Health`；`kernel` 的错误、分页、ID/时钟类型；文档子模块的 Bun 文件读取与本地静态资源。
+- 禁止：导入任何 store；执行 SQL；在路由层实现名称唯一、引用保护、版本递增等业务规则；直接序列化领域实体；文档子模块接触数据库或领域服务。
 - 校验分工：HTTP 校验 JSON 形状、必填、类型、简单范围、未知字段；领域校验唯一性、引用、状态与事务不变量。
 - 错误映射：领域错误 → HTTP `code`/状态码；未知异常 → 500，不泄漏 SQL/堆栈。
 
 ## 9 预算与运行
 
-- 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 21 KB，OpenAPI 派生文档约 55 KB（不计入组件预算）。
+- 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 21 KB，OpenAPI 派生文档约 55 KB（不计入组件预算）；Swagger UI 静态资源约 2.14 MB，单独 vendor，也不计入。
 - 单独验证命令：`bun test tests/components/http-gateway`。
+- 文档入口：启动后访问 `/docs`；机器可读契约：`/openapi.yaml`。
 - 当前状态：`current`；已实现并通过契约测试，验证入口见 [`result.md`](../../../works/2026-10-24-db-backend-infra/result.md)。
 
 ## 10 B1 实现口径与剩余问题
@@ -443,3 +460,4 @@ B1 不提供的页面动作：Harness 连接测试/心跳刷新、工具调试/�
 - `API-28` / `API-29` 保持分开，避免一次保存两类装配关系时互相覆盖。
 - 错误体不新增顶层 `fieldErrors`，字段级错误仍放在 `details`：单字段为 `details.field` / `details.reason`，多字段为 `details.fieldErrors` 数组。
 - 本仓库不配置 CORS；外部浏览器若跨源调用，由部署层同源代理或调用方处理，不在本仓库范围。
+- Swagger UI 是开发者文档，不是产品 UI；`/docs` 与 `/openapi.yaml` 不改变“只提供 HTTP API、无 CLI/库/产品 UI”的边界。

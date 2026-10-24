@@ -1,7 +1,7 @@
 ---
 layer: works
 module: global
-status: active
+status: closed
 updated: 2026-10-25
 ---
 

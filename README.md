@@ -2,7 +2,7 @@
 
 AgentFlow 研发智能体工作流编排服务的编排侧工程：目标是把「工作流定义 → 专家 / Skill / 工具装配 → 运行实例 → 效能数据」这条链路落成可运行、可验证的服务。
 
-- 对外形态：只提供 HTTP API（`/api/v1` + `/healthz`），不提供 CLI、SDK/库或 UI。
+- 对外形态：只提供 HTTP API（`/api/v1` + `/healthz`），不提供 CLI、SDK/库或产品 UI；Swagger UI 仅作为开发者文档。
 - UI 是独立项目（不在本仓库内）：[`../agent-flow-ui`](../agent-flow-ui)；跨项目只按 REST 契约交互，本仓库不包含、不启动、不修改 UI。
 - 文档树：[`docs/`](docs/README.md)（五态分离，导航与阅读顺序见该页）
 - 协作与门禁：[`AGENTS.md`](AGENTS.md)
@@ -15,6 +15,7 @@ AgentFlow 研发智能体工作流编排服务的编排侧工程：目标是把�
 - Bun 1.4.4 + PostgreSQL 18.4；模块化单体，8 个组件。
 - 16 张业务表；4 个只向前迁移。
 - 29 个 B1 业务端点 + `/healthz`，契约见 [`http-gateway/spec.md`](docs/design/components/http-gateway/spec.md) 与 [`openapi.yaml`](docs/design/components/http-gateway/openapi.yaml)。
+- 开发者 API 文档：`/docs`（Swagger UI）与 `/openapi.yaml`，Swagger UI 资源已 vendor 到仓库，可离线使用。
 - 演示种子：5 Harness / 10 工具 / 12 Skill / 8 专家，Skill 与工具装配边各 23 条。
 - 实现结果与验证记录：[`result.md`](docs/works/2026-10-24-db-backend-infra/result.md)。
 
@@ -44,10 +45,19 @@ bun run dev
 curl http://127.0.0.1:3000/healthz
 ```
 
+## API 文档
+
+启动服务后打开：
+
+- Swagger UI：`http://127.0.0.1:<port>/docs`（默认 3000，端口被占用时随 `PORT` 变化）
+- OpenAPI 文件：`http://127.0.0.1:<port>/openapi.yaml`
+
+这是开发者 API 文档，不是产品 UI；不改变本仓库只提供 HTTP API 的边界。`Try it out` 会真实调用本地 API，更新/删除/装配操作会修改数据库数据。
+
 验证：
 
 ```bash
-bun test --max-concurrency=1   # 86 个测试
+bun test --max-concurrency=1   # 95 个测试
 bun run typecheck              # tsc --noEmit
 ```
 

@@ -1,0 +1,10 @@
+swagger-ui-dist 5.34.0
+source: https://unpkg.com/swagger-ui-dist@5.34.0/
+vendored: 2026-10-25
+license: Apache-2.0
+
+files:
+c3cfe8248c4b0b89673600fb829924eafbac6de4bc4b2b06f5f5243483074d0a  swagger-ui.css
+3f6abf70480db7e07914df4c98a77385f22ea585eaf457a3e6415ba0eae2d167  swagger-ui-bundle.js
+5243d492e14505e0cab87ac8b0195d0e615943e651743b2b698450a46eb470be  swagger-ui-standalone-preset.js
+3ed612f41e050ca5e7000cad6f1cbe7e7da39f65fca99c02e99e6591056e5837  favicon-32x32.png

@@ -4,7 +4,7 @@
 
 ## 项目定位
 
-AgentFlow 研发智能体工作流编排服务的编排侧：只提供 HTTP API（`/api/v1` + `/healthz`），不提供 CLI、SDK/库或 UI。UI 是独立项目 [`../agent-flow-ui`](../agent-flow-ui)，不在本仓库内；本仓库不包含、不启动、不修改 UI，也不以 UI 作为需求来源或验收前置。跨项目只按 REST 契约交互。
+AgentFlow 研发智能体工作流编排服务的编排侧：只提供 HTTP API（`/api/v1` + `/healthz`），不提供 CLI、SDK/库或产品 UI；Swagger UI 仅作为开发者文档，不是产品界面。UI 是独立项目 [`../agent-flow-ui`](../agent-flow-ui)，不在本仓库内；本仓库不包含、不启动、不修改 UI，也不以 UI 作为需求来源或验收前置。跨项目只按 REST 契约交互。
 
 ## 语言
 

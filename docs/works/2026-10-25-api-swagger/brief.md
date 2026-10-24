@@ -1,7 +1,7 @@
 ---
 layer: works
 module: global
-status: active
+status: closed
 updated: 2026-10-25
 ---
 
@@ -46,11 +46,11 @@ updated: 2026-10-25
 
 **P2**：新增外部文档端点、第三方静态资源和跨文件改动；不触碰组件切分、业务契约、核心 schema、数据所有权或热路径，因此不升 P1。
 
-- 实现前：用户确认本分析与实施计划（本文即确认材料）。
+- 2026-10-25 用户确认执行；实现与验证见 [`result.md`](result.md)。
 - 合并前：自动化测试 + `typecheck` + 本机 `/docs` 冒烟通过；用户最终确认。
 - 若实现中发现需要新增组件、运行时依赖、鉴权或改变业务契约，停止并按更高一级重新确认。
 
-## 建议方案（待确认）
+## 已确认方案（2026-10-25）
 
 1. **不新增组件**：在 `CMP-http-gateway` 内增加 `docs.ts` 子模块，由 `createHttpApp` 在业务路由前委托；文档与 API 共用唯一 HTTP 入口。
 2. **静态资源 vendor**：把 Swagger UI 5.34.0 的 `swagger-ui.css`、`swagger-ui-bundle.js`、`swagger-ui-standalone-preset.js`、`favicon-32x32.png` 及许可证放入 `src/components/http-gateway/docs-assets/`，不引入 `swagger-ui-dist` 及其 `@scarf/scarf` 安装统计。
@@ -65,11 +65,11 @@ updated: 2026-10-25
 | ID | 类型 | 组件 | 状态 | 装载清单 | 产出 |
 |---|---|---|---|---|---|
 | `T-DOC-01` | design | `global` | completed | `http-gateway/spec.md`、`openapi.yaml`、`src/main.ts`、`app.ts` | [`analysis.md`](analysis.md)、[`implementation-plan.md`](implementation-plan.md) |
-| `T-DOC-02` | change | `http-gateway` | pending | `implementation-plan` §3–§5 | `docs.ts`、路由委托、`index.ts` 导出、`main.ts` 注入 |
-| `T-DOC-03` | change | `http-gateway` | pending | `implementation-plan` §6–§7 | vendor 静态资源、OpenAPI `servers`、`spec.md` 与 README |
-| `T-DOC-04` | verify | `global` | pending | `implementation-plan` §8–§9 | 文档/静态资源/OpenAPI 测试、`result.md` |
+| `T-DOC-02` | change | `http-gateway` | completed | `implementation-plan` §3–§5 | `docs.ts`、路由委托、`index.ts` 导出、`main.ts` 注入 |
+| `T-DOC-03` | change | `http-gateway` | completed | `implementation-plan` §6–§7 | vendor 静态资源、OpenAPI `servers`、`spec.md` 与 README |
+| `T-DOC-04` | verify | `global` | completed | `implementation-plan` §8–§9 | 文档/静态资源/OpenAPI 测试、`result.md` |
 
-追溯：本工序是无 `REQ`/`SCN` 的技术补充，按旁路处理；`brief.md` + `implementation-plan.md` 为锚点，commit 绑定 `T-DOC-*`。
+追溯：本工序是无 `REQ`/`SCN` 的技术补充，按旁路处理；`brief.md` + `implementation-plan.md` 为锚点，commit 绑定 `T-DOC-*`。结果见 [`result.md`](result.md)。
 
 ## 验收标准
 

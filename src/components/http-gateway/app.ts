@@ -22,6 +22,7 @@ import type {
   ExpertService,
   UpdateExpert,
 } from "../expert/index.ts";
+import type { ApiDocs } from "./docs.ts";
 import {
   actorFrom,
   assertAllowedFields,
@@ -44,6 +45,7 @@ export type HttpDeps = {
   expertService: ExpertService;
   health: Health;
   actor: string;
+  docs?: ApiDocs;
 };
 
 type JsonValue = Record<string, unknown> | unknown[];
@@ -271,10 +273,16 @@ export function createHttpApp(deps: HttpDeps): (request: Request) => Promise<Res
     expertService,
     health,
     actor,
+    docs,
   } = deps;
 
   async function route(request: Request, url: URL): Promise<Response> {
     const path = url.pathname;
+
+    if (docs !== undefined) {
+      const docsResponse = await docs.handle(request, url);
+      if (docsResponse !== null) return docsResponse;
+    }
 
     if (path === "/healthz") {
       if (request.method !== "GET") throw new NotFoundError("路径", path);
