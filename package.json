@@ -1,0 +1,21 @@
+{
+  "name": "agent-flow-orchaster",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/main.ts",
+    "start": "bun run src/main.ts",
+    "test": "bun test --max-concurrency=1",
+    "typecheck": "tsc --noEmit",
+    "db:start": "bash scripts/pg.sh start",
+    "db:stop": "bash scripts/pg.sh stop",
+    "db:status": "bash scripts/pg.sh status",
+    "db:init": "bun run scripts/db-init.ts",
+    "db:migrate": "bun run scripts/db-migrate.ts",
+    "db:seed": "bun run scripts/seed.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.4",
+    "typescript": "^7.0.2"
+  }
+}
