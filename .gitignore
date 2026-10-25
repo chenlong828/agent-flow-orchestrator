@@ -24,3 +24,6 @@ pnpm-debug.log*
 .idea/
 .vscode/
 *.swp
+
+# 本机配置：只保留示例文件
+config/local.toml

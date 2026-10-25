@@ -92,6 +92,20 @@ describe("组件依赖与数据所有权", () => {
     expect(writes).toEqual([]);
   });
 
+  test("config 只被组合根引用，组件不直接依赖启动配置", () => {
+    const violations: string[] = [];
+    const mainEntry = join(SRC, "main.ts");
+    for (const file of sourceFiles(SRC)) {
+      if (file === mainEntry) continue;
+      for (const specifier of importsOf(file)) {
+        if (specifier.includes("core/config")) {
+          violations.push(`${relative(SRC, file)} -> ${specifier}`);
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
   test("Bun.sql 仅由 platform/db 持有，其他代码使用 Db 契约", () => {
     const violations: string[] = [];
     for (const file of sourceFiles(SRC)) {

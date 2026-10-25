@@ -14,6 +14,7 @@ docs/
 │   ├── architecture.md
 │   └── components/
 │       ├── kernel/spec.md
+│       ├── config/spec.md
 │       ├── platform/spec.md
 │       ├── harness/spec.md
 │       ├── tool/spec.md
@@ -59,7 +60,7 @@ docs/
 3. [`plan/roadmap.md`](plan/roadmap.md) —— 里程碑、工序与依赖
 4. [`plan/open-questions.md`](plan/open-questions.md) —— 开放问题登记；当前无开放问题，历史条目已关闭归档
 5. [`design/architecture.md`](design/architecture.md) —— 现行组件边界、依赖与数据所有权
-6. [`design/components/kernel/spec.md`](design/components/kernel/spec.md) —— 共享错误、分页与端口契约
+6. [`design/components/kernel/spec.md`](design/components/kernel/spec.md) 与 [`config/spec.md`](design/components/config/spec.md) —— 共享错误/分页/端口，以及 TOML 启动配置
 7. [`design/components/http-gateway/spec.md`](design/components/http-gateway/spec.md) 与 [`openapi.yaml`](design/components/http-gateway/openapi.yaml) —— 对外 REST 契约；Swagger UI 在 `/docs`；UI 为独立项目，若接入按此消费
 8. [`works/2026-10-24-db-backend-infra/result.md`](works/2026-10-24-db-backend-infra/result.md) —— B1 实现结果、验证命令与偏差
 9. [`works/2026-10-25-api-swagger/result.md`](works/2026-10-25-api-swagger/result.md) —— Swagger UI、OpenAPI 端点与验证结果

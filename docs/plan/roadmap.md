@@ -29,4 +29,5 @@ updated: 2026-10-25
 
 - `2026-10-24-db-backend-infra`：B1 资产注册中心（Harness/工具/Skill/专家）已完成。29 个业务端点 + `/healthz`、16 张表迁移、种子与测试已交付；用户直接要求实现，`T-B1-D05` 门据此通过。结论见 [`result.md`](../works/2026-10-24-db-backend-infra/result.md)，契约见 [`http-gateway/spec.md`](../design/components/http-gateway/spec.md) 与 [`openapi.yaml`](../design/components/http-gateway/openapi.yaml)。
 - `2026-10-25-api-swagger`：在 B1 上补 `GET /docs` Swagger UI 与 `GET /openapi.yaml`，静态资源 vendor，不改业务端点与数据库。结论见 [`result.md`](../works/2026-10-25-api-swagger/result.md)。
+- `2026-10-25-core-config`：把配置从 `CMP-platform` 拆到 `CMP-config`，支持 `default.toml` / `local.toml` / `process.env` 合并与校验；组件数 8 → 9，默认端口仍为 3000。结论见 [`result.md`](../works/2026-10-25-core-config/result.md)。
 - 后续不预置 M2/M4 的答案；实际运行需求出现时再启动对应工序。B1 只覆盖控制面资产注册，不包含工作流与运行实例。早期开放问题已关闭，见 [`open-questions.md`](open-questions.md)。

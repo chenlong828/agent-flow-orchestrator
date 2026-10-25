@@ -1,5 +1,6 @@
 import { join } from "node:path";
-import { createDb, createMigrator, ensureDatabase, loadConfig } from "../src/core/platform/index.ts";
+import { createDb, createMigrator, ensureDatabase } from "../src/core/platform/index.ts";
+import { loadConfig } from "../src/core/config/index.ts";
 import type { Db } from "../src/core/platform/index.ts";
 
 type LegacyHarness = {
@@ -391,7 +392,7 @@ export async function seedAll(db: Db): Promise<SeedResult> {
 }
 
 if (import.meta.main) {
-  const config = loadConfig();
+  const config = await loadConfig();
   await ensureDatabase(config.databaseUrl);
   const db = createDb(config.databaseUrl);
   try {

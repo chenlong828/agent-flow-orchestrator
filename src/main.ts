@@ -4,10 +4,10 @@ import {
   createHealth,
   createMigrator,
   ensureDatabase,
-  loadConfig,
   systemClock,
   uuidv7Ids,
 } from "./core/platform/index.ts";
+import { loadConfig } from "./core/config/index.ts";
 import {
   createHarnessRead,
   createHarnessService,
@@ -21,7 +21,7 @@ import {
 import { createCatalog } from "./components/catalog/index.ts";
 import { createApiDocs, createHttpApp } from "./components/http-gateway/index.ts";
 
-const config = loadConfig();
+const config = await loadConfig();
 
 await ensureDatabase(config.databaseUrl);
 const db = createDb(config.databaseUrl);

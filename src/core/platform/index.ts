@@ -1,5 +1,3 @@
-export type { Config, LogLevel } from "./config.ts";
-export { loadConfig } from "./config.ts";
 export type { Db, DbHandle } from "./db.ts";
 export {
   createDb,

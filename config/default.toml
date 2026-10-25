@@ -1,0 +1,12 @@
+# 默认启动配置。优先级：本文件 < config/local.toml < process.env。
+# 数据库连接串属于密钥，只从 DATABASE_URL / .env 读取，不写在 TOML。
+
+[server]
+host = "127.0.0.1"
+port = 3000
+
+[app]
+actor = "local"
+
+[log]
+level = "info"

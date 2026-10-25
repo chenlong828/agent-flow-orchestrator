@@ -12,7 +12,7 @@ updated: 2026-10-25
 
 ## 1 结论
 
-1. 一个 Bun 进程、一个 PostgreSQL 数据库、8 个组件：共享契约、运行时平台、四类资产、只读目录、HTTP 网关。
+1. 一个 Bun 进程、一个 PostgreSQL 数据库、9 个组件：共享契约、启动配置、运行时平台、四类资产、只读目录、HTTP 网关。
 2. 外部契约只有 **REST API `/api/v1`**；本仓库不提供 CLI、库或产品 UI。UI 是独立项目，若接入只按契约调用；双方互不进入对方项目改代码。Swagger UI 仅作为开发者文档，不是产品界面。
 3. 内部契约按同一原则逐层收窄：函数/类 → 组件 → 模块 → 进程/项目；每层只通过公开契约交互，不越过边界读写对方内部。
 4. 每个组件只有一个主目标；数据只有一个写入口；读模型通过公开读契约组合。
@@ -42,14 +42,15 @@ updated: 2026-10-25
 - `http-gateway` 只做协议翻译与错误映射，不承载业务规则；业务规则在领域组件。
 - 数据只有一个写入口；其他组件只能读，不得写别人的表。
 - 每个组件规格页只写自己的公共契约、数据所有权、依赖与验证；不写另一个组件的内部实现，不复制另一份契约。组件规格页之间只通过 `component` ID 和契约名引用。
-- `kernel` 只定义共享契约词汇与端口，`platform` 只提供运行时基础设施；两者不合并成一个“core 组件”，避免一个组件同时承担两类变化轴。
+- `kernel` 只定义共享契约词汇与端口，`config` 只负责启动配置合并/校验，`platform` 只提供运行时基础设施；三者不合并成一个“core 组件”，避免一个组件同时承担多类变化轴。
 
 ## 3 组件地图
 
 | 组件 | 一句话主目标 | 拥有的数据 | 依赖 |
 |---|---|---|---|
 | `CMP-kernel` | 定义共享错误、分页、引用检查端口、时钟与 ID 端口 | 无 | 无 |
-| `CMP-platform` | 提供配置、数据库连接/事务、迁移、ID/时钟实现、健康检查与测试库 | `schema_migrations` | `kernel`、Bun、PostgreSQL |
+| `CMP-config` | 合并 TOML 与进程环境，校验并产出启动 `Config` | 无 | Bun TOML、文件系统 |
+| `CMP-platform` | 提供数据库连接/事务、迁移、ID/时钟实现、健康检查与测试库 | `schema_migrations` | `kernel`、Bun、PostgreSQL |
 | `CMP-harness` | 维护 Harness 聚合的生命周期、标签与不变量 | `harness`、`harness_tag` | `platform`、`kernel` |
 | `CMP-tool` | 维护工具聚合、参数与 Harness 归属 | `tool`、`tool_param` | `platform`、`kernel` |
 | `CMP-skill` | 维护 Skill 聚合、分类引用、五章、触发、踩坑与引用 | `skill_category`（只读种子）、`skill` 及其子表 | `platform`、`kernel` |
@@ -57,11 +58,15 @@ updated: 2026-10-25
 | `CMP-catalog` | 组合跨资产的列表/详情/引用只读投影，并实现 `ReferenceGuard` | 无 | 四类资产的公开读契约、`kernel` |
 | `CMP-http-gateway` | 把 HTTP 请求翻译为用例调用、映射 DTO/错误，并托管开发者 API 文档 | 无 | `catalog`、四类资产写服务、`platform`（健康检查）、`kernel`、Bun 文件 API |
 
-组件 ID 与目录：`CMP-*` 对应 `docs/design/components/<short-name>/spec.md`；任务表可用去掉 `CMP-` 的简称。`kernel` 与 `platform` 是两个独立组件；物理目录可用 `src/core/{kernel,platform}` 收口，但 `core` 只是容器，不是组件。
+组件 ID 与目录：`CMP-*` 对应 `docs/design/components/<short-name>/spec.md`；任务表可用去掉 `CMP-` 的简称。`kernel`、`config`、`platform` 是三个独立组件；物理目录可用 `src/core/{kernel,config,platform}` 收口，但 `core` 只是容器，不是组件。
 
 ## 4 依赖规则
 
 ```
+main / scripts
+  ├── config                    （启动 Config）
+  └── platform                  （Db、迁移、健康检查）
+
 http-gateway
   ├── catalog                   （读）
   ├── harness / tool / skill / expert（写）
@@ -81,20 +86,24 @@ platform
 
 kernel
   └── 无外部依赖
+
+config
+  └── 无外部依赖（Bun TOML/文件 API）
 ```
 
-- 依赖方向只能向下：`http-gateway` → `catalog`/领域写服务/`platform`（健康检查）/`kernel`；`catalog` → 领域读契约/`kernel`；领域 → `platform`/`kernel`；`platform` → `kernel`；`kernel` → 无。
+- 依赖方向只能向下：`http-gateway` → `catalog`/领域写服务/`platform`（健康检查）/`kernel`；`catalog` → 领域读契约/`kernel`；领域 → `platform`/`kernel`；`platform` → `kernel`；`main`/脚本 → `config`/`platform`；`config`/`kernel` → 无外部依赖。
 - 禁止：领域组件互相导入写服务或 store；`http-gateway` 直接导入 store；`catalog` 直接写表；循环依赖；同层横向写调用。
 - `ReferenceGuard` 端口定义在 `kernel`，`catalog` 实现；领域删除服务只依赖端口，不依赖 `catalog` 类型。组合根负责注入。
 - `catalog` 不拥有表，不执行写操作；只通过领域公开读契约读数据。
 - `http-gateway` 不执行 SQL，不实现业务规则；只校验传输层形状、调用契约、映射错误；文档子模块只读本地静态资源，不新增依赖边。
-- `main.ts` 只做组合根：加载 `kernel` 类型、创建 `platform`/领域/`catalog`/`http-gateway`，注入 `ReferenceGuard`；不承载业务规则，不计为组件。
+- `main.ts` 只做组合根：调用 `config` 取 `Config`、创建 `platform`/领域/`catalog`/`http-gateway`，注入 `ReferenceGuard`；不承载业务规则，不计为组件。
 
 ## 5 数据所有权
 
 | 组件 | 表 | 写入口 |
 |---|---|---|
 | `CMP-kernel` | 无 | 无，只定义类型与端口 |
+| `CMP-config` | 无 | 无，只持有启动配置 |
 | `CMP-platform` | `schema_migrations` | 迁移执行器 |
 | `CMP-harness` | `harness`、`harness_tag` | Harness 服务 |
 | `CMP-tool` | `tool`、`tool_param` | 工具服务 |
@@ -135,7 +144,7 @@ kernel
 
 ## 9 验证
 
-- **架构测试**：无跨组件 store 导入；无领域组件互调；`Bun.sql` 只在 `platform/db` 与 store；无循环依赖；`http-gateway` 不碰 store；`catalog` 无写操作；`kernel` 不导入运行时组件。
+- **架构测试**：无跨组件 store 导入；无领域组件互调；`Bun.sql` 只在 `platform/db` 与 store；无循环依赖；`http-gateway` 不碰 store；`catalog` 无写操作；`kernel` 不导入运行时组件；`config` 只被入口/脚本/测试引用。
 - **组件测试**：每个组件能只加载自身源码 + 规格 + 测试运行验证命令。
 - **契约测试**：HTTP 端点按 `http-gateway/spec.md` 的 3 正 1 反验证；错误码、字段、分页、`If-Match`、引用列表；文档端点验证 HTML、静态资源与 OpenAPI 结构。
 - **项目边界检查**：仓库内不出现 `agent-flow-ui` 的源码导入；不出现跨项目相对路径依赖；外部 UI 只通过 HTTP 契约交互。
@@ -147,3 +156,4 @@ kernel
 - `ReferenceGuard` 已按端口方案实现：端口在 `kernel`，由 `catalog` 实现，领域删除服务经组合根注入；未新增 L2 删除组件。
 - REST API 已按 [`http-gateway/spec.md`](components/http-gateway/spec.md) 实现；Swagger 文档已挂到 `/docs` 与 `/openapi.yaml`，结果见 [`api-swagger/result.md`](../works/2026-10-25-api-swagger/result.md)。UI 是独立项目，是否接入由该项目决定，契约反馈只改本仓库契约。
 - 组件状态均为 `current`；实现与验证结果见 [`result.md`](../works/2026-10-24-db-backend-infra/result.md)。
+- `CMP-config` 已从 `CMP-platform` 拆出；TOML + `process.env` 启动配置结果见 [`core-config/result.md`](../works/2026-10-25-core-config/result.md)。

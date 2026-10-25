@@ -3,10 +3,10 @@ import {
   createDb,
   createMigrator,
   ensureDatabase,
-  loadConfig,
 } from "../src/core/platform/index.ts";
+import { loadConfig } from "../src/core/config/index.ts";
 
-const config = loadConfig();
+const config = await loadConfig();
 await ensureDatabase(config.databaseUrl);
 const db = createDb(config.databaseUrl);
 try {

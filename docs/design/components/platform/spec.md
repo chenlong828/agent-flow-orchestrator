@@ -10,9 +10,9 @@ updated: 2026-10-25
 
 ## 1 主目标
 
-提供 B1 运行时基础设施：配置、数据库连接与事务、迁移执行、ID/时钟、日志与健康检查；不承载业务规则。
+提供 B1 运行时基础设施：数据库连接与事务、迁移执行、ID/时钟实现、健康检查与测试库；不承载业务规则。
 
-**不负责**：Harness/工具/Skill/专家的业务不变量、HTTP 路由、读模型拼装。
+**不负责**：Harness/工具/Skill/专家的业务不变量、HTTP 路由、读模型拼装、启动配置加载（由 `CMP-config` 负责）。
 
 ## 2 拥有的数据
 
@@ -22,14 +22,6 @@ updated: 2026-10-25
 ## 3 公共契约
 
 ```ts
-type Config = {
-  host: string;                 // 默认 127.0.0.1
-  port: number;                 // 默认 3000
-  databaseUrl: string;
-  actor: string;                // DEV_ACTOR / X-Actor 默认
-  logLevel: "debug" | "info" | "warn" | "error";
-};
-
 type Db = {
   query<T>(sql: string, params?: unknown[]): Promise<T[]>;
   one<T>(sql: string, params?: unknown[]): Promise<T | null>;
@@ -65,7 +57,8 @@ type Health = { check(): Promise<{ status: "ok" | "degraded"; database: "up" | "
 ## 4 依赖与边界
 
 - 允许：Bun 内置 `Bun.sql`、Bun 运行时类型、PostgreSQL、`CMP-kernel` 的共享契约类型。
-- 禁止：导入任何领域组件的 store/service；实现业务规则；直接拼 HTTP 响应。
+- 禁止：导入任何领域组件的 store/service；实现业务规则；直接拼 HTTP 响应；读取配置文件或进程环境。
+- 启动配置由 `CMP-config` 产出，组合根注入数据库连接串；本组件不依赖 `CMP-config`。
 - `ReferenceGuard` 端口是共享契约，不在本组件实现；由 `catalog` 实现，组合根注入。
 
 ## 5 验证
@@ -85,4 +78,5 @@ type Health = { check(): Promise<{ status: "ok" | "degraded"; database: "up" | "
 ## 7 B1 实现口径
 
 - `Bun.sql` 的事务、动态 SQL 与错误映射已在 `T-B1-I02` 验证，实现继续使用 `Bun.sql`。
+- 配置已拆到 `CMP-config`；本组件只接收 `databaseUrl`，不再导出 `Config` / `loadConfig`。
 - 测试库按进程独立命名（`agentflow_test_<pid>`，可用 `TEST_DATABASE_URL` 覆盖），由测试基座自动创建并迁移；不单独提供销毁脚本。

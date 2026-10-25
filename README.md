@@ -12,7 +12,7 @@ AgentFlow 研发智能体工作流编排服务的编排侧工程：目标是把�
 
 控制面首批 **B1 资产注册中心**（Harness、工具、Skill、专家）已实现并通过验证：
 
-- Bun 1.4.4 + PostgreSQL 18.4；模块化单体，8 个组件。
+- Bun 1.4.4 + PostgreSQL 18.4；模块化单体，9 个组件（新增 `CMP-config`）。
 - 16 张业务表；4 个只向前迁移。
 - 29 个 B1 业务端点 + `/healthz`，契约见 [`http-gateway/spec.md`](docs/design/components/http-gateway/spec.md) 与 [`openapi.yaml`](docs/design/components/http-gateway/openapi.yaml)。
 - 开发者 API 文档：`/docs`（Swagger UI）与 `/openapi.yaml`，Swagger UI 资源已 vendor 到仓库，可离线使用。
@@ -41,15 +41,25 @@ bun run db:seed
 
 ```bash
 bun run dev
-# 端口被占用时可指定：PORT=3100 bun run dev
 curl http://127.0.0.1:3000/healthz
 ```
+
+本机端口被占用时，复制示例配置并修改端口：
+
+```bash
+cp config/local.example.toml config/local.toml
+# 示例已写入 [server] port = 3100
+bun run dev
+curl http://127.0.0.1:3100/healthz
+```
+
+`config/local.toml` 已被 gitignore；也可以临时用 `PORT=3100 bun run dev` 覆盖。
 
 ## API 文档
 
 启动服务后打开：
 
-- Swagger UI：`http://127.0.0.1:<port>/docs`（默认 3000，端口被占用时随 `PORT` 变化）
+- Swagger UI：`http://127.0.0.1:<port>/docs`（默认 3000；由 `config/local.toml` 或 `PORT` 决定）
 - OpenAPI 文件：`http://127.0.0.1:<port>/openapi.yaml`
 
 这是开发者 API 文档，不是产品 UI；不改变本仓库只提供 HTTP API 的边界。`Try it out` 会真实调用本地 API，更新/删除/装配操作会修改数据库数据。
@@ -57,11 +67,11 @@ curl http://127.0.0.1:3000/healthz
 验证：
 
 ```bash
-bun test --max-concurrency=1   # 95 个测试
+bun test --max-concurrency=1   # 102 个测试
 bun run typecheck              # tsc --noEmit
 ```
 
-数据库连接默认 `postgres://postgres@127.0.0.1:54329/agentflow`；可用 `DATABASE_URL` 覆盖。`HOST`、`PORT`、`DEV_ACTOR`、`LOG_LEVEL` 见 [`platform/spec.md`](docs/design/components/platform/spec.md)。服务无登录/鉴权，只监听本机。
+配置优先级：代码默认值 < `config/default.toml` < `config/local.toml` < `process.env`（Bun 会自动把 `.env` 加载到 `process.env`）。`DATABASE_URL` 只从 `.env`/环境读取，不写入 TOML。`HOST`、`PORT`、`DEV_ACTOR`、`LOG_LEVEL` 与 `CONFIG_FILE` 见 [`config/spec.md`](docs/design/components/config/spec.md)。数据库连接默认 `postgres://postgres@127.0.0.1:54329/agentflow`。服务无登录/鉴权，只监听本机。
 
 ## 目录
 
@@ -71,11 +81,13 @@ bun run typecheck              # tsc --noEmit
 ├── .agents/skills/           ← 五个开发流程技能（项目级安装）
 ├── package.json              ← 运行、测试、迁移、种子脚本
 ├── tsconfig.json
+├── config/                   ← default.toml、local.example.toml；local.toml 不入库
 ├── db/migrations/            ← 0001～0004 只向前迁移
 ├── src/
 │   ├── main.ts               ← 组合根与 Bun.serve
 │   ├── core/kernel/          ← 错误、分页、ReferenceGuard、时钟/ID 端口
-│   ├── core/platform/        ← 配置、DB/事务、迁移、健康检查
+│   ├── core/config/          ← TOML + 环境变量合并与校验
+│   ├── core/platform/        ← DB/事务、迁移、健康检查
 │   └── components/           ← harness / tool / skill / expert / catalog / http-gateway
 ├── scripts/                  ← PostgreSQL 启停、迁移、种子
 ├── tests/                    ← 组件、HTTP 契约、旅程、架构、种子测试

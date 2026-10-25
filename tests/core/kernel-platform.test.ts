@@ -7,7 +7,6 @@ import {
 } from "../../src/core/kernel/index.ts";
 import {
   createHealth,
-  loadConfig,
   type Db,
 } from "../../src/core/platform/index.ts";
 
@@ -31,38 +30,6 @@ describe("分页规范化", () => {
       expect(error).toBeInstanceOf(ValidationError);
       expect((error as ValidationError).details?.field).toBe("limit");
     }
-  });
-});
-
-describe("进程配置", () => {
-  test("默认值", () => {
-    expect(loadConfig({})).toEqual({
-      host: "127.0.0.1",
-      port: 3000,
-      databaseUrl: "postgres://postgres@127.0.0.1:54329/agentflow",
-      actor: "local",
-      logLevel: "info",
-    });
-  });
-
-  test("环境覆盖与非法 PORT / LOG_LEVEL", () => {
-    expect(
-      loadConfig({
-        HOST: "0.0.0.0",
-        PORT: "3100",
-        DATABASE_URL: "postgres://u@db:5432/x",
-        DEV_ACTOR: "alice",
-        LOG_LEVEL: "debug",
-      }),
-    ).toEqual({
-      host: "0.0.0.0",
-      port: 3100,
-      databaseUrl: "postgres://u@db:5432/x",
-      actor: "alice",
-      logLevel: "debug",
-    });
-    expect(() => loadConfig({ PORT: "70000" })).toThrow("PORT 不合法");
-    expect(() => loadConfig({ LOG_LEVEL: "verbose" })).toThrow("LOG_LEVEL 不合法");
   });
 });
 
