@@ -99,7 +99,7 @@ describe("专家 HTTP 契约", () => {
     ]);
   });
 
-  test("POST 可带有序装配，创建与装配一次返回", async () => {
+  test("TC-EXP-001 POST 可带有序装配，创建与装配一次返回", async () => {
     const response = await call(ctx.app, "POST", "/api/v1/experts", {
       body: {
         ...expertBody("带装配专家"),
@@ -115,7 +115,7 @@ describe("专家 HTTP 契约", () => {
     expect(response.body.toolCount).toBe(2);
   });
 
-  test("POST 装配目标不存在返回 400，专家根回滚", async () => {
+  test("TC-EXP-004 POST 装配目标不存在返回 400，专家根回滚", async () => {
     const response = await call(ctx.app, "POST", "/api/v1/experts", {
       body: {
         ...expertBody("坏装配专家"),
@@ -144,7 +144,7 @@ describe("专家 HTTP 契约", () => {
     expect(list.body.items[0].skills).toEqual([]);
   });
 
-  test("GET 列表返回前 3 个 Skill 预览，按装配顺序", async () => {
+  test("TC-EXP-002 GET 列表返回前 3 个 Skill 预览，按装配顺序", async () => {
     const created = await createExpert("预览专家");
     await ctx.expertService.setSkills(created.id, 1, [...skillIds].reverse());
     const list = await call(ctx.app, "GET", "/api/v1/experts?q=预览专家");
@@ -202,7 +202,7 @@ describe("专家 HTTP 契约", () => {
     expect(stale.status).toBe(409);
   });
 
-  test("PATCH 聚合更新只改提交字段并一次递增 revision；缺 If-Match 428、旧版本 409", async () => {
+  test("TC-EXP-003 PATCH 聚合更新只改提交字段并一次递增 revision；缺 If-Match 428、旧版本 409", async () => {
     const created = await createExpert();
     await ctx.expertService.setSkills(created.id, 1, [skillIds[0]!]);
 

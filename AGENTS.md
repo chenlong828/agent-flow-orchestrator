@@ -55,9 +55,9 @@ AgentFlow 研发智能体工作流编排服务的编排侧：只提供 HTTP API�
 
 ## 文档纪律
 
-- 五态分离：`docs/requirements|plan|design|works|history`，位置即状态；每份文档带 frontmatter（`layer` / `module` / `status` / `updated`）。
+- 五态分离：`docs/requirements|plan|design|works|history`，位置即状态；每份文档带 frontmatter（`layer` / `module` / `status` / `updated`）。项目本地另有方法层 `docs/playbook/`（`layer: playbook`，`status: draft / current / deprecated`），不属于生命周期状态；上游 `doc-layout-spec` 合并前按项目本地扩展执行。
 - 反占位：目录与文件在内容诞生时创建，不预建空目录、不预建索引行。
 - 一处一事：同一事实只有一份权威文档，其余引用不复制；排期只在 `plan/roadmap.md`。
 - 场景只引用 `REQ-` / `SCN-` / `CMP-` ID，不写文件行号。
 - 生成物（如 `design/scenarios/_index.md`）标 `generated: true`，不手改。
-- 当前没有自动校验脚本，属已知欠账；改完文档人工核对「路径 ↔ layer / status」一致。
+- `docs:check` 已覆盖场景索引再生成；完整文档树的「路径 ↔ layer / status」校验仍是欠账，改完其他文档需人工核对。
