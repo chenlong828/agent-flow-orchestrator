@@ -265,4 +265,249 @@ describe("专家 HTTP 契约", () => {
     expect(badItem.status).toBe(400);
     expect(badItem.body.error.code).toBe("validation_error");
   });
+
+  test("API-22 空库返回默认分页信封，支持 q/启停筛选与分页排序", async () => {
+    const empty = await call(ctx.app, "GET", "/api/v1/experts");
+    expect(empty.status).toBe(200);
+    expect(empty.body).toEqual({ items: [], total: 0, limit: 50, offset: 0 });
+
+    const alpha = await createExpert("alpha");
+    await createExpert("beta");
+    await createExpert("gamma");
+    await call(ctx.app, "PATCH", `/api/v1/experts/${alpha.id}/enabled`, {
+      body: { enabled: false },
+      headers: withRevision(1),
+    });
+
+    const searched = await call(ctx.app, "GET", "/api/v1/experts?q=BETA&unknown=1");
+    expect(searched.body.total).toBe(1);
+    expect(searched.body.items[0].name).toBe("beta");
+
+    const disabled = await call(ctx.app, "GET", "/api/v1/experts?enabled=false");
+    expect(disabled.body.total).toBe(1);
+    expect(disabled.body.items[0].name).toBe("alpha");
+
+    const page = await call(ctx.app, "GET", "/api/v1/experts?limit=1&offset=1&sort=name:desc");
+    expect(page.body).toMatchObject({ total: 3, limit: 1, offset: 1 });
+    expect(page.body.items.map((item: any) => item.name)).toEqual(["beta"]);
+  });
+
+  test("API-23 详情返回五区完整字段与空装配", async () => {
+    const created = await createExpert("detail-expert");
+    const detail = await call(ctx.app, "GET", `/api/v1/experts/${created.id}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body).toMatchObject({
+      name: "detail-expert",
+      color: "#7c3aed",
+      role: "在遗留方案基础上给出变更方案",
+      enabled: true,
+      persona: ["全局观", "谨慎"],
+      duty: "输出技术方案与任务拆分",
+      skillOrder: "先检索现状，再设计",
+      verifyOrder: "完整性对照",
+      notes: "优先复用公共能力",
+      skillCount: 0,
+      toolCount: 0,
+      refCount: 0,
+      skills: [],
+      tools: [],
+      revision: 1,
+    });
+    expect(detail.body.refs).toEqual([
+      { label: "架构设计红线的 Brief", refType: "经验", path: null },
+    ]);
+    expect(detail.body.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  test("API-24 最小创建体使用默认值，并允许创建即停用", async () => {
+    const minimal = await call(ctx.app, "POST", "/api/v1/experts", {
+      body: { name: "minimal-expert", color: "#000000", role: "最小专家" },
+    });
+    expect(minimal.status).toBe(201);
+    expect(minimal.body).toMatchObject({
+      enabled: true,
+      persona: [],
+      duty: "",
+      skillOrder: "",
+      verifyOrder: "",
+      notes: "",
+      refs: [],
+      skillCount: 0,
+      toolCount: 0,
+      refCount: 0,
+      revision: 1,
+    });
+
+    const disabled = await call(ctx.app, "POST", "/api/v1/experts", {
+      body: { ...expertBody("disabled-expert"), enabled: false },
+    });
+    expect(disabled.status).toBe(201);
+    expect(disabled.body.enabled).toBe(false);
+  });
+
+  test("API-25 更新五区不覆盖已装配的 Skill/工具", async () => {
+    const created = await createExpert("assembled-expert");
+    await ctx.expertService.setSkills(created.id, 1, skillIds);
+    await ctx.expertService.setTools(created.id, 2, toolIds);
+
+    const updated = await call(ctx.app, "PUT", `/api/v1/experts/${created.id}`, {
+      body: { ...expertBody("assembled-expert-2"), persona: [], refs: [] },
+      headers: withRevision(3),
+    });
+    expect(updated.status).toBe(200);
+    expect(updated.body).toMatchObject({
+      name: "assembled-expert-2",
+      persona: [],
+      refs: [],
+      skillCount: 2,
+      toolCount: 2,
+      revision: 4,
+    });
+    expect(updated.body.skills.map((skill: any) => skill.id)).toEqual(skillIds);
+    expect(updated.body.tools.map((tool: any) => tool.id)).toEqual(toolIds);
+  });
+
+  test("API-26 可重新启用；缺少 If-Match 428；资源不存在 404", async () => {
+    const created = await createExpert("toggle-expert");
+    const disabled = await call(ctx.app, "PATCH", `/api/v1/experts/${created.id}/enabled`, {
+      body: { enabled: false },
+      headers: withRevision(1),
+    });
+    expect(disabled.body).toMatchObject({ enabled: false, revision: 2 });
+
+    const enabled = await call(ctx.app, "PATCH", `/api/v1/experts/${created.id}/enabled`, {
+      body: { enabled: true },
+      headers: withRevision(2),
+    });
+    expect(enabled.body).toMatchObject({ enabled: true, revision: 3 });
+
+    const missingPrecondition = await call(
+      ctx.app,
+      "PATCH",
+      `/api/v1/experts/${created.id}/enabled`,
+      { body: { enabled: false } },
+    );
+    expect(missingPrecondition.status).toBe(428);
+
+    const missing = await call(
+      ctx.app,
+      "PATCH",
+      "/api/v1/experts/0191f2f0-0000-7000-8000-000000000000/enabled",
+      { body: { enabled: true }, headers: withRevision(1) },
+    );
+    expect(missing.status).toBe(404);
+    expect(missing.body.error.code).toBe("not_found");
+
+    const stale = await call(ctx.app, "PATCH", `/api/v1/experts/${created.id}/enabled`, {
+      body: { enabled: false },
+      headers: withRevision(2),
+    });
+    expect(stale.status).toBe(409);
+    expect(stale.body.error.code).toBe("revision_conflict");
+    expect(stale.body.error.details.currentRevision).toBe(3);
+  });
+
+  test("API-27 删除使用旧 revision 返回 409；删除后重复调用 404", async () => {
+    const created = await createExpert("delete-expert");
+    const stale = await call(ctx.app, "DELETE", `/api/v1/experts/${created.id}`, {
+      headers: withRevision(2),
+    });
+    expect(stale.status).toBe(409);
+    expect(stale.body.error.details.currentRevision).toBe(1);
+
+    const deleted = await call(ctx.app, "DELETE", `/api/v1/experts/${created.id}`, {
+      headers: withRevision(1),
+    });
+    expect(deleted.status).toBe(204);
+    const again = await call(ctx.app, "DELETE", `/api/v1/experts/${created.id}`, {
+      headers: withRevision(1),
+    });
+    expect(again.status).toBe(404);
+    expect(again.body.error.code).toBe("not_found");
+  });
+
+  test("API-28 装配可清空；重复 Skill 与不存在目标返回 400；缺 If-Match 428", async () => {
+    const created = await createExpert("skill-assembly");
+    const first = await call(ctx.app, "PUT", `/api/v1/experts/${created.id}/skills`, {
+      body: { items: skillIds.map((skillId) => ({ skillId })) },
+      headers: withRevision(1),
+    });
+    expect(first.body.skillCount).toBe(2);
+
+    const cleared = await call(ctx.app, "PUT", `/api/v1/experts/${created.id}/skills`, {
+      body: { items: [] },
+      headers: withRevision(2),
+    });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.skills).toEqual([]);
+    expect(cleared.body.skillCount).toBe(0);
+
+    const duplicate = await call(ctx.app, "PUT", `/api/v1/experts/${created.id}/skills`, {
+      body: { items: [{ skillId: skillIds[0] }, { skillId: skillIds[0] }] },
+      headers: withRevision(3),
+    });
+    expect(duplicate.status).toBe(400);
+    expect(duplicate.body.error.details.field).toBe("items");
+
+    const missingTarget = await call(ctx.app, "PUT", `/api/v1/experts/${created.id}/skills`, {
+      body: { items: [{ skillId: "0191f2f0-0000-7000-8000-000000000000" }] },
+      headers: withRevision(3),
+    });
+    expect(missingTarget.status).toBe(400);
+    expect(missingTarget.body.error.code).toBe("validation_error");
+
+    const missingPrecondition = await call(
+      ctx.app,
+      "PUT",
+      `/api/v1/experts/${created.id}/skills`,
+      { body: { items: [] } },
+    );
+    expect(missingPrecondition.status).toBe(428);
+  });
+
+  test("API-29 装配可清空；重复工具与不存在目标返回 400；缺 If-Match 428", async () => {
+    const created = await createExpert("tool-assembly");
+    const first = await call(ctx.app, "PUT", `/api/v1/experts/${created.id}/tools`, {
+      body: { items: toolIds.map((toolId) => ({ toolId })) },
+      headers: withRevision(1),
+    });
+    expect(first.body.toolCount).toBe(2);
+
+    const cleared = await call(ctx.app, "PUT", `/api/v1/experts/${created.id}/tools`, {
+      body: { items: [] },
+      headers: withRevision(2),
+    });
+    expect(cleared.body.tools).toEqual([]);
+    expect(cleared.body.toolCount).toBe(0);
+
+    const duplicate = await call(ctx.app, "PUT", `/api/v1/experts/${created.id}/tools`, {
+      body: { items: [{ toolId: toolIds[0] }, { toolId: toolIds[0] }] },
+      headers: withRevision(3),
+    });
+    expect(duplicate.status).toBe(400);
+    expect(duplicate.body.error.details.field).toBe("items");
+
+    const missingTarget = await call(ctx.app, "PUT", `/api/v1/experts/${created.id}/tools`, {
+      body: { items: [{ toolId: "0191f2f0-0000-7000-8000-000000000000" }] },
+      headers: withRevision(3),
+    });
+    expect(missingTarget.status).toBe(400);
+    expect(missingTarget.body.error.code).toBe("validation_error");
+
+    const missingPrecondition = await call(
+      ctx.app,
+      "PUT",
+      `/api/v1/experts/${created.id}/tools`,
+      { body: { items: [] } },
+    );
+    expect(missingPrecondition.status).toBe(428);
+
+    const stale = await call(ctx.app, "PUT", `/api/v1/experts/${created.id}/tools`, {
+      body: { items: [] },
+      headers: withRevision(1),
+    });
+    expect(stale.status).toBe(409);
+    expect(stale.body.error.code).toBe("revision_conflict");
+    expect(stale.body.error.details.currentRevision).toBe(3);
+  });
 });

@@ -108,4 +108,17 @@ describe("健康检查与 503 映射", () => {
     const wrongMethod = await call(ctx.app, "POST", "/api/v1/skill-categories");
     expect(wrongMethod.status).toBe(404);
   });
+
+  test("/healthz 成功响应稳定，且只接受 GET", async () => {
+    for (const _ of [1, 2]) {
+      const response = await call(ctx.app, "GET", "/healthz");
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ status: "ok", database: "up" });
+      expect(response.headers.get("content-type")).toBe("application/json; charset=utf-8");
+    }
+
+    const wrongMethod = await call(ctx.app, "POST", "/healthz");
+    expect(wrongMethod.status).toBe(404);
+    expect(wrongMethod.body.error.code).toBe("not_found");
+  });
 });

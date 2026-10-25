@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import {
+  NameConflictError,
   NotFoundError,
   RevisionConflictError,
   ValidationError,
@@ -121,6 +122,66 @@ describe("专家写入规则", () => {
       .catch((e) => e);
     expect(emptyRole).toBeInstanceOf(ValidationError);
     expect(emptyRole.details.field).toBe("role");
+
+    const badRefPath = await ctx.expertService
+      .create({
+        ...expertBody("e3"),
+        refs: [{ label: "参考", refType: "经验", path: 1 as never }],
+      })
+      .catch((e) => e);
+    expect(badRefPath).toBeInstanceOf(ValidationError);
+    expect(badRefPath.details.field).toBe("refs.0.path");
+
+    const badRefs = await ctx.expertService
+      .create({ ...expertBody("e4"), refs: "not-array" as never })
+      .catch((e) => e);
+    expect(badRefs).toBeInstanceOf(ValidationError);
+    expect(badRefs.details.field).toBe("refs");
+  });
+
+  test("更新拒绝改名冲突，原名称与 revision 不变", async () => {
+    const first = await ctx.expertService.create(expertBody("expert-a"));
+    await ctx.expertService.create({ ...expertBody("expert-b"), color: "#dc2626" });
+    const conflict = await ctx.expertService
+      .update(first.id, 1, { ...expertBody("expert-b"), color: "#dc2626" })
+      .catch((e) => e);
+    expect(conflict).toBeInstanceOf(NameConflictError);
+    expect(conflict.code).toBe("name_conflict");
+
+    const after = await ctx.catalog.getExpert(first.id);
+    expect(after.name).toBe("expert-a");
+    expect(after.revision).toBe(1);
+  });
+
+  test("启停拒绝非布尔值，未知资源 404，旧 revision 409", async () => {
+    const badValue = await ctx.expertService
+      .setEnabled("0191f2f0-0000-7000-8000-000000000000", 1, "false" as never)
+      .catch((e) => e);
+    expect(badValue).toBeInstanceOf(ValidationError);
+    expect(badValue.details.field).toBe("enabled");
+
+    const missing = await ctx.expertService
+      .setEnabled("0191f2f0-0000-7000-8000-000000000000", 1, false)
+      .catch((e) => e);
+    expect(missing).toBeInstanceOf(NotFoundError);
+
+    const created = await ctx.expertService.create(expertBody("toggle-expert"));
+    await ctx.expertService.setEnabled(created.id, 1, false);
+    const stale = await ctx.expertService.setEnabled(created.id, 1, true).catch((e) => e);
+    expect(stale).toBeInstanceOf(RevisionConflictError);
+    expect(stale.details.currentRevision).toBe(2);
+  });
+
+  test("删除未知资源 404，旧 revision 409", async () => {
+    const missing = await ctx.expertService
+      .delete("0191f2f0-0000-7000-8000-000000000000", 1)
+      .catch((e) => e);
+    expect(missing).toBeInstanceOf(NotFoundError);
+
+    const created = await ctx.expertService.create(expertBody("delete-stale"));
+    const stale = await ctx.expertService.delete(created.id, 2).catch((e) => e);
+    expect(stale).toBeInstanceOf(RevisionConflictError);
+    expect(stale.details.currentRevision).toBe(1);
   });
 
   test("更新整体替换人设与引用并递增 revision，旧 revision 冲突", async () => {
@@ -159,6 +220,13 @@ describe("专家写入规则", () => {
       .catch((e) => e);
     expect(duplicate).toBeInstanceOf(ValidationError);
     expect(duplicate.details.field).toBe("items");
+
+    const duplicateTool = await ctx.expertService
+      .setTools(created.id, 3, [toolIds[0]!, toolIds[0]!])
+      .catch((e) => e);
+    expect(duplicateTool).toBeInstanceOf(ValidationError);
+    expect(duplicateTool.details.field).toBe("items");
+    expect((await ctx.catalog.getExpert(created.id)).revision).toBe(3);
   });
 
   test("目标不存在整批回滚，不留下半套装配且 revision 不变", async () => {
@@ -178,7 +246,9 @@ describe("专家写入规则", () => {
       .setTools(created.id, 1, [missing])
       .catch((e) => e);
     expect(toolError).toBeInstanceOf(ToolNotFoundError);
-    expect((await ctx.catalog.getExpert(created.id)).toolCount).toBe(0);
+    const afterToolError = await ctx.catalog.getExpert(created.id);
+    expect(afterToolError.toolCount).toBe(0);
+    expect(afterToolError.revision).toBe(1);
   });
 
   test("删除专家级联装配关系，删除后不可读", async () => {
@@ -220,6 +290,23 @@ describe("专家读契约", () => {
     const all = await ctx.catalog.listExperts({ page: normalizePageQuery(), sort: "name" });
     expect(all.total).toBe(2);
     expect(all.items.map((item) => item.name)).toEqual(["方案设计专家", "评审专家"]);
+  });
+
+  test("列表支持名称检索、分页与排序", async () => {
+    await ctx.expertService.create({ ...expertBody("expert-a"), color: "#111111" });
+    await ctx.expertService.create({ ...expertBody("expert-b"), color: "#222222" });
+    await ctx.expertService.create({ ...expertBody("expert-c"), color: "#333333" });
+
+    const searched = await ctx.expertRead.list({ q: "EXPERT-A", page: normalizePageQuery() });
+    expect(searched.total).toBe(1);
+    expect(searched.items[0]?.name).toBe("expert-a");
+
+    const page = await ctx.expertRead.list({
+      page: normalizePageQuery(1, 1),
+      sort: "name",
+    });
+    expect(page.total).toBe(3);
+    expect(page.items.map((item) => item.name)).toEqual(["expert-b"]);
   });
 
   test("引用查询返回使用该 Skill/工具的专家", async () => {

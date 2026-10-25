@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import {
+  NameConflictError,
   NotFoundError,
   ReferencedError,
   RevisionConflictError,
@@ -103,6 +104,75 @@ describe("Skill 写入规则", () => {
     expect(duplicateTag.details.field).toBe("tags");
   });
 
+  test("名称与触发词唯一，引用 path 必须是字符串或空", async () => {
+    await ctx.skillService.create(skillBody("unique-skill"));
+    const duplicateName = await ctx.skillService
+      .create(skillBody("UNIQUE-SKILL"))
+      .catch((e) => e);
+    expect(duplicateName).toBeInstanceOf(NameConflictError);
+    expect(duplicateName.code).toBe("name_conflict");
+
+    const duplicateTrigger = await ctx.skillService
+      .create({ ...skillBody("trigger-dup"), triggers: ["同一触发", "同一触发"] })
+      .catch((e) => e);
+    expect(duplicateTrigger).toBeInstanceOf(ValidationError);
+    expect(duplicateTrigger.details.field).toBe("triggers");
+
+    const badRefPath = await ctx.skillService
+      .create({
+        ...skillBody("bad-ref-path"),
+        refs: [{ label: "参考", refType: "经验", path: 1 as never }],
+      })
+      .catch((e) => e);
+    expect(badRefPath).toBeInstanceOf(ValidationError);
+    expect(badRefPath.details.field).toBe("refs.0.path");
+  });
+
+  test("更新拒绝改名冲突，原名称与版本不变", async () => {
+    const first = await ctx.skillService.create(skillBody("update-a"));
+    await ctx.skillService.create(skillBody("update-b"));
+    const conflict = await ctx.skillService
+      .update(first.id, 1, skillBody("update-b"))
+      .catch((e) => e);
+    expect(conflict).toBeInstanceOf(NameConflictError);
+
+    const after = await ctx.catalog.getSkill(first.id);
+    expect(after.name).toBe("update-a");
+    expect(after.version).toBe("v1.0");
+    expect(after.revision).toBe(1);
+  });
+
+  test("启停拒绝非布尔值，未知资源 404，旧 revision 409", async () => {
+    const badValue = await ctx.skillService
+      .setEnabled("0191f2f0-0000-7000-8000-000000000000", 1, "false" as never)
+      .catch((e) => e);
+    expect(badValue).toBeInstanceOf(ValidationError);
+    expect(badValue.details.field).toBe("enabled");
+
+    const missing = await ctx.skillService
+      .setEnabled("0191f2f0-0000-7000-8000-000000000000", 1, false)
+      .catch((e) => e);
+    expect(missing).toBeInstanceOf(NotFoundError);
+
+    const created = await ctx.skillService.create(skillBody("toggle-skill"));
+    await ctx.skillService.setEnabled(created.id, 1, false);
+    const stale = await ctx.skillService.setEnabled(created.id, 1, true).catch((e) => e);
+    expect(stale).toBeInstanceOf(RevisionConflictError);
+    expect(stale.details.currentRevision).toBe(2);
+  });
+
+  test("删除未知资源 404，旧 revision 409", async () => {
+    const missing = await ctx.skillService
+      .delete("0191f2f0-0000-7000-8000-000000000000", 1)
+      .catch((e) => e);
+    expect(missing).toBeInstanceOf(NotFoundError);
+
+    const created = await ctx.skillService.create(skillBody("delete-stale"));
+    const stale = await ctx.skillService.delete(created.id, 2).catch((e) => e);
+    expect(stale).toBeInstanceOf(RevisionConflictError);
+    expect(stale.details.currentRevision).toBe(1);
+  });
+
   test("更新递增 minor 版本并整体替换子表，旧 revision 冲突", async () => {
     const created = await ctx.skillService.create(skillBody());
     const updated = await ctx.skillService.update(created.id, 1, {
@@ -186,5 +256,36 @@ describe("Skill 读契约", () => {
       { code: "review", label: "审视", position: 2 },
       { code: "testing", label: "测试", position: 3 },
     ]);
+  });
+
+  test("列表支持名称检索、启停筛选与排序分页，摘要可单独读取", async () => {
+    const first = await ctx.skillService.create(skillBody("read-a"));
+    await ctx.skillService.create(skillBody("read-b"));
+    await ctx.skillService.create(skillBody("read-c"));
+    await ctx.skillService.setEnabled(first.id, 1, false);
+
+    const searched = await ctx.skillRead.list({ q: "READ", page: normalizePageQuery() });
+    expect(searched.total).toBe(3);
+
+    const disabled = await ctx.skillRead.list({
+      enabled: false,
+      page: normalizePageQuery(),
+    });
+    expect(disabled.total).toBe(1);
+    expect(disabled.items[0]?.name).toBe("read-a");
+
+    const page = await ctx.skillRead.list({
+      page: normalizePageQuery(2, 0),
+      sort: "-name",
+    });
+    expect(page.items.map((item) => item.name)).toEqual(["read-c", "read-b"]);
+
+    const summary = await ctx.skillRead.getSummary(first.id);
+    expect(summary).toMatchObject({ name: "read-a", version: "v1.0", tags: ["规范", "文档"] });
+
+    const missing = await ctx.skillRead
+      .getSummary("0191f2f0-0000-7000-8000-000000000000")
+      .catch((e) => e);
+    expect(missing).toBeInstanceOf(NotFoundError);
   });
 });

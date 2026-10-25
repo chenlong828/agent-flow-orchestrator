@@ -227,4 +227,207 @@ describe("Harness HTTP 契约", () => {
     expect(badSort.status).toBe(400);
     expect(badSort.body.error.details.field).toBe("sort");
   });
+
+  test("API-01 空库返回默认分页信封，未知查询参数不影响结果", async () => {
+    const empty = await call(ctx.app, "GET", "/api/v1/harnesses");
+    expect(empty.status).toBe(200);
+    expect(empty.body).toEqual({ items: [], total: 0, limit: 50, offset: 0 });
+
+    await createHarness("build-01");
+    const ignored = await call(ctx.app, "GET", "/api/v1/harnesses?unknown=1");
+    expect(ignored.status).toBe(200);
+    expect(ignored.body.total).toBe(1);
+    expect(ignored.body.items[0].name).toBe("build-01");
+  });
+
+  test("API-01 支持启停/健康筛选与名称倒序排序", async () => {
+    const enabled = await createHarness("build-02");
+    await createHarness("build-01");
+    const disabled = await createHarness("agent-07");
+    await call(ctx.app, "PATCH", `/api/v1/harnesses/${disabled.id}/enabled`, {
+      body: { enabled: false },
+      headers: withRevision(1),
+    });
+    await ctx.db.query("update harness set health = $1 where id = $2", ["online", enabled.id]);
+    await ctx.db.query("update harness set health = $1 where id = $2", [
+      "overloaded",
+      disabled.id,
+    ]);
+
+    const offline = await call(ctx.app, "GET", "/api/v1/harnesses?enabled=false");
+    expect(offline.body.total).toBe(1);
+    expect(offline.body.items[0].name).toBe("agent-07");
+
+    const online = await call(ctx.app, "GET", "/api/v1/harnesses?health=online");
+    expect(online.body.total).toBe(1);
+    expect(online.body.items[0].name).toBe("build-02");
+
+    const sorted = await call(ctx.app, "GET", "/api/v1/harnesses?sort=name:desc");
+    expect(sorted.body.items.map((item: any) => item.name)).toEqual([
+      "build-02",
+      "build-01",
+      "agent-07",
+    ]);
+  });
+
+  test("API-02 详情 toolCount 随工具引用变化，更新后字段可回读", async () => {
+    const harness = await createHarness("detail-01");
+    const tool = await call(ctx.app, "POST", "/api/v1/tools", {
+      body: {
+        name: "detail-tool",
+        kind: "cli",
+        invocation: "trace {path}",
+        harnessId: harness.id,
+        timeoutMs: 30000,
+      },
+    });
+    expect(tool.status).toBe(201);
+
+    const before = await call(ctx.app, "GET", `/api/v1/harnesses/${harness.id}`);
+    expect(before.body.toolCount).toBe(1);
+
+    const updated = await call(ctx.app, "PUT", `/api/v1/harnesses/${harness.id}`, {
+      body: { ...harnessBody("detail-01"), description: "更新后的描述", kind: "server" },
+      headers: withRevision(1),
+    });
+    expect(updated.body).toMatchObject({
+      description: "更新后的描述",
+      kind: "server",
+      toolCount: 1,
+      revision: 2,
+    });
+  });
+
+  test("API-03 最小创建体使用默认值，并允许创建即停用", async () => {
+    const minimal = await call(ctx.app, "POST", "/api/v1/harnesses", {
+      body: {
+        name: "minimal-01",
+        kind: "laptop",
+        address: "127.0.0.1:9000",
+        accessMode: "ssh",
+        concurrencyMax: 1,
+        queuePolicy: "priority",
+      },
+    });
+    expect(minimal.status).toBe(201);
+    expect(minimal.body).toMatchObject({
+      description: "",
+      tags: [],
+      enabled: true,
+      health: "unknown",
+      lastHeartbeatAt: null,
+      revision: 1,
+    });
+
+    const disabled = await call(ctx.app, "POST", "/api/v1/harnesses", {
+      body: { ...harnessBody("disabled-01"), enabled: false },
+    });
+    expect(disabled.status).toBe(201);
+    expect(disabled.body.enabled).toBe(false);
+    expect(disabled.body.health).toBe("unknown");
+  });
+
+  test("API-04 更新可修改名称，并可按新名称检索", async () => {
+    const created = await createHarness("rename-source");
+    const renamed = await call(ctx.app, "PUT", `/api/v1/harnesses/${created.id}`, {
+      body: harnessBody("rename-target"),
+      headers: withRevision(1),
+    });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body.name).toBe("rename-target");
+
+    const byNewName = await call(ctx.app, "GET", "/api/v1/harnesses?q=rename-target");
+    expect(byNewName.body.total).toBe(1);
+    expect(byNewName.body.items[0].id).toBe(created.id);
+    const byOldName = await call(ctx.app, "GET", "/api/v1/harnesses?q=rename-source");
+    expect(byOldName.body.total).toBe(0);
+  });
+
+  test("API-05 可重新启用；缺少 If-Match 428；资源不存在 404", async () => {
+    const created = await createHarness("toggle-01");
+    const disabled = await call(ctx.app, "PATCH", `/api/v1/harnesses/${created.id}/enabled`, {
+      body: { enabled: false },
+      headers: withRevision(1),
+    });
+    expect(disabled.body).toMatchObject({ enabled: false, revision: 2 });
+
+    const enabled = await call(ctx.app, "PATCH", `/api/v1/harnesses/${created.id}/enabled`, {
+      body: { enabled: true },
+      headers: withRevision(2),
+    });
+    expect(enabled.body).toMatchObject({ enabled: true, revision: 3 });
+
+    const missingPrecondition = await call(
+      ctx.app,
+      "PATCH",
+      `/api/v1/harnesses/${created.id}/enabled`,
+      { body: { enabled: false } },
+    );
+    expect(missingPrecondition.status).toBe(428);
+
+    const missing = await call(
+      ctx.app,
+      "PATCH",
+      "/api/v1/harnesses/0191f2f0-0000-7000-8000-000000000000/enabled",
+      { body: { enabled: true }, headers: withRevision(1) },
+    );
+    expect(missing.status).toBe(404);
+    expect(missing.body.error.code).toBe("not_found");
+  });
+
+  test("API-06 删除使用旧 revision 返回 409，且不删除资源", async () => {
+    const created = await createHarness("stale-delete");
+    const stale = await call(ctx.app, "DELETE", `/api/v1/harnesses/${created.id}`, {
+      headers: withRevision(2),
+    });
+    expect(stale.status).toBe(409);
+    expect(stale.body.error.code).toBe("revision_conflict");
+    expect(stale.body.error.details.currentRevision).toBe(1);
+
+    const stillThere = await call(ctx.app, "GET", `/api/v1/harnesses/${created.id}`);
+    expect(stillThere.status).toBe(200);
+    const deleted = await call(ctx.app, "DELETE", `/api/v1/harnesses/${created.id}`, {
+      headers: withRevision(1),
+    });
+    expect(deleted.status).toBe(204);
+    const missing = await call(ctx.app, "GET", `/api/v1/harnesses/${created.id}`);
+    expect(missing.status).toBe(404);
+  });
+
+  test("API-07 引用页返回多个工具；资产不存在 404", async () => {
+    const harness = await createHarness("refs-01");
+    for (const name of ["trace-b", "trace-a"]) {
+      const response = await call(ctx.app, "POST", "/api/v1/tools", {
+        body: {
+          name,
+          kind: "cli",
+          invocation: `${name} {input}`,
+          harnessId: harness.id,
+          timeoutMs: 30000,
+        },
+      });
+      expect(response.status).toBe(201);
+    }
+
+    const references = await call(
+      ctx.app,
+      "GET",
+      `/api/v1/harnesses/${harness.id}/references`,
+    );
+    expect(references.status).toBe(200);
+    expect(references.body.asset).toEqual({ type: "harness", id: harness.id, name: "refs-01" });
+    expect(references.body.total).toBe(2);
+    expect(references.body.items).toEqual([
+      { type: "tool", id: expect.any(String), name: "trace-a" },
+      { type: "tool", id: expect.any(String), name: "trace-b" },
+    ]);
+
+    const missing = await call(
+      ctx.app,
+      "GET",
+      "/api/v1/harnesses/0191f2f0-0000-7000-8000-000000000000/references",
+    );
+    expect(missing.status).toBe(404);
+    expect(missing.body.error.code).toBe("not_found");
+  });
 });
