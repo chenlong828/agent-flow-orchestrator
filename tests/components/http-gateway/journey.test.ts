@@ -80,7 +80,7 @@ describe("B1 全链路旅程（仅通过 HTTP）", () => {
         description: "旅程工具",
         harnessId,
         timeoutMs: 60000,
-        params: [{ paramKey: "input", type: "string", description: "输入" }],
+        params: [{ key: "input", type: "string", description: "输入" }],
       },
     });
     expect(toolCreated.status).toBe(201);

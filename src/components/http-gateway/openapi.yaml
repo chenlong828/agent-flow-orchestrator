@@ -1060,7 +1060,7 @@ components:
       name: id
       in: path
       required: true
-      description: 资源 ID（UUIDv7）。
+      description: 资源 ID（UUIDv7）；格式不合法返回 400，格式合法但资源不存在返回 404。
       schema:
         type: string
         format: uuid
@@ -1084,7 +1084,7 @@ components:
       name: limit
       in: query
       required: false
-      description: 每页数量。
+      description: 每页数量，1–200；越界或非整数返回 400，不截断。
       schema:
         type: integer
         minimum: 1
@@ -1443,7 +1443,6 @@ components:
       required:
       - key
       - type
-      - description
       properties:
         key:
           type: string
@@ -1457,7 +1456,7 @@ components:
           description: 参数类型
         description:
           type: string
-          description: 参数说明
+          description: 参数说明；可省略，省略时返回空字符串
       description: 工具参数；HTTP 字段 key 对应领域字段 paramKey。
     ToolListItem:
       type: object
@@ -1666,7 +1665,6 @@ components:
       required:
       - label
       - refType
-      - path
       properties:
         label:
           type: string
@@ -1677,8 +1675,8 @@ components:
         path:
           type: string
           nullable: true
-          description: 引用路径；可为 null
-      description: Skill 引用链接；path 可为 null。
+          description: 引用路径；可省略或为 null
+      description: Skill 引用链接；path 可省略或为 null。
     SkillListItem:
       type: object
       required:
@@ -1889,7 +1887,6 @@ components:
       required:
       - label
       - refType
-      - path
       properties:
         label:
           type: string
@@ -1900,8 +1897,8 @@ components:
         path:
           type: string
           nullable: true
-          description: 引用路径；可为 null
-      description: 专家引用链接；path 可为 null。
+          description: 引用路径；可省略或为 null
+      description: 专家引用链接；path 可省略或为 null。
     ExpertSkillSummary:
       type: object
       required:

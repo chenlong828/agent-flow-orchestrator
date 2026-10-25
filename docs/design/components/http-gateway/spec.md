@@ -44,6 +44,7 @@ updated: 2026-10-25
 - 若写入已提交但回读失败，响应 500；调用方可用 `Location` / `GET` 重试，不把 500 当作未写入。
 - 删除：成功 204，无响应体。
 - 列表：`{items,total,limit,offset}`；默认 `limit=50`，上限 200；`offset>=0`。
+- `limit` / `offset` 必须是整数且落在上述范围；越界或非整数返回 400，不截断。
 - 单资源：直接返回对象，不包 `data`。
 
 ```json
@@ -94,7 +95,8 @@ updated: 2026-10-25
 | 503 | `service_unavailable` | 数据库不可用；`/healthz` 同样返回 503 |
 
 - `message` 中文；`code` 稳定英文；`details` 按错误类型定义。
-- 路径资源不存在用 404；请求体引用的目标（`harnessId`、`categoryCode`、`skillId`、`toolId`）不存在用 400 `validation_error`，`details.field` 指向字段。
+- 路径 `id` 必须是 UUID；格式不合法返回 400 `validation_error`，格式合法但资源不存在返回 404。
+- 请求体引用的目标（`harnessId`、`categoryCode`、`skillId`、`toolId`）不存在用 400 `validation_error`，`details.field` 指向字段。
 - 校验错误 `details` 至少含 `{field, reason}`；多字段可用数组。
 
 ## 4 端点总表
@@ -224,7 +226,7 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 
 **详情 `ToolDetail`**：列表项 + `description`、`params: ToolParam[]`、`createdAt`。
 
-**`ToolParam`**：`{key: string, type: "string"|"int", description: string}`；对应领域 `paramKey`，HTTP 层做字段映射。
+**`ToolParam`**：`{key: string, type: "string"|"int", description?: string}`；`description` 可省略，省略时返回空字符串；对应领域 `paramKey`，HTTP 层做字段映射。
 
 **查询参数**：`q`、`kind`、`status`、`harnessId`、`limit`、`offset`、`sort`（`name`、`updatedAt`）。
 
@@ -264,7 +266,7 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 
 **`SkillSections`**：固定五键 `{overview:string, steps:string, examples:string, scripts:string, verification:string}`，全部必填。
 
-**`SkillRef`**：`{label:string, refType:string, path:string|null}`。
+**`SkillRef`**：`{label:string, refType:string, path?: string|null}`；`path` 可省略或为 null。
 
 **查询参数**：`q`、`category`、`enabled`、`tag`、`limit`、`offset`、`sort`（`name`、`updatedAt`、`version`）。
 
@@ -306,7 +308,7 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 
 **`ExpertSkillSummary`**：`{id,name,categoryCode,categoryLabel,summary}`。
 **`ExpertToolSummary`**：`{id,name,kind,status}`。
-**`ExpertRef`**：`{label,refType,path:string|null}`。
+**`ExpertRef`**：`{label,refType,path?: string|null}`；`path` 可省略或为 null。
 
 **查询参数**：`q`、`enabled`、`limit`、`offset`、`sort`（`name`、`updatedAt`）。
 
@@ -354,7 +356,7 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 ```
 
 - Harness 引用项 `type="tool"`；工具/Skill 引用项 `type="expert"`。
-- 删除 409 的 `details` 使用同一 `asset` + `items` 结构。
+- 删除 409 的 `details` 使用 `asset` + `references` 结构，与 §3.3 示例一致。
 - B1 不返回工作流节点引用。
 
 ### 5.6 端点 → 组件方法

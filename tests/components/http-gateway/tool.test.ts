@@ -14,8 +14,8 @@ function toolBody(name = "trace_call_chain") {
     harnessId,
     timeoutMs: 30000,
     params: [
-      { paramKey: "path", type: "string", description: "目标路径" },
-      { paramKey: "depth", type: "int" },
+      { key: "path", type: "string", description: "目标路径" },
+      { key: "depth", type: "int" },
     ],
   };
 }
@@ -67,6 +67,19 @@ describe("工具 HTTP 契约", () => {
     ]);
   });
 
+  test("请求参数只接受契约字段 key，不接受 paramKey 别名", async () => {
+    const response = await call(ctx.app, "POST", "/api/v1/tools", {
+      body: {
+        ...toolBody("legacy-param"),
+        params: [{ paramKey: "path", type: "string", description: "旧字段" }],
+      },
+    });
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("validation_error");
+    expect(response.body.error.details.field).toBe("params[0]");
+    expect(response.body.error.message).toContain("未知字段 paramKey");
+  });
+
   test("GET 列表按 kind/status/harnessId 筛选并返回分页信封", async () => {
     await createTool("trace-call-chain");
     await call(ctx.app, "POST", "/api/v1/tools", {
@@ -105,7 +118,7 @@ describe("工具 HTTP 契约", () => {
       body: {
         ...toolBody(),
         invocation: "trace --fast {target}",
-        params: [{ paramKey: "target", type: "string" }],
+        params: [{ key: "target", type: "string" }],
       },
       headers: withRevision(1),
     });

@@ -165,13 +165,22 @@ function requireObject(value: unknown, field: string): Record<string, unknown> {
   return value;
 }
 
-function validateNestedParams(body: Record<string, unknown>): void {
-  if (body.params === undefined) return;
+function normalizeToolParams(body: Record<string, unknown>): Record<string, unknown> {
+  if (body.params === undefined) return body;
   if (!Array.isArray(body.params)) throw new ValidationError("params", "必须是数组");
-  body.params.forEach((item, index) => {
+  const params = body.params.map((item, index) => {
     const param = requireObject(item, `params[${index}]`);
-    assertAllowedFields(param, ["paramKey", "type", "description"], `params[${index}]`);
+    assertAllowedFields(param, ["key", "type", "description"], `params[${index}]`);
+    if (typeof param.key !== "string" || param.key.trim() === "") {
+      throw new ValidationError(`params[${index}].key`, "必须是非空字符串");
+    }
+    return {
+      paramKey: param.key,
+      type: param.type,
+      description: param.description,
+    };
   });
+  return { ...body, params };
 }
 
 function validateNestedRefs(body: Record<string, unknown>, key: string): void {
@@ -325,8 +334,7 @@ export function createHttpApp(deps: HttpDeps): (request: Request) => Promise<Res
             return json(pagePayload(page));
           }
           if (request.method === "POST") {
-            const body = await readJsonObject(request, TOOL_WRITE_FIELDS);
-            validateNestedParams(body);
+            const body = normalizeToolParams(await readJsonObject(request, TOOL_WRITE_FIELDS));
             if (typeof body.harnessId === "string") assertUuid(body.harnessId, "harnessId");
             const created = await toolService.create(body as unknown as CreateTool, actorFrom(request, actor));
             const detail = await catalog.getTool(created.id);
@@ -392,8 +400,7 @@ export function createHttpApp(deps: HttpDeps): (request: Request) => Promise<Res
           if (request.method === "GET") return json(await catalog.getTool(id));
           if (request.method === "PUT") {
             const revision = parseIfMatch(request);
-            const body = await readJsonObject(request, TOOL_WRITE_FIELDS);
-            validateNestedParams(body);
+            const body = normalizeToolParams(await readJsonObject(request, TOOL_WRITE_FIELDS));
             if (typeof body.harnessId === "string") assertUuid(body.harnessId, "harnessId");
             await toolService.update(id, revision, body as unknown as UpdateTool, actorFrom(request, actor));
             return json(await catalog.getTool(id));

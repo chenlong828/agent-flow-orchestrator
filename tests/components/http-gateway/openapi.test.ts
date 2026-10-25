@@ -96,6 +96,20 @@ describe("OpenAPI 契约结构", () => {
     }
   });
 
+  test("请求 DTO 的必填字段与实现一致", () => {
+    const toolParam = spec.components.schemas.ToolParam;
+    expect(toolParam.required).toContain("key");
+    expect(toolParam.required).toContain("type");
+    expect(toolParam.required).not.toContain("description");
+
+    for (const name of ["SkillRef", "ExpertRef"]) {
+      const schema = spec.components.schemas[name];
+      expect(schema.required).toContain("label");
+      expect(schema.required).toContain("refType");
+      expect(schema.required).not.toContain("path");
+    }
+  });
+
   test("components 完整，所有 $ref 都可解析", () => {
     expect(Object.keys(spec.components.parameters)).toHaveLength(7);
     expect(Object.keys(spec.components.schemas)).toHaveLength(48);
