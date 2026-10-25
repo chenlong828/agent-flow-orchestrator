@@ -91,6 +91,7 @@ describe("工具 HTTP 契约", () => {
     expect(cli.status).toBe(200);
     expect(cli.body.total).toBe(2);
     expect(cli.body.items.every((item: any) => item.harnessName === "build-01")).toBe(true);
+    expect(cli.body.items.every((item: any) => item.description === "调用链追踪")).toBe(true);
 
     const none = await call(ctx.app, "GET", "/api/v1/tools?status=available");
     expect(none.body.total).toBe(0);

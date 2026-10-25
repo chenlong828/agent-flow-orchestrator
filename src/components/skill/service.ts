@@ -60,7 +60,7 @@ function toIso(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
 
-function toSummary(row: SkillRootRow, tags: string[]): SkillSummary {
+function toSummary(row: SkillRootRow, tags: string[], triggers: string[]): SkillSummary {
   return {
     id: row.id,
     name: row.name,
@@ -69,6 +69,7 @@ function toSummary(row: SkillRootRow, tags: string[]): SkillSummary {
     version: row.version,
     enabled: row.enabled,
     tags,
+    triggers,
     revision: row.revision,
     updatedAt: toIso(row.updated_at),
   };
@@ -383,8 +384,11 @@ export function createSkillRead(deps: { db: Db }): SkillRead {
       const { rows, total } = await store.listRoots(db, query);
       const items: SkillSummary[] = [];
       for (const row of rows) {
-        const tags = await store.tagsFor(db, row.id);
-        items.push(toSummary(row, tags));
+        const [tags, triggers] = await Promise.all([
+          store.tagsFor(db, row.id),
+          store.triggersFor(db, row.id),
+        ]);
+        items.push(toSummary(row, tags, triggers));
       }
       return { items, total, limit: query.page.limit, offset: query.page.offset };
     },
@@ -405,8 +409,7 @@ export function createSkillRead(deps: { db: Db }): SkillRead {
         path: ref.path ?? undefined,
       }));
       return {
-        ...toSummary(row, tags),
-        triggers,
+        ...toSummary(row, tags, triggers),
         sections: toSections(sections),
         pitfalls,
         refs: refsInput,
@@ -417,8 +420,11 @@ export function createSkillRead(deps: { db: Db }): SkillRead {
     async getSummary(id): Promise<SkillSummary> {
       const row = await store.findRoot(db, id);
       if (row === null) throw new NotFoundError("Skill", id);
-      const tags = await store.tagsFor(db, id);
-      return toSummary(row, tags);
+      const [tags, triggers] = await Promise.all([
+        store.tagsFor(db, id),
+        store.triggersFor(db, id),
+      ]);
+      return toSummary(row, tags, triggers);
     },
 
     async listCategories(): Promise<SkillCategory[]> {

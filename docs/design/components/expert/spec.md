@@ -50,7 +50,7 @@ type ExpertService = {
 };
 
 type ExpertRead = {
-  list(query: ExpertQuery): Promise<Page<ExpertSummary>>; // 含 skillCount/toolCount/refCount
+  list(query: ExpertQuery): Promise<Page<ExpertSummary>>; // 含 skillCount/toolCount/refCount/skillIds
   get(id: string): Promise<ExpertDetail>; // 详情含 skillIds/toolIds，由 catalog 解析名称
   listExpertsUsingSkill(skillId: string): Promise<ExpertReference[]>;
   listExpertsUsingTool(toolId: string): Promise<ExpertReference[]>;
@@ -108,12 +108,12 @@ type ExpertSummary = {
   skillCount: number;
   toolCount: number;
   refCount: number;
+  skillIds: string[];
   revision: number;
   updatedAt: string;
 };
 
 type ExpertDetail = ExpertSummary & {
-  skillIds: string[];
   toolIds: string[];
   refs: ExpertRefInput[];
   createdAt: string;
@@ -129,7 +129,7 @@ type ExpertQuery = {
 type ExpertReference = { id: string; name: string };
 ```
 
-`ExpertSummary` 的 `persona` 是领域数组；REST DTO 也按数组返回。`refCount` B1 恒为 0。
+`ExpertSummary` 的 `persona` 是领域数组；`skillIds` 供 `catalog` 列表组合前 3 个 Skill 预览，REST 列表不直接暴露该字段。`refCount` B1 恒为 0。
 
 ### 3.2 方法契约
 
@@ -142,7 +142,7 @@ type ExpertReference = { id: string; name: string };
 | `delete` | 删除专家 | `id`、`revision` | `void` | `NotFoundError`、`RevisionConflictError` | B1 无引用保护 |
 | `setSkills` | 整体替换 Skill 装配 | `id`、`revision`、`skillIds[]` | `{ revision }` | `NotFoundError`、`RevisionConflictError`、`ValidationError`、`SkillNotFoundError` | 单事务；顺序即位置；重复/不存在整批失败 |
 | `setTools` | 整体替换工具装配 | `id`、`revision`、`toolIds[]` | `{ revision }` | `NotFoundError`、`RevisionConflictError`、`ValidationError`、`ToolNotFoundError` | 单事务；顺序即位置；重复/不存在整批失败 |
-| `list` | 列表查询 | `ExpertQuery` | `Page<ExpertSummary>` | `ValidationError` | 读 |
+| `list` | 列表查询 | `ExpertQuery` | `Page<ExpertSummary>` | `ValidationError` | 读；含有序 `skillIds` |
 | `get` | 详情查询 | `id` | `ExpertDetail` | `NotFoundError` | 读 |
 | `listExpertsUsingSkill` | 查询引用 Skill 的专家 | `skillId` | `ExpertReference[]` | 无 | 读，供 catalog/引用检查 |
 | `listExpertsUsingTool` | 查询引用工具的专家 | `toolId` | `ExpertReference[]` | 无 | 读，供 catalog/引用检查 |
@@ -161,7 +161,7 @@ type ExpertReference = { id: string; name: string };
 - 规则：名称唯一、颜色、角色、人设顺序、装配唯一/顺序。
 - 存储：创建五区、创建即装配、更新整体替换人设/引用、聚合部分更新、启停、删除级联。
 - 装配：整体替换 Skill/工具；重复/不存在目标；`create` / `updateAggregate` 任一步失败整批回滚；`revision` 只递增一次。
-- 读契约：列表筛选、详情、`listExpertsUsingSkill/Tool`、`refCount=0`。
+- 读契约：列表筛选、列表含有序 `skillIds`、详情、`listExpertsUsingSkill/Tool`、`refCount=0`。
 - 契约：对应 REST 端点 3 正 1 反在 `http-gateway` 规格中列明；`PATCH /experts/{id}` 覆盖省略不变、数组替换、空数组清空与旧版本冲突。
 
 ## 6 预算与运行

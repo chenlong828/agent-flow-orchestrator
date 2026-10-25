@@ -54,6 +54,7 @@ export type ToolListItem = {
   name: string;
   kind: "mcp" | "cli" | "script";
   invocation: string;
+  description: string;
   harnessId: string;
   harnessName: string;
   timeoutMs: number;
@@ -66,7 +67,6 @@ export type ToolListItem = {
 };
 
 export type ToolDetailView = ToolListItem & {
-  description: string;
   params: ToolParamView[];
   createdAt: string;
 };
@@ -80,13 +80,13 @@ export type SkillListItem = {
   version: string;
   enabled: boolean;
   tags: string[];
+  triggers: string[];
   usedByCount: number;
   revision: number;
   updatedAt: string;
 };
 
 export type SkillDetailView = SkillListItem & {
-  triggers: string[];
   sections: {
     overview: string;
     steps: string;
@@ -109,6 +109,11 @@ export type ExpertSkillSummaryView = {
   summary: string;
 };
 
+export type ExpertSkillPreviewView = {
+  id: string;
+  name: string;
+};
+
 export type ExpertToolSummaryView = {
   id: string;
   name: string;
@@ -126,11 +131,12 @@ export type ExpertListItem = {
   skillCount: number;
   toolCount: number;
   refCount: number;
+  skills: ExpertSkillPreviewView[];
   revision: number;
   updatedAt: string;
 };
 
-export type ExpertDetailView = ExpertListItem & {
+export type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
   duty: string;
   skillOrder: string;
   verifyOrder: string;
@@ -250,6 +256,7 @@ export function createCatalog(deps: CatalogDeps): CatalogRead & ReferenceGuard {
           name: tool.name,
           kind: tool.kind,
           invocation: tool.invocation,
+          description: tool.description,
           harnessId: tool.harnessId,
           harnessName,
           timeoutMs: tool.timeoutMs,
@@ -314,6 +321,7 @@ export function createCatalog(deps: CatalogDeps): CatalogRead & ReferenceGuard {
           version: skill.version,
           enabled: skill.enabled,
           tags: skill.tags,
+          triggers: skill.triggers,
           usedByCount: usedBy.length,
           revision: skill.revision,
           updatedAt: skill.updatedAt,
@@ -363,19 +371,28 @@ export function createCatalog(deps: CatalogDeps): CatalogRead & ReferenceGuard {
 
     async listExperts(query) {
       const page = await expertRead.list(query);
-      const items: ExpertListItem[] = page.items.map((expert) => ({
-        id: expert.id,
-        name: expert.name,
-        color: expert.color,
-        role: expert.role,
-        enabled: expert.enabled,
-        persona: expert.persona,
-        skillCount: expert.skillCount,
-        toolCount: expert.toolCount,
-        refCount: expert.refCount,
-        revision: expert.revision,
-        updatedAt: expert.updatedAt,
-      }));
+      const items: ExpertListItem[] = [];
+      for (const expert of page.items) {
+        const skills: ExpertSkillPreviewView[] = [];
+        for (const skillId of expert.skillIds.slice(0, 3)) {
+          const skill = await skillRead.getSummary(skillId);
+          skills.push({ id: skill.id, name: skill.name });
+        }
+        items.push({
+          id: expert.id,
+          name: expert.name,
+          color: expert.color,
+          role: expert.role,
+          enabled: expert.enabled,
+          persona: expert.persona,
+          skillCount: expert.skillCount,
+          toolCount: expert.toolCount,
+          refCount: expert.refCount,
+          skills,
+          revision: expert.revision,
+          updatedAt: expert.updatedAt,
+        });
+      }
       return { ...page, items };
     },
 

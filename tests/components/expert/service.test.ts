@@ -373,10 +373,45 @@ describe("专家读契约", () => {
       toolCount: 0,
       persona: ["全局观", "谨慎"],
     });
+    expect(disabled.items[0]?.skills).toEqual([
+      { id: skillIds[0]!, name: "CRES 技能" },
+    ]);
 
     const all = await ctx.catalog.listExperts({ page: normalizePageQuery(), sort: "name" });
     expect(all.total).toBe(2);
     expect(all.items.map((item) => item.name)).toEqual(["方案设计专家", "评审专家"]);
+  });
+
+  test("列表专家 skills 最多返回前 3 个，按装配顺序", async () => {
+    const extraSkills = [];
+    for (const name of ["第三技能", "第四技能"]) {
+      extraSkills.push(
+        await ctx.skillService.create({
+          name,
+          categoryCode: "coding",
+          summary: "s",
+          sections: { overview: "o", steps: "s", examples: "e", scripts: "sc", verification: "v" },
+        }),
+      );
+    }
+    const assembled = [...skillIds, ...extraSkills.map((skill) => skill.id)];
+    const created = await ctx.expertService.create({
+      ...expertBody("预览专家"),
+      skillIds: assembled,
+    });
+
+    const page = await ctx.catalog.listExperts({
+      q: "预览专家",
+      page: normalizePageQuery(),
+    });
+    expect(page.total).toBe(1);
+    expect(page.items[0]?.skillCount).toBe(4);
+    expect(page.items[0]?.skills).toEqual([
+      { id: assembled[0]!, name: "CRES 技能" },
+      { id: assembled[1]!, name: "调用链分析" },
+      { id: assembled[2]!, name: "第三技能" },
+    ]);
+    expect(created.revision).toBe(1);
   });
 
   test("列表支持名称检索、分页与排序", async () => {

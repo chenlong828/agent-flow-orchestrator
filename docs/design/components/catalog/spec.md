@@ -90,6 +90,7 @@ type ToolListItem = {
   name: string;
   kind: "mcp" | "cli" | "script";
   invocation: string;
+  description: string;
   harnessId: string;
   harnessName: string;
   timeoutMs: number;
@@ -102,7 +103,6 @@ type ToolListItem = {
 };
 
 type ToolDetailView = ToolListItem & {
-  description: string;
   params: ToolParamView[];
   createdAt: string;
 };
@@ -116,13 +116,13 @@ type SkillListItem = {
   version: string;
   enabled: boolean;
   tags: string[];
+  triggers: string[];
   usedByCount: number;
   revision: number;
   updatedAt: string;
 };
 
 type SkillDetailView = SkillListItem & {
-  triggers: string[];
   sections: {
     overview: string;
     steps: string;
@@ -139,6 +139,11 @@ type SkillCategoryView = {
   code: string;
   label: string;
   position: number;
+};
+
+type ExpertSkillPreviewView = {
+  id: string;
+  name: string;
 };
 
 type ExpertSkillSummaryView = {
@@ -166,11 +171,12 @@ type ExpertListItem = {
   skillCount: number;
   toolCount: number;
   refCount: number;
+  skills: ExpertSkillPreviewView[];
   revision: number;
   updatedAt: string;
 };
 
-type ExpertDetailView = ExpertListItem & {
+type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
   duty: string;
   skillOrder: string;
   verifyOrder: string;
@@ -202,7 +208,7 @@ type ExpertDetailView = ExpertListItem & {
 | `getSkill` | Skill 详情 | `id` | `SkillDetailView` | `NotFoundError` | `SkillRead.get` + `ExpertRead.listExpertsUsingSkill` |
 | `listSkillCategories` | 分类参考数据 | 无 | `SkillCategoryView[]` | 无 | `SkillRead.listCategories` |
 | `listExpertsUsingSkill` | Skill 的引用专家 | `skillId` | `Reference[]` | 无 | `ExpertRead.listExpertsUsingSkill` |
-| `listExperts` | 专家列表 | `ExpertQuery` | `Page<ExpertListItem>` | `ValidationError` | `ExpertRead.list` + 摘要读 |
+| `listExperts` | 专家列表 | `ExpertQuery` | `Page<ExpertListItem>` | `ValidationError` | `ExpertRead.list` + `SkillRead.getSummary`（前 3 个预览） |
 | `getExpert` | 专家详情 | `id` | `ExpertDetailView` | `NotFoundError` | `ExpertRead.get` + `SkillRead.getSummary` + `ToolRead.getSummary` |
 | `listExpertsUsingTool` | 工具的引用专家 | `toolId` | `Reference[]` | 无 | `ExpertRead.listExpertsUsingTool` |
 | `referencesForHarness` | 删除前引用页 | `id` | `ReferencePage` | `NotFoundError` | `ReferenceGuard.check` |
@@ -217,14 +223,15 @@ type ExpertDetailView = ExpertListItem & {
 |---|---|
 | Harness 列表/详情 | `HarnessRead` + `ToolRead.listByHarness` |
 | 工具列表/详情 | `ToolRead` + `HarnessRead.get`（名称）+ `ExpertRead.listExpertsUsingTool` |
-| Skill 列表/详情 | `SkillRead` + `ExpertRead.listExpertsUsingSkill` |
-| 专家列表/详情 | `ExpertRead` + `SkillRead.getSummary` + `ToolRead.getSummary` |
+| Skill 列表/详情 | `SkillRead`（列表摘要含 `triggers`）+ `ExpertRead.listExpertsUsingSkill` |
+| 专家列表/详情 | `ExpertRead`（列表含 `skillIds`）+ `SkillRead.getSummary` + `ToolRead.getSummary` |
 | 分类列表 | `SkillRead.listCategories` |
 | 引用查询 | `ToolRead.listByHarness` / `ExpertRead.listExpertsUsing*` |
 
 - 不直接 SQL；不导入任何 store。
 - 单次请求内的多次读尽量在同一数据库快照/事务中完成；是否使用只读事务在实现时定，契约不承诺强一致。
 - 计数口径：Harness `toolCount` = 引用工具数；工具/Skill `usedByCount` = 引用专家数；专家 `refCount=0`（B1）。
+- 专家列表只为前 3 个 `skillIds` 解析名称，不把完整摘要塞进列表；Skill 列表的 `triggers` 由 `SkillRead` 摘要直接提供，不需要逐条详情。
 
 ## 5 依赖与边界
 
@@ -249,5 +256,5 @@ type ExpertDetailView = ExpertListItem & {
 ## 8 B1 实现口径与剩余风险
 
 - 列表/详情按多次只读查询组合，未引入统一只读事务；单次请求内各查询之间不保证同一快照。
-- 专家详情的 Skill/工具摘要由 catalog 逐项解析；B1 接受当前读放大，不提前加缓存。若后续列表规模明显增长，再评估领域读契约合并。
+- 专家详情与列表的 Skill 摘要在 catalog 内逐项解析；列表最多 3 个预览，详情为完整装配；B1 接受当前读放大，不提前加缓存。若后续列表规模明显增长，再评估领域读契约合并或批量摘要读。
 - 剩余风险：跨表读一致性由调用方按业务容忍度处理；B1 未出现需要强一致的读路径。

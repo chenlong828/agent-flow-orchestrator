@@ -102,12 +102,12 @@ describe("catalog 只读组合", () => {
     expect(list.items[0]).toMatchObject({
       name: "catalog-tool",
       harnessName: "catalog-harness",
+      description: "",
       paramCount: 1,
       usedByCount: 1,
       status: "unverified",
       lastDebugAt: null,
     });
-    expect("description" in (list.items[0] as object)).toBe(false);
     expect("params" in (list.items[0] as object)).toBe(false);
 
     const detail = await ctx.catalog.getTool(tool.id);
@@ -127,6 +127,7 @@ describe("catalog 只读组合", () => {
       categoryCode: "coding",
       categoryLabel: "编码",
       version: "v1.0",
+      triggers: [],
       usedByCount: 1,
     });
 
@@ -159,6 +160,7 @@ describe("catalog 只读组合", () => {
       skillCount: 1,
       toolCount: 1,
       refCount: 0,
+      skills: [{ id: skill.id, name: "skill-a" }],
     });
 
     const detail = await ctx.catalog.getExpert(expert.id);

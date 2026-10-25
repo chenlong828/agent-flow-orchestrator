@@ -215,6 +215,7 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 | `name` | string | 唯一 |
 | `kind` | `mcp` / `cli` / `script` | 类型 |
 | `invocation` | string | 命令模板/端点 |
+| `description` | string | 描述；列表检索与导航使用，空描述返回空字符串 |
 | `harnessId` | string | 所属 Harness |
 | `harnessName` | string | 派生展示 |
 | `timeoutMs` | number | 1000–600000 |
@@ -225,7 +226,7 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 | `revision` | number | 乐观锁 |
 | `updatedAt` | string | ISO-8601 |
 
-**详情 `ToolDetail`**：列表项 + `description`、`params: ToolParam[]`、`createdAt`。
+**详情 `ToolDetail`**：列表项 + `params: ToolParam[]`、`createdAt`。
 
 **`ToolParam`**：`{key: string, type: "string"|"int", description?: string}`；`description` 可省略，省略时返回空字符串；对应领域 `paramKey`，HTTP 层做字段映射。
 
@@ -259,11 +260,12 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 | `version` | string | `vX.Y`，服务端维护 |
 | `enabled` | boolean | 启停 |
 | `tags` | string[] | 标签，有序 |
+| `triggers` | string[] | 触发条件，有序且唯一；列表检索使用 |
 | `usedByCount` | number | 派生：引用专家数 |
 | `revision` | number | 乐观锁 |
 | `updatedAt` | string | ISO-8601 |
 
-**详情 `SkillDetail`**：列表项 + `triggers: string[]`、`sections: SkillSections`、`pitfalls: string[]`、`refs: SkillRef[]`、`createdAt`。
+**详情 `SkillDetail`**：列表项 + `sections: SkillSections`、`pitfalls: string[]`、`refs: SkillRef[]`、`createdAt`。
 
 **`SkillSections`**：固定五键 `{overview:string, steps:string, examples:string, scripts:string, verification:string}`，全部必填。
 
@@ -302,11 +304,13 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 | `skillCount` | number | 装配 Skill 数 |
 | `toolCount` | number | 装配工具数 |
 | `refCount` | number | B1 固定 0 |
+| `skills` | `ExpertSkillPreview[]` | 前 3 个装配 Skill 预览，按装配顺序；无装配为空数组 |
 | `revision` | number | 乐观锁 |
 | `updatedAt` | string | ISO-8601 |
 
 **详情 `ExpertDetail`**：共享字段 + `duty`、`skillOrder`、`verifyOrder`、`notes`、`skills: ExpertSkillSummary[]`、`tools: ExpertToolSummary[]`、`refs: ExpertRef[]`、`createdAt`。
 
+**`ExpertSkillPreview`**：`{id,name}`，仅用于列表选择/导航。
 **`ExpertSkillSummary`**：`{id,name,categoryCode,categoryLabel,summary}`。
 **`ExpertToolSummary`**：`{id,name,kind,status}`。
 **`ExpertRef`**：`{label,refType,path?: string|null}`；`path` 可省略或为 null。
@@ -332,6 +336,7 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 
 - `POST` 可带初始有序装配；`PUT` 只更新五区/人设/引用，不接收 `skills`/`tools`/`skillIds`/`toolIds`。
 - `PATCH /experts/{id}` 是聚合部分更新：省略字段不变，数组字段传入即整体替换，空数组清空；一次事务、一次递增 `revision`。独立装配端点 `API-28`/`API-29` 保留。
+- `GET /experts` 的 `skills` 只返回前 3 个 `{id,name}`，避免把详情摘要塞进列表；`GET /experts/{id}` 返回完整装配摘要。
 - `skillCount` / `toolCount` 由装配关系派生。
 
 **装配请求/响应**：
@@ -458,7 +463,7 @@ B1 不提供的页面动作：Harness 连接测试/心跳刷新、工具调试/�
 
 - 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 23 KB；OpenAPI 运行时资产约 69 KB、Swagger UI 静态资源约 2.14 MB，均单独计量，不计入组件预算。
 - 单独验证命令：`bun test tests/components/http-gateway`。
-- 文档入口：启动后访问 `/docs`；机器可读契约：`/openapi.yaml`。OpenAPI 资产随组件发布，包含 31 个 operation 的说明、49 个 schema 的说明与核心 DTO 的字段说明。
+- 文档入口：启动后访问 `/docs`；机器可读契约：`/openapi.yaml`。OpenAPI 资产随组件发布，包含 31 个 operation 的说明、51 个 schema 的说明与核心 DTO 的字段说明。
 - 当前状态：`current`；已实现并通过契约测试，验证入口见 [`result.md`](../../../works/2026-10-24-db-backend-infra/result.md)。
 
 ## 10 B1 实现口径与剩余问题

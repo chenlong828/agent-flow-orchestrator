@@ -32,5 +32,5 @@ updated: 2026-10-25
 - `2026-10-25-runtime-openapi-export`：把 OpenAPI 资产从 `docs/design/` 移入 `CMP-http-gateway`，补齐 30 个 operation 与 48 个 schema 的说明，运行时 `/docs`、`/openapi.yaml` 不变。结论见 [`result.md`](../works/2026-10-25-runtime-openapi-export/result.md)。
 - `2026-10-25-core-config`：把配置从 `CMP-platform` 拆到 `CMP-config`，支持 `default.toml` / `local.toml` / `process.env` 合并与校验；组件数 8 → 9，默认端口仍为 3000。结论见 [`result.md`](../works/2026-10-25-core-config/result.md)。
 - `2026-10-25-expert-aggregate-write`：专家创建即装配、`PATCH /experts/{id}` 聚合部分更新；一次事务、一次 `revision`，保留原 `PUT` 与装配端点。结论见 [`result.md`](../works/2026-10-25-expert-aggregate-write/result.md)。
-- `2026-10-25-playbook-method-layer`：新增项目本地方法层 `docs/playbook/`，首份 `backend-contract-boundaries.md` 以 `draft` 落地；上游 `doc-layout-spec` 暂不更新，待本迭代多次复用后统一合并。决策见 [`decision`](../history/decisions/2026-10-25-playbook-method-layer.md)，方法见 [`playbook`](../playbook/backend-contract-boundaries.md)。
+- `2026-10-25-list-read-model`：列表直接补 `SkillListItem.triggers`、`ExpertListItem.skills`（前 3 个 `{id,name}`）、`ToolListItem.description`；不引入 BFF 富化或前端 N+1。结论见 [`result.md`](../works/2026-10-25-list-read-model/result.md)。
 - 后续不预置 M2/M4 的答案；实际运行需求出现时再启动对应工序。B1 只覆盖控制面资产注册，不包含工作流与运行实例。早期开放问题已关闭，见 [`open-questions.md`](open-questions.md)。

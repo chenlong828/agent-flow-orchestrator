@@ -141,6 +141,18 @@ describe("专家 HTTP 契约", () => {
       toolCount: 0,
       persona: ["全局观", "谨慎"],
     });
+    expect(list.body.items[0].skills).toEqual([]);
+  });
+
+  test("GET 列表返回前 3 个 Skill 预览，按装配顺序", async () => {
+    const created = await createExpert("预览专家");
+    await ctx.expertService.setSkills(created.id, 1, [...skillIds].reverse());
+    const list = await call(ctx.app, "GET", "/api/v1/experts?q=预览专家");
+    expect(list.body.items[0].skills).toEqual([
+      { id: skillIds[1], name: "调用链分析" },
+      { id: skillIds[0], name: "CRES 技能" },
+    ]);
+    expect(list.body.items[0].skillCount).toBe(2);
   });
 
   test("GET 详情返回解析后的 Skill/工具摘要；不存在 404", async () => {

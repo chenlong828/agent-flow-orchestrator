@@ -51,12 +51,12 @@ export type ExpertSummary = {
   skillCount: number;
   toolCount: number;
   refCount: number;
+  skillIds: string[];
   revision: number;
   updatedAt: string;
 };
 
 export type ExpertDetail = ExpertSummary & {
-  skillIds: string[];
   toolIds: string[];
   refs: ExpertRefInput[];
   createdAt: string;

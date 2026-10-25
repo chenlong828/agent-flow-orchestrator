@@ -531,6 +531,7 @@ describe("B1 公共契约", () => {
     const tool = await post("/api/v1/tools", toolBody("snapshot-tool"));
     const toolList = await call(ctx.app, "GET", "/api/v1/tools?q=snapshot-tool");
     expect(keys(toolList.body.items[0])).toEqual([
+      "description",
       "harnessId",
       "harnessName",
       "id",
@@ -576,6 +577,7 @@ describe("B1 公共契约", () => {
       "revision",
       "summary",
       "tags",
+      "triggers",
       "updatedAt",
       "usedByCount",
       "version",
@@ -612,6 +614,7 @@ describe("B1 公共契约", () => {
       "revision",
       "role",
       "skillCount",
+      "skills",
       "toolCount",
       "updatedAt",
     ]);

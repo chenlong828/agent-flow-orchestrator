@@ -100,12 +100,12 @@ type SkillSummary = {
   version: string;
   enabled: boolean;
   tags: string[];
+  triggers: string[];
   revision: number;
   updatedAt: string;
 };
 
 type SkillDetail = SkillSummary & {
-  triggers: string[];
   sections: SkillSections;
   pitfalls: string[];
   refs: SkillRefInput[];
@@ -128,7 +128,7 @@ type SkillQuery = {
 };
 ```
 
-`SkillSummary` 不包含 `usedByCount`；由 `catalog` 组合。`version` 由服务端计算，客户端不可写。
+`SkillSummary` 不包含 `usedByCount`；由 `catalog` 组合。`triggers` 进入摘要，供列表检索/导航直接使用；完整子表仍只在详情读取。`version` 由服务端计算，客户端不可写。
 
 ### 3.2 方法契约
 

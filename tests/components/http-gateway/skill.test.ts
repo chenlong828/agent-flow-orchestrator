@@ -86,6 +86,7 @@ describe("Skill HTTP 契约", () => {
     expect(coding.status).toBe(200);
     expect(coding.body.total).toBe(1);
     expect(coding.body.items[0].categoryLabel).toBe("编码");
+    expect(coding.body.items[0].triggers).toEqual(["写需求", "出方案"]);
 
     const tagged = await call(ctx.app, "GET", "/api/v1/skills?tag=检索&enabled=true");
     expect(tagged.body.total).toBe(1);

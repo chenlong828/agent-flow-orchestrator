@@ -1500,6 +1500,7 @@ components:
       - name
       - kind
       - invocation
+      - description
       - harnessId
       - harnessName
       - timeoutMs
@@ -1527,6 +1528,10 @@ components:
           minLength: 1
           maxLength: 500
           description: 命令模板或端点
+        description:
+          type: string
+          maxLength: 500
+          description: 描述；列表检索与导航使用，空描述返回空字符串
         harnessId:
           type: string
           format: uuid
@@ -1569,14 +1574,9 @@ components:
       - "$ref": "#/components/schemas/ToolListItem"
       - type: object
         required:
-        - description
         - params
         - createdAt
         properties:
-          description:
-            type: string
-            maxLength: 500
-            description: 描述
           params:
             type: array
             items:
@@ -1586,7 +1586,7 @@ components:
             type: string
             format: date-time
             description: 创建时间，ISO-8601 UTC
-      description: 工具详情；列表项字段加参数、描述与创建时间。
+      description: 工具详情；列表项字段加参数与创建时间。
     ToolCreate:
       type: object
       required:
@@ -1723,6 +1723,7 @@ components:
       - version
       - enabled
       - tags
+      - triggers
       - usedByCount
       - revision
       - updatedAt
@@ -1758,6 +1759,11 @@ components:
           items:
             type: string
           description: 标签，有序
+        triggers:
+          type: array
+          items:
+            type: string
+          description: 触发条件，有序且唯一；列表检索使用
         usedByCount:
           type: integer
           minimum: 0
@@ -1776,17 +1782,11 @@ components:
       - "$ref": "#/components/schemas/SkillListItem"
       - type: object
         required:
-        - triggers
         - sections
         - pitfalls
         - refs
         - createdAt
         properties:
-          triggers:
-            type: array
-            items:
-              type: string
-            description: 触发条件，有序且唯一
           sections:
             "$ref": "#/components/schemas/SkillSections"
             description: 五章，全部必填
@@ -1804,7 +1804,7 @@ components:
             type: string
             format: date-time
             description: 创建时间，ISO-8601 UTC
-      description: Skill 详情；列表项字段加五章、触发、踩坑与引用。
+      description: Skill 详情；列表项字段加五章、踩坑与引用。
     SkillCreate:
       type: object
       required:
@@ -1982,7 +1982,21 @@ components:
           "$ref": "#/components/schemas/ToolStatus"
           description: 运行时状态
       description: 专家装配的工具摘要。
-    ExpertListItem:
+    ExpertSkillPreview:
+      type: object
+      required:
+      - id
+      - name
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Skill ID
+        name:
+          type: string
+          description: Skill 名称
+      description: 专家列表使用的前 3 个 Skill 预览。
+    ExpertBase:
       type: object
       required:
       - id
@@ -2043,10 +2057,24 @@ components:
           type: string
           format: date-time
           description: 更新时间，ISO-8601 UTC
-      description: 专家列表项；装配计数由关系实时派生，refCount 在 B1 固定为 0。
+      description: 专家列表与详情共享字段；装配计数由关系实时派生，refCount 在 B1 固定为 0。
+    ExpertListItem:
+      allOf:
+      - "$ref": "#/components/schemas/ExpertBase"
+      - type: object
+        required:
+        - skills
+        properties:
+          skills:
+            type: array
+            maxItems: 3
+            items:
+              "$ref": "#/components/schemas/ExpertSkillPreview"
+            description: 前 3 个装配 Skill 预览，按装配顺序；无装配为空数组
+      description: 专家列表项；共享字段加前 3 个 Skill 预览，供卡片导航使用。
     ExpertDetail:
       allOf:
-      - "$ref": "#/components/schemas/ExpertListItem"
+      - "$ref": "#/components/schemas/ExpertBase"
       - type: object
         required:
         - duty
@@ -2074,7 +2102,7 @@ components:
             type: array
             items:
               "$ref": "#/components/schemas/ExpertSkillSummary"
-            description: 装配 Skill 摘要
+            description: 装配 Skill 摘要，完整列表
           tools:
             type: array
             items:
@@ -2089,7 +2117,7 @@ components:
             type: string
             format: date-time
             description: 创建时间，ISO-8601 UTC
-      description: 专家详情；列表项字段加五区、装配摘要与引用。
+      description: 专家详情；共享字段加五区、完整装配摘要与引用。
     ExpertCreate:
       type: object
       required:

@@ -79,6 +79,8 @@ describe("OpenAPI 契约结构", () => {
       "SkillCreate",
       "SkillDetail",
       "ExpertListItem",
+      "ExpertBase",
+      "ExpertSkillPreview",
       "ExpertCreate",
       "ExpertAggregatePatch",
       "ExpertDetail",
@@ -113,13 +115,13 @@ describe("OpenAPI 契约结构", () => {
 
   test("components 完整，所有 $ref 都可解析", () => {
     expect(Object.keys(spec.components.parameters)).toHaveLength(7);
-    expect(Object.keys(spec.components.schemas)).toHaveLength(49);
+    expect(Object.keys(spec.components.schemas)).toHaveLength(51);
     expect(Object.keys(spec.components.responses)).toHaveLength(6);
 
     const refs = [...text.matchAll(/\$ref['"]?\s*:\s*['"]?#\/components\/([^'"]+)['"]?/g)].map(
       (match) => match[1]!,
     );
-    expect(refs.length).toBe(300);
+    expect(refs.length).toBe(302);
     const missing: string[] = [];
     for (const ref of new Set(refs)) {
       let current: any = spec.components;

@@ -67,7 +67,7 @@ curl http://127.0.0.1:3100/healthz
 验证：
 
 ```bash
-bun test --max-concurrency=1   # 197 个测试
+bun test --max-concurrency=1   # 199 个测试
 bun run typecheck              # tsc --noEmit
 ```
 

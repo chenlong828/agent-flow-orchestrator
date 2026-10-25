@@ -43,12 +43,12 @@ export type SkillSummary = {
   version: string;
   enabled: boolean;
   tags: string[];
+  triggers: string[];
   revision: number;
   updatedAt: string;
 };
 
 export type SkillDetail = SkillSummary & {
-  triggers: string[];
   sections: SkillSections;
   pitfalls: string[];
   refs: SkillRefInput[];
