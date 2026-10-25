@@ -34,7 +34,7 @@ updated: 2026-10-25
 
 1. `T-B1-D01` 用例清单 → [`use-cases.md`](use-cases.md)（已完成）。
 2. `T-B1-D02` 领域对象清单 → [`domain-objects.md`](domain-objects.md)（已完成）。
-3. `T-B1-D03` 组件规格与 REST API → [`design/architecture.md`](../../design/architecture.md) + 8 份组件规格 + REST API 列表 + [OpenAPI](../../design/components/http-gateway/openapi.yaml)（已完成）；UI 侧仍按契约印证。
+3. `T-B1-D03` 组件规格与 REST API → [`design/architecture.md`](../../design/architecture.md) + 8 份组件规格 + REST API 列表 + [OpenAPI](../../../src/components/http-gateway/openapi.yaml)（已完成）；UI 侧仍按契约印证。
 4. `T-B1-D04` 表级数据库设计：按 Harness → 工具 → Skill → 专家逐聚合，逐表设计（已完成并落入迁移）。
 5. `T-B1-D05` 组件契约复核与任务拆分（已完成）：用户直接要求实现，视为通过该门。
 6. 实现已按「用例 × 组件」切片完成，验证结果见 [`result.md`](result.md)。
@@ -47,7 +47,7 @@ updated: 2026-10-25
 2. B1 设计提议（仅 B1）→ [`proposal.md`](proposal.md)。
 3. 用例清单草案 → [`use-cases.md`](use-cases.md)。
 4. 数据领域对象清单草案 → [`domain-objects.md`](domain-objects.md)。
-5. 组件规格与 REST API 契约 → [`design/architecture.md`](../../design/architecture.md)、[`design/components/http-gateway/spec.md`](../../design/components/http-gateway/spec.md)、[`openapi.yaml`](../../design/components/http-gateway/openapi.yaml)。
+5. 组件规格与 REST API 契约 → [`design/architecture.md`](../../design/architecture.md)、[`design/components/http-gateway/spec.md`](../../design/components/http-gateway/spec.md)、[`openapi.yaml`](../../../src/components/http-gateway/openapi.yaml)。
 6. 设计/实施计划 → [`implementation-plan.md`](implementation-plan.md)。
 7. kernel / platform / 16 张表迁移 → `src/core/`、`db/migrations/`。
 8. 四类资产领域、catalog 读模型、HTTP 网关与组合根 → `src/components/`、`src/main.ts`。
@@ -55,7 +55,7 @@ updated: 2026-10-25
 
 ## 下一步（不在本工序）
 
-1. 把 [`http-gateway/spec.md`](../../design/components/http-gateway/spec.md) 与 [`openapi.yaml`](../../design/components/http-gateway/openapi.yaml) 交给 `agent-flow-ui` 侧按契约印证；UI 接入与适配层是另一个项目的工作。
+1. 把 [`http-gateway/spec.md`](../../design/components/http-gateway/spec.md) 与 [`openapi.yaml`](../../../src/components/http-gateway/openapi.yaml) 交给 `agent-flow-ui` 侧按契约印证；UI 接入与适配层是另一个项目的工作。
 2. B2/B3/B4（Key/工作区、工作流、实例/看板）与 ACP 执行模型另立工序，按各自改动级别走确认门。
 3. 生产化事项（鉴权、CORS、限流、容量、SLA、故障演练）未定，不在 B1 结果内。
 

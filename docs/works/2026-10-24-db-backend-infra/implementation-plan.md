@@ -35,7 +35,7 @@ updated: 2026-10-25
 |---|---|---|---|
 | D01 | `T-B1-D01` 用例清单 | [`use-cases.md`](use-cases.md) | 对象清单定稿 |
 | D02 | `T-B1-D02` 领域对象清单 | [`domain-objects.md`](domain-objects.md) | 组件规格与 REST 契约 |
-| D03 | `T-B1-D03` 组件规格与 REST API | [`design/architecture.md`](../../design/architecture.md) + 8 份组件规格 + REST API 列表 + [OpenAPI](../../design/components/http-gateway/openapi.yaml) | 表级数据库设计 |
+| D03 | `T-B1-D03` 组件规格与 REST API | [`design/architecture.md`](../../design/architecture.md) + 8 份组件规格 + REST API 列表 + [OpenAPI](../../../src/components/http-gateway/openapi.yaml) | 表级数据库设计 |
 | D04 | `T-B1-D04` 表级数据库设计 | 各组件规格的 `数据模型` 章节（列/约束/索引/删除） | 契约复核与任务拆分 |
 | D05 | `T-B1-D05` 组件契约复核与任务拆分 | 组件卡复核、契约一致性检查、实现任务表 | 编码 |
 
@@ -214,7 +214,7 @@ updated: 2026-10-25
 
 ## 10 下一步（不在本工序）
 
-- 外部 UI 若接入，由该项目按 [`http-gateway/spec.md`](../../design/components/http-gateway/spec.md) 与 [`openapi.yaml`](../../design/components/http-gateway/openapi.yaml) 自行做适配层/契约测试。
+- 外部 UI 若接入，由该项目按 [`http-gateway/spec.md`](../../design/components/http-gateway/spec.md) 与 [`openapi.yaml`](../../../src/components/http-gateway/openapi.yaml) 自行做适配层/契约测试。
 - B2/B3/B4、ACP 执行模型与生产化事项另立工序，各自走确认门。
 - 本工序结论与验证记录见 [`result.md`](result.md)。
 

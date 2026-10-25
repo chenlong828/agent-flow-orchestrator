@@ -71,14 +71,6 @@ const expertService = createExpertService({
 const health = createHealth(db);
 
 const docs = await createApiDocs({
-  specFile: join(
-    process.cwd(),
-    "docs",
-    "design",
-    "components",
-    "http-gateway",
-    "openapi.yaml",
-  ),
   assetsDirectory: join(
     process.cwd(),
     "src",

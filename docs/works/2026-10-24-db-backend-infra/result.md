@@ -67,7 +67,7 @@ B1 的 29 个业务端点与 `/healthz` 已按 [`http-gateway/spec.md`](../../de
 
 | 内容 | 落点 |
 |---|---|
-| REST 端点与 DTO | [`http-gateway/spec.md`](../../design/components/http-gateway/spec.md)、[`openapi.yaml`](../../design/components/http-gateway/openapi.yaml) |
+| REST 端点与 DTO | [`http-gateway/spec.md`](../../design/components/http-gateway/spec.md)、[`openapi.yaml`](../../../src/components/http-gateway/openapi.yaml) |
 | 组件边界与依赖 | [`architecture.md`](../../design/architecture.md) |
 | 表结构与迁移 | [`db/migrations/`](../../../db/migrations/) |
 | 实现入口 | [`src/main.ts`](../../../src/main.ts) |

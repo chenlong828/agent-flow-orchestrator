@@ -10,14 +10,6 @@ import { closeTestDb } from "../../helpers/test-db.ts";
 import { createTestContext, type TestContext } from "../../helpers/app.ts";
 
 const ROOT = join(import.meta.dir, "../../..");
-const SPEC_FILE = join(
-  ROOT,
-  "docs",
-  "design",
-  "components",
-  "http-gateway",
-  "openapi.yaml",
-);
 const ASSETS_DIRECTORY = join(
   ROOT,
   "src",
@@ -40,7 +32,6 @@ async function handle(path: string, method = "GET"): Promise<Response | null> {
 
 beforeAll(async () => {
   docs = await createApiDocs({
-    specFile: SPEC_FILE,
     assetsDirectory: ASSETS_DIRECTORY,
   });
   ctx = await createTestContext();
@@ -51,6 +42,19 @@ afterAll(async () => {
 });
 
 describe("Swagger 文档端点", () => {
+  test("OpenAPI 只由组件持有，不再保留设计目录副本", async () => {
+    expect(
+      await Bun.file(
+        join(ROOT, "docs", "design", "components", "http-gateway", "openapi.yaml"),
+      ).exists(),
+    ).toBe(false);
+    expect(
+      await Bun.file(
+        join(ROOT, "src", "components", "http-gateway", "openapi.yaml"),
+      ).exists(),
+    ).toBe(true);
+  });
+
   test("/docs 与 /docs/ 返回 Swagger UI HTML，并只引用本地资源", async () => {
     for (const path of ["/docs", "/docs/"]) {
       const response = await handle(path);
@@ -77,6 +81,10 @@ describe("Swagger 文档端点", () => {
     expect(response!.headers.get("content-type")).toBe("application/yaml; charset=utf-8");
     const spec = Bun.YAML.parse(await response!.text()) as any;
     expect(spec.openapi).toBe("3.0.3");
+    expect(spec.info["x-runtime-asset"]).toBe(true);
+    expect(spec.info["x-source-spec"]).toBe(
+      "docs/design/components/http-gateway/spec.md",
+    );
     expect(spec.servers).toEqual([
       {
         url: "/",
@@ -155,7 +163,6 @@ describe("Swagger 文档端点", () => {
   test("缺少静态资源时启动失败，不带病提供服务", async () => {
     await expect(
       createApiDocs({
-        specFile: SPEC_FILE,
         assetsDirectory: join(ROOT, "src", "components", "http-gateway", "no-such-assets"),
       }),
     ).rejects.toThrow("缺少 API 文档静态资源");

@@ -110,7 +110,7 @@ config
 | `CMP-skill` | `skill_category`（种子只读）、`skill`、`skill_tag`、`skill_trigger`、`skill_section`、`skill_pitfall`、`skill_ref` | Skill 服务 |
 | `CMP-expert` | `expert`、`expert_persona`、`expert_skill`、`expert_tool`、`expert_ref` | 专家服务 |
 | `CMP-catalog` | 无 | 无，只读组合 |
-| `CMP-http-gateway` | 无 | 无，只做协议翻译与静态文档托管 |
+| `CMP-http-gateway` | 无 | 无，只做协议翻译与 OpenAPI / Swagger UI 托管 |
 
 - 引用计数、`toolCount`、`usedByCount`、`refCount` 不落可写列。
 - 删除规则与不变量见各组件规格的「拥有的数据」章节；列级外键与索引在 `T-B1-D04` 补。
@@ -120,7 +120,7 @@ config
 
 - 基础路径：`/api/v1`；健康检查：`/healthz`（不在 `/api/v1` 下）。
 - 29 个 B1 业务端点：Harness 7、工具 6、Skill 8、专家 8。
-- 开发者文档：Swagger UI `/docs`、静态资源 `/docs/*`、OpenAPI `/openapi.yaml`；不计入业务端点，不写入 OpenAPI `paths`。
+- 开发者文档：Swagger UI `/docs`、静态资源 `/docs/*`、OpenAPI `/openapi.yaml`；OpenAPI 资产由 `CMP-http-gateway` 直接提供，不在 `docs/` 维护设计副本；不计入业务端点，不写入 OpenAPI `paths`。
 - 契约明细：方法、路径、查询参数、请求/响应 DTO、错误码、并发头、删除引用列表，全部在 [`components/http-gateway/spec.md`](components/http-gateway/spec.md)。
 - 外部 UI 页面映射（参考）：Harness 页、工具页、Skill 页、专家页；本仓库无 Key/工作区/工作流/实例/看板端点。
 - 契约验证：本项目用 HTTP 契约测试与用例旅程验证契约；外部 UI 若接入，由该项目按端点表与 DTO 表自行适配。
@@ -154,6 +154,6 @@ config
 
 - `T-B1-D04` 已完成：16 张业务表落入 [`db/migrations/`](../../db/migrations/)，未改变本文与 REST DTO 的字段语义。
 - `ReferenceGuard` 已按端口方案实现：端口在 `kernel`，由 `catalog` 实现，领域删除服务经组合根注入；未新增 L2 删除组件。
-- REST API 已按 [`http-gateway/spec.md`](components/http-gateway/spec.md) 实现；Swagger 文档已挂到 `/docs` 与 `/openapi.yaml`，结果见 [`api-swagger/result.md`](../works/2026-10-25-api-swagger/result.md)。UI 是独立项目，是否接入由该项目决定，契约反馈只改本仓库契约。
+- REST API 已按 [`http-gateway/spec.md`](components/http-gateway/spec.md) 实现；Swagger 文档已挂到 `/docs` 与 `/openapi.yaml`，结果见 [`api-swagger/result.md`](../works/2026-10-25-api-swagger/result.md) 与 [`runtime-openapi-export/result.md`](../works/2026-10-25-runtime-openapi-export/result.md)。UI 是独立项目，是否接入由该项目决定，契约反馈只改本仓库契约。
 - 组件状态均为 `current`；实现与验证结果见 [`result.md`](../works/2026-10-24-db-backend-infra/result.md)。
 - `CMP-config` 已从 `CMP-platform` 拆出；TOML + `process.env` 启动配置结果见 [`core-config/result.md`](../works/2026-10-25-core-config/result.md)。

@@ -83,7 +83,7 @@ export async function createApiDocs(options: {
 
 ```ts
 const docs = await createApiDocs({
-  specFile: join(process.cwd(), "docs", "design", "components", "http-gateway", "openapi.yaml"),
+  specFile: join(process.cwd(), "src", "components", "http-gateway", "openapi.yaml"),
   assetsDirectory: join(process.cwd(), "src", "components", "http-gateway", "docs-assets"),
 });
 ```
@@ -122,7 +122,7 @@ src/components/http-gateway/docs-assets/** linguist-vendored
 
 这样 GitHub 不把 Swagger UI 统计成项目源码；不影响 Bun 读取。
 
-### 3.6 修改 `docs/design/components/http-gateway/openapi.yaml`
+### 3.6 修改 `src/components/http-gateway/openapi.yaml`
 
 只做两处最小改动：
 

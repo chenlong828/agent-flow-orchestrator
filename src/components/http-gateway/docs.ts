@@ -64,10 +64,11 @@ function assetName(pathname: string): AssetName | undefined {
 }
 
 export async function createApiDocs(options: {
-  specFile: string;
+  specFile?: string;
   assetsDirectory: string;
 }): Promise<ApiDocs> {
-  const spec = await Bun.file(options.specFile).text();
+  const specFile = options.specFile ?? join(import.meta.dir, "openapi.yaml");
+  const spec = await Bun.file(specFile).text();
 
   const assets = new Map<AssetName, ArrayBuffer>();
   for (const name of Object.keys(ASSETS) as AssetName[]) {

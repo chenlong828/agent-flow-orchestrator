@@ -4,8 +4,7 @@ import { join } from "node:path";
 const ROOT = join(import.meta.dir, "../../..");
 const SPEC_FILE = join(
   ROOT,
-  "docs",
-  "design",
+  "src",
   "components",
   "http-gateway",
   "openapi.yaml",
@@ -38,7 +37,7 @@ describe("OpenAPI 契约结构", () => {
     expect(spec.info["x-api-count"]).toBe(29);
   });
 
-  test("operationId、summary、tag 与响应齐全", () => {
+  test("operation 介绍、schema 说明与 tag 齐全", () => {
     const ids = operations.map(({ operation }) => operation.operationId);
     expect(new Set(ids).size).toBe(ids.length);
 
@@ -46,6 +45,8 @@ describe("OpenAPI 契约结构", () => {
     for (const { path, method, operation } of operations) {
       expect(typeof operation.operationId).toBe("string");
       expect(typeof operation.summary).toBe("string");
+      expect(typeof operation.description).toBe("string");
+      expect(operation.description.trim().length).toBeGreaterThan(0);
       expect(operation.tags.length).toBeGreaterThan(0);
       for (const tag of operation.tags) {
         expect(topTags.has(tag)).toBe(true);
@@ -59,6 +60,40 @@ describe("OpenAPI 契约结构", () => {
       .map(({ operation }) => operation["x-api-id"])
       .filter((id: unknown) => typeof id === "string" && /^API-\d+$/.test(id));
     expect(apiIds).toHaveLength(29);
+
+    for (const [name, schema] of Object.entries<any>(spec.components.schemas)) {
+      expect(typeof schema.description, name).toBe("string");
+      expect(schema.description.trim().length, name).toBeGreaterThan(0);
+    }
+  });
+
+  test("核心 DTO 字段都带说明", () => {
+    const core = [
+      "HarnessListItem",
+      "HarnessCreate",
+      "HarnessDetail",
+      "ToolListItem",
+      "ToolCreate",
+      "ToolDetail",
+      "SkillListItem",
+      "SkillCreate",
+      "SkillDetail",
+      "ExpertListItem",
+      "ExpertCreate",
+      "ExpertDetail",
+      "ReferencePage",
+      "ErrorDetail",
+    ];
+    for (const name of core) {
+      const schema = spec.components.schemas[name];
+      const parts = schema.allOf ?? [schema];
+      for (const part of parts) {
+        for (const [property, value] of Object.entries<any>(part.properties ?? {})) {
+          expect(typeof value.description, `${name}.${property}`).toBe("string");
+          expect(value.description.trim().length, `${name}.${property}`).toBeGreaterThan(0);
+        }
+      }
+    }
   });
 
   test("components 完整，所有 $ref 都可解析", () => {
@@ -66,7 +101,7 @@ describe("OpenAPI 契约结构", () => {
     expect(Object.keys(spec.components.schemas)).toHaveLength(48);
     expect(Object.keys(spec.components.responses)).toHaveLength(6);
 
-    const refs = [...text.matchAll(/\$ref:\s*['"]?#\/components\/([^'"]+)['"]?/g)].map(
+    const refs = [...text.matchAll(/\$ref['"]?\s*:\s*['"]?#\/components\/([^'"]+)['"]?/g)].map(
       (match) => match[1]!,
     );
     expect(refs.length).toBe(290);

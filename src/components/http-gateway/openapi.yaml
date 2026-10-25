@@ -1,0 +1,2313 @@
+---
+openapi: 3.0.3
+info:
+  title: AgentFlow B1 资产注册中心 API
+  version: 0.1.0
+  description: |
+    AgentFlow B1 控制面的 HTTP JSON 契约，覆盖 Harness、工具、Skill、专家、
+    引用页与健康检查。业务端点统一以 `/api/v1` 为前缀，`/healthz` 不参与版本。
+
+    本文件是 `CMP-http-gateway` 的运行时 OpenAPI 资产，由 `spec.md` 派生，供外部 HTTP 客户端与接口调试工具对照使用。
+    本仓库只提供 HTTP API，不提供产品 UI、CLI 或库；Swagger UI 是开发者文档，不是产品 UI。
+    `spec.md` 是契约权威版本；若两者冲突，以 `spec.md` 为准。
+
+    通用约定：
+    - 请求/响应为 `application/json; charset=utf-8`；ID 为 UUIDv7；时间为 ISO-8601 UTC。
+    - 列表响应为 `{items,total,limit,offset}`；`limit` 默认 50、上限 200。
+    - 更新、启停、删除、专家装配需带 `If-Match: "<revision>"`；缺少为 428，旧版本为 409。
+    - 无登录/鉴权；`X-Actor` 仅用于显示，不是身份。请求可带 `X-Request-Id`，响应可回显。无 CORS 配置。
+  x-source-spec: docs/design/components/http-gateway/spec.md
+  x-contract-status: current
+  x-api-count: 29
+  license:
+    name: Internal use only
+  x-runtime-asset: true
+security: []
+servers:
+- url: "/"
+  description: 当前文档所在服务；业务路径已包含 /api/v1，/healthz 不在版本内。
+tags:
+- name: Harness
+  description: Harness 资产的生命周期、检索与引用。
+- name: Tool
+  description: 工具资产、参数、Harness 归属与引用。
+- name: Skill
+  description: Skill 资产、五章、分类、启停与引用。
+- name: Expert
+  description: 专家资产、五区、有序装配与引用。
+- name: Reference
+  description: 删除前的引用检查页。
+- name: Health
+  description: 进程与数据库健康检查。
+paths:
+  "/healthz":
+    get:
+      tags:
+      - Health
+      summary: API-H 健康检查
+      operationId: getHealth
+      x-api-id: API-H
+      x-component-method: platform.Health.check
+      description: 返回进程与数据库健康状态；数据库不可用时返回 503。
+      responses:
+        '200':
+          description: 进程与数据库均正常。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Health"
+        '503':
+          description: 数据库不可用。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Health"
+  "/api/v1/harnesses":
+    parameters:
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    get:
+      tags:
+      - Harness
+      summary: API-01 查询 Harness 列表
+      operationId: listHarnesses
+      x-api-id: API-01
+      x-component-method: catalog.listHarnesses
+      description: 按名称、类型、启停状态、健康状态筛选；支持分页与排序。
+      parameters:
+      - "$ref": "#/components/parameters/Q"
+      - name: kind
+        in: query
+        required: false
+        description: Harness 类型。
+        schema:
+          "$ref": "#/components/schemas/HarnessKind"
+      - name: enabled
+        in: query
+        required: false
+        description: 启停状态。
+        schema:
+          type: boolean
+      - name: health
+        in: query
+        required: false
+        description: 运行时健康状态。
+        schema:
+          "$ref": "#/components/schemas/HarnessHealth"
+      - "$ref": "#/components/parameters/Limit"
+      - "$ref": "#/components/parameters/Offset"
+      - name: sort
+        in: query
+        required: false
+        description: 排序字段与方向。
+        schema:
+          "$ref": "#/components/schemas/HarnessSort"
+      responses:
+        '200':
+          description: Harness 分页列表。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/HarnessList"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+    post:
+      tags:
+      - Harness
+      summary: API-03 创建 Harness
+      operationId: createHarness
+      x-api-id: API-03
+      x-component-method: harness.create + catalog.getHarness
+      description: 创建成功后返回资源详情；可传 `enabled`，默认 `true`。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/HarnessCreate"
+      responses:
+        '201':
+          description: 创建成功。
+          headers:
+            Location:
+              description: 新资源详情路径。
+              schema:
+                type: string
+                example: "/api/v1/harnesses/0191f2f0-7a5e-7c3b-9d1a-3f2b4c5d6e7f"
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/HarnessDetail"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/harnesses/{id}":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    get:
+      tags:
+      - Harness
+      summary: API-02 查询 Harness 详情
+      operationId: getHarness
+      x-api-id: API-02
+      x-component-method: catalog.getHarness
+      responses:
+        '200':
+          description: Harness 详情。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/HarnessDetail"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      description: 按 ID 返回 Harness 详情；在列表字段之外包含 `description` 与 `createdAt`。
+    put:
+      tags:
+      - Harness
+      summary: API-04 全量更新 Harness
+      operationId: updateHarness
+      x-api-id: API-04
+      x-component-method: harness.update + catalog.getHarness
+      description: 全量更新；不接收 `enabled`，启停使用 API-05。
+      parameters:
+      - "$ref": "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/HarnessUpdate"
+      responses:
+        '200':
+          description: 更新后的 Harness 详情。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/HarnessDetail"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '428':
+          "$ref": "#/components/responses/PreconditionRequired"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+    delete:
+      tags:
+      - Harness
+      summary: API-06 删除 Harness
+      operationId: deleteHarness
+      x-api-id: API-06
+      x-component-method: harness.delete
+      description: 被工具引用时返回 409 `referenced`；成功后无响应体。
+      parameters:
+      - "$ref": "#/components/parameters/IfMatch"
+      responses:
+        '204':
+          description: 删除成功，无响应体。
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '428':
+          "$ref": "#/components/responses/PreconditionRequired"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/harnesses/{id}/enabled":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    patch:
+      tags:
+      - Harness
+      summary: API-05 启用/停用 Harness
+      operationId: setHarnessEnabled
+      x-api-id: API-05
+      x-component-method: harness.setEnabled + catalog.getHarness
+      parameters:
+      - "$ref": "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/EnabledPatch"
+      responses:
+        '200':
+          description: 更新后的 Harness 详情。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/HarnessDetail"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '428':
+          "$ref": "#/components/responses/PreconditionRequired"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      description: 设置 Harness 启停；请求体为 `{enabled:boolean}`，成功返回更新后的详情。
+  "/api/v1/harnesses/{id}/references":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    get:
+      tags:
+      - Reference
+      summary: API-07 查询 Harness 的引用工具
+      operationId: listHarnessReferences
+      x-api-id: API-07
+      x-component-method: catalog.referencesForHarness
+      responses:
+        '200':
+          description: Harness 引用页；`asset.type=harness`，条目类型为 `tool`。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ReferencePage"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      description: 返回引用该 Harness 的工具；`asset.type=harness`，条目类型为 `tool`。
+  "/api/v1/tools":
+    parameters:
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    get:
+      tags:
+      - Tool
+      summary: API-08 查询工具列表
+      operationId: listTools
+      x-api-id: API-08
+      x-component-method: catalog.listTools
+      description: 按名称、类型、状态、所属 Harness 筛选；支持分页与排序。
+      parameters:
+      - "$ref": "#/components/parameters/Q"
+      - name: kind
+        in: query
+        required: false
+        description: 工具类型。
+        schema:
+          "$ref": "#/components/schemas/ToolKind"
+      - name: status
+        in: query
+        required: false
+        description: 运行时状态。
+        schema:
+          "$ref": "#/components/schemas/ToolStatus"
+      - name: harnessId
+        in: query
+        required: false
+        description: 所属 Harness ID。
+        schema:
+          type: string
+          format: uuid
+      - "$ref": "#/components/parameters/Limit"
+      - "$ref": "#/components/parameters/Offset"
+      - name: sort
+        in: query
+        required: false
+        description: 排序字段与方向。
+        schema:
+          "$ref": "#/components/schemas/ToolSort"
+      responses:
+        '200':
+          description: 工具分页列表。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ToolList"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+    post:
+      tags:
+      - Tool
+      summary: API-10 创建工具
+      operationId: createTool
+      x-api-id: API-10
+      x-component-method: tool.create + catalog.getTool
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ToolCreate"
+      responses:
+        '201':
+          description: 创建成功。
+          headers:
+            Location:
+              description: 新资源详情路径。
+              schema:
+                type: string
+                example: "/api/v1/tools/0191f2f0-7a5e-7c3b-9d1a-3f2b4c5d6e7f"
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ToolDetail"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      description: 创建工具；`harnessId` 必须存在，`params` 按数组顺序整体写入，`status` 固定为 `unverified`。
+  "/api/v1/tools/{id}":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    get:
+      tags:
+      - Tool
+      summary: API-09 查询工具详情
+      operationId: getTool
+      x-api-id: API-09
+      x-component-method: catalog.getTool
+      responses:
+        '200':
+          description: 工具详情。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ToolDetail"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      description: 按 ID 返回工具详情；包含 `params`、`description` 与 `createdAt`。
+    put:
+      tags:
+      - Tool
+      summary: API-11 全量更新工具
+      operationId: updateTool
+      x-api-id: API-11
+      x-component-method: tool.update + catalog.getTool
+      parameters:
+      - "$ref": "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ToolUpdate"
+      responses:
+        '200':
+          description: 更新后的工具详情。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ToolDetail"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '428':
+          "$ref": "#/components/responses/PreconditionRequired"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      description: 全量更新工具；`params` 整体替换，不接收 `status` / `lastDebugAt`。
+    delete:
+      tags:
+      - Tool
+      summary: API-12 删除工具
+      operationId: deleteTool
+      x-api-id: API-12
+      x-component-method: tool.delete
+      description: 被专家引用时返回 409 `referenced`；成功后无响应体。
+      parameters:
+      - "$ref": "#/components/parameters/IfMatch"
+      responses:
+        '204':
+          description: 删除成功，无响应体。
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '428':
+          "$ref": "#/components/responses/PreconditionRequired"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/tools/{id}/references":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    get:
+      tags:
+      - Reference
+      summary: API-13 查询工具的引用专家
+      operationId: listToolReferences
+      x-api-id: API-13
+      x-component-method: catalog.referencesForTool
+      responses:
+        '200':
+          description: 工具引用页；`asset.type=tool`，条目类型为 `expert`。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ReferencePage"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      description: 返回引用该工具的专家；`asset.type=tool`，条目类型为 `expert`。
+  "/api/v1/skills":
+    parameters:
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    get:
+      tags:
+      - Skill
+      summary: API-14 查询 Skill 列表
+      operationId: listSkills
+      x-api-id: API-14
+      x-component-method: catalog.listSkills
+      description: 按名称、分类、启停状态、标签筛选；支持分页与排序。
+      parameters:
+      - "$ref": "#/components/parameters/Q"
+      - name: category
+        in: query
+        required: false
+        description: 分类代码。
+        schema:
+          type: string
+      - name: enabled
+        in: query
+        required: false
+        description: 启停状态。
+        schema:
+          type: boolean
+      - name: tag
+        in: query
+        required: false
+        description: 标签。
+        schema:
+          type: string
+      - "$ref": "#/components/parameters/Limit"
+      - "$ref": "#/components/parameters/Offset"
+      - name: sort
+        in: query
+        required: false
+        description: 排序字段与方向。
+        schema:
+          "$ref": "#/components/schemas/SkillSort"
+      responses:
+        '200':
+          description: Skill 分页列表。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/SkillList"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+    post:
+      tags:
+      - Skill
+      summary: API-16 创建 Skill
+      operationId: createSkill
+      x-api-id: API-16
+      x-component-method: skill.create + catalog.getSkill
+      description: 创建时服务端生成 `v1.0`，`enabled` 默认 `true`；不接收 `version`/`enabled`。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/SkillCreate"
+      responses:
+        '201':
+          description: 创建成功。
+          headers:
+            Location:
+              description: 新资源详情路径。
+              schema:
+                type: string
+                example: "/api/v1/skills/0191f2f0-7a5e-7c3b-9d1a-3f2b4c5d6e7f"
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/SkillDetail"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/skills/{id}":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    get:
+      tags:
+      - Skill
+      summary: API-15 查询 Skill 详情
+      operationId: getSkill
+      x-api-id: API-15
+      x-component-method: catalog.getSkill
+      responses:
+        '200':
+          description: Skill 详情。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/SkillDetail"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      description: 按 ID 返回 Skill 详情；包含五章、触发、踩坑与 `refs`。
+    put:
+      tags:
+      - Skill
+      summary: API-17 全量更新 Skill
+      operationId: updateSkill
+      x-api-id: API-17
+      x-component-method: skill.update + catalog.getSkill
+      description: 服务端递增版本：minor+1；minor 超过 9 时 major+1 且 minor 归零。不接收 `version`/`enabled`。
+      parameters:
+      - "$ref": "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/SkillUpdate"
+      responses:
+        '200':
+          description: 更新后的 Skill 详情。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/SkillDetail"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '428':
+          "$ref": "#/components/responses/PreconditionRequired"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+    delete:
+      tags:
+      - Skill
+      summary: API-19 删除 Skill
+      operationId: deleteSkill
+      x-api-id: API-19
+      x-component-method: skill.delete
+      description: 被专家引用时返回 409 `referenced`；成功后无响应体。
+      parameters:
+      - "$ref": "#/components/parameters/IfMatch"
+      responses:
+        '204':
+          description: 删除成功，无响应体。
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '428':
+          "$ref": "#/components/responses/PreconditionRequired"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/skills/{id}/enabled":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    patch:
+      tags:
+      - Skill
+      summary: API-18 启用/停用 Skill
+      operationId: setSkillEnabled
+      x-api-id: API-18
+      x-component-method: skill.setEnabled + catalog.getSkill
+      parameters:
+      - "$ref": "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/EnabledPatch"
+      responses:
+        '200':
+          description: 更新后的 Skill 详情。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/SkillDetail"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '428':
+          "$ref": "#/components/responses/PreconditionRequired"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      description: 设置 Skill 启停；请求体为 `{enabled:boolean}`，成功返回更新后的详情。
+  "/api/v1/skills/{id}/references":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    get:
+      tags:
+      - Reference
+      summary: API-20 查询 Skill 的引用专家
+      operationId: listSkillReferences
+      x-api-id: API-20
+      x-component-method: catalog.referencesForSkill
+      responses:
+        '200':
+          description: Skill 引用页；`asset.type=skill`，条目类型为 `expert`。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ReferencePage"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      description: 返回引用该 Skill 的专家；`asset.type=skill`，条目类型为 `expert`。
+  "/api/v1/skill-categories":
+    parameters:
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    get:
+      tags:
+      - Skill
+      summary: API-21 查询 Skill 分类
+      operationId: listSkillCategories
+      x-api-id: API-21
+      x-component-method: catalog.listSkillCategories
+      description: 返回只读参考数据，不提供分页。
+      responses:
+        '200':
+          description: Skill 分类列表。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/SkillCategoryList"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/experts":
+    parameters:
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    get:
+      tags:
+      - Expert
+      summary: API-22 查询专家列表
+      operationId: listExperts
+      x-api-id: API-22
+      x-component-method: catalog.listExperts
+      description: 按名称、启停状态筛选；支持分页与排序。
+      parameters:
+      - "$ref": "#/components/parameters/Q"
+      - name: enabled
+        in: query
+        required: false
+        description: 启停状态。
+        schema:
+          type: boolean
+      - "$ref": "#/components/parameters/Limit"
+      - "$ref": "#/components/parameters/Offset"
+      - name: sort
+        in: query
+        required: false
+        description: 排序字段与方向。
+        schema:
+          "$ref": "#/components/schemas/ExpertSort"
+      responses:
+        '200':
+          description: 专家分页列表。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ExpertList"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+    post:
+      tags:
+      - Expert
+      summary: API-24 创建专家
+      operationId: createExpert
+      x-api-id: API-24
+      x-component-method: expert.create + catalog.getExpert
+      description: 创建时不接收 `skills`/`tools`；装配使用 API-28/API-29。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ExpertCreate"
+      responses:
+        '201':
+          description: 创建成功。
+          headers:
+            Location:
+              description: 新资源详情路径。
+              schema:
+                type: string
+                example: "/api/v1/experts/0191f2f0-7a5e-7c3b-9d1a-3f2b4c5d6e7f"
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ExpertDetail"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/experts/{id}":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    get:
+      tags:
+      - Expert
+      summary: API-23 查询专家详情
+      operationId: getExpert
+      x-api-id: API-23
+      x-component-method: catalog.getExpert
+      description: 返回专家五区、装配摘要与引用。
+      responses:
+        '200':
+          description: 专家详情。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ExpertDetail"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+    put:
+      tags:
+      - Expert
+      summary: API-25 全量更新专家
+      operationId: updateExpert
+      x-api-id: API-25
+      x-component-method: expert.update + catalog.getExpert
+      description: 更新五区与引用，不接收 `skills`/`tools`，也不接收 `enabled`。
+      parameters:
+      - "$ref": "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ExpertUpdate"
+      responses:
+        '200':
+          description: 更新后的专家详情。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ExpertDetail"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '428':
+          "$ref": "#/components/responses/PreconditionRequired"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+    delete:
+      tags:
+      - Expert
+      summary: API-27 删除专家
+      operationId: deleteExpert
+      x-api-id: API-27
+      x-component-method: expert.delete
+      description: B1 没有引用专家的资产；成功后无响应体。
+      parameters:
+      - "$ref": "#/components/parameters/IfMatch"
+      responses:
+        '204':
+          description: 删除成功，无响应体。
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '428':
+          "$ref": "#/components/responses/PreconditionRequired"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/experts/{id}/enabled":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    patch:
+      tags:
+      - Expert
+      summary: API-26 启用/停用专家
+      operationId: setExpertEnabled
+      x-api-id: API-26
+      x-component-method: expert.setEnabled + catalog.getExpert
+      parameters:
+      - "$ref": "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/EnabledPatch"
+      responses:
+        '200':
+          description: 更新后的专家详情。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ExpertDetail"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '428':
+          "$ref": "#/components/responses/PreconditionRequired"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      description: 设置专家启停；请求体为 `{enabled:boolean}`，成功返回更新后的详情。
+  "/api/v1/experts/{id}/skills":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    put:
+      tags:
+      - Expert
+      summary: API-28 整体替换专家的有序 Skill
+      operationId: setExpertSkills
+      x-api-id: API-28
+      x-component-method: expert.setSkills + catalog.getExpert
+      description: "`items` 顺序即装配顺序；整体替换，重复目标或目标不存在返回 400，旧 revision 返回 409。"
+      parameters:
+      - "$ref": "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ExpertSkillAssembly"
+      responses:
+        '200':
+          description: 更新后的专家详情。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ExpertDetail"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '428':
+          "$ref": "#/components/responses/PreconditionRequired"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/experts/{id}/tools":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    put:
+      tags:
+      - Expert
+      summary: API-29 整体替换专家的有序工具
+      operationId: setExpertTools
+      x-api-id: API-29
+      x-component-method: expert.setTools + catalog.getExpert
+      description: "`items` 顺序即装配顺序；整体替换，重复目标或目标不存在返回 400，旧 revision 返回 409。"
+      parameters:
+      - "$ref": "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ExpertToolAssembly"
+      responses:
+        '200':
+          description: 更新后的专家详情。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ExpertDetail"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '428':
+          "$ref": "#/components/responses/PreconditionRequired"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+components:
+  parameters:
+    Actor:
+      name: X-Actor
+      in: header
+      required: false
+      description: 显示用操作者标识，不是身份认证。
+      schema:
+        type: string
+        maxLength: 200
+    RequestId:
+      name: X-Request-Id
+      in: header
+      required: false
+      description: 可选的请求追踪 ID；服务端可在响应中回显。
+      schema:
+        type: string
+        maxLength: 200
+    Id:
+      name: id
+      in: path
+      required: true
+      description: 资源 ID（UUIDv7）。
+      schema:
+        type: string
+        format: uuid
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: 当前 revision，带双引号，例如 `"3"`。缺失返回 428，旧版本返回 409。
+      schema:
+        type: string
+        pattern: ^"[1-9][0-9]*"$
+        example: '"3"'
+    Q:
+      name: q
+      in: query
+      required: false
+      description: 名称大小写不敏感包含匹配。
+      schema:
+        type: string
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: 每页数量。
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    Offset:
+      name: offset
+      in: query
+      required: false
+      description: 偏移量。
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+  schemas:
+    ErrorCode:
+      type: string
+      enum:
+      - validation_error
+      - not_found
+      - name_conflict
+      - revision_conflict
+      - referenced
+      - precondition_required
+      - internal
+      - service_unavailable
+      description: 稳定错误码；客户端按 code 分支，不依赖中文 message。
+    ErrorDetail:
+      type: object
+      required:
+      - code
+      - message
+      properties:
+        code:
+          "$ref": "#/components/schemas/ErrorCode"
+          description: 稳定错误码
+        message:
+          type: string
+          description: 中文错误说明
+        details:
+          type: object
+          additionalProperties: true
+          description: 错误附加信息
+        requestId:
+          type: string
+          description: 请求追踪 ID，可能为空
+      description: 统一错误体内容；details 的结构由 code 决定。
+    ErrorResponse:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          "$ref": "#/components/schemas/ErrorDetail"
+          description: 错误内容
+      description: 所有业务错误使用同一外层结构。
+    Health:
+      type: object
+      required:
+      - status
+      - database
+      properties:
+        status:
+          type: string
+          enum:
+          - ok
+          - degraded
+          description: 健康状态
+        database:
+          type: string
+          enum:
+          - up
+          - down
+          description: 数据库状态
+      description: 进程与数据库健康状态；status=degraded 时 HTTP 为 503。
+    EnabledPatch:
+      type: object
+      required:
+      - enabled
+      properties:
+        enabled:
+          type: boolean
+          description: 是否启用
+      description: 启停请求体。
+    HarnessKind:
+      type: string
+      enum:
+      - container
+      - server
+      - desktop
+      - laptop
+      description: Harness 类型。
+    HarnessAccessMode:
+      type: string
+      enum:
+      - agent
+      - ssh
+      - container_registry
+      description: Harness 接入方式。
+    HarnessHealth:
+      type: string
+      enum:
+      - unknown
+      - online
+      - offline
+      - overloaded
+      description: Harness 运行时健康状态；由运行时维护，不由创建/更新请求写入。
+    HarnessQueuePolicy:
+      type: string
+      enum:
+      - fifo
+      - priority
+      description: Harness 排队策略。
+    HarnessSort:
+      type: string
+      enum:
+      - name:asc
+      - name:desc
+      - updatedAt:asc
+      - updatedAt:desc
+      default: updatedAt:desc
+      description: Harness 列表排序字段与方向。
+    HarnessListItem:
+      type: object
+      required:
+      - id
+      - name
+      - kind
+      - address
+      - accessMode
+      - enabled
+      - health
+      - lastHeartbeatAt
+      - concurrencyMax
+      - queuePolicy
+      - tags
+      - toolCount
+      - revision
+      - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: UUIDv7
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: 名称，大小写不敏感唯一
+        kind:
+          "$ref": "#/components/schemas/HarnessKind"
+          description: Harness 类型
+        address:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: 接入地址
+        accessMode:
+          "$ref": "#/components/schemas/HarnessAccessMode"
+          description: 接入方式
+        enabled:
+          type: boolean
+          description: 是否启用
+        health:
+          "$ref": "#/components/schemas/HarnessHealth"
+          description: 运行时健康状态，只读
+        lastHeartbeatAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 最近心跳时间，只读；可为 null
+        concurrencyMax:
+          type: integer
+          minimum: 1
+          description: 最大并发数，≥1
+        queuePolicy:
+          "$ref": "#/components/schemas/HarnessQueuePolicy"
+          description: 排队策略
+        tags:
+          type: array
+          items:
+            type: string
+          description: 能力标签，有序
+        toolCount:
+          type: integer
+          minimum: 0
+          description: 引用工具数，实时派生
+        revision:
+          type: integer
+          minimum: 1
+          description: 乐观锁版本，从 1 开始
+        updatedAt:
+          type: string
+          format: date-time
+          description: 更新时间，ISO-8601 UTC
+      description: Harness 列表项；计数与运行时字段由服务端派生。
+    HarnessDetail:
+      allOf:
+      - "$ref": "#/components/schemas/HarnessListItem"
+      - type: object
+        required:
+        - description
+        - createdAt
+        properties:
+          description:
+            type: string
+            maxLength: 500
+            description: 描述
+          createdAt:
+            type: string
+            format: date-time
+            description: 创建时间，ISO-8601 UTC
+      description: Harness 详情；列表项字段加描述与创建时间。
+    HarnessCreate:
+      type: object
+      required:
+      - name
+      - kind
+      - address
+      - accessMode
+      - concurrencyMax
+      - queuePolicy
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: 名称，1–80 字，大小写不敏感唯一
+        kind:
+          "$ref": "#/components/schemas/HarnessKind"
+          description: Harness 类型
+        address:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: 接入地址，1–200 字
+        accessMode:
+          "$ref": "#/components/schemas/HarnessAccessMode"
+          description: 接入方式
+        description:
+          type: string
+          maxLength: 500
+          description: 描述，≤500 字
+        concurrencyMax:
+          type: integer
+          minimum: 1
+          description: 最大并发数，≥1
+        queuePolicy:
+          "$ref": "#/components/schemas/HarnessQueuePolicy"
+          description: 排队策略
+        tags:
+          type: array
+          items:
+            type: string
+          description: 能力标签，有序
+        enabled:
+          type: boolean
+          default: true
+          description: 是否启用；省略时默认 true
+      description: 创建 Harness 请求；enabled 可省略，默认 true。
+    HarnessUpdate:
+      type: object
+      required:
+      - name
+      - kind
+      - address
+      - accessMode
+      - concurrencyMax
+      - queuePolicy
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: 名称，1–80 字，大小写不敏感唯一
+        kind:
+          "$ref": "#/components/schemas/HarnessKind"
+          description: Harness 类型
+        address:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: 接入地址，1–200 字
+        accessMode:
+          "$ref": "#/components/schemas/HarnessAccessMode"
+          description: 接入方式
+        description:
+          type: string
+          maxLength: 500
+          description: 描述，≤500 字
+        concurrencyMax:
+          type: integer
+          minimum: 1
+          description: 最大并发数，≥1
+        queuePolicy:
+          "$ref": "#/components/schemas/HarnessQueuePolicy"
+          description: 排队策略
+        tags:
+          type: array
+          items:
+            type: string
+          description: 能力标签，有序
+      description: 全量更新 Harness 请求；不接收 enabled，启停走独立端点。
+    HarnessList:
+      type: object
+      required:
+      - items
+      - total
+      - limit
+      - offset
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/HarnessListItem"
+          description: 当前页 Harness
+        total:
+          type: integer
+          minimum: 0
+          description: 匹配总数
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 200
+          description: 每页数量
+        offset:
+          type: integer
+          minimum: 0
+          description: 偏移量
+      description: Harness 分页列表。
+    ToolKind:
+      type: string
+      enum:
+      - mcp
+      - cli
+      - script
+      description: 工具类型。
+    ToolStatus:
+      type: string
+      enum:
+      - unverified
+      - available
+      - unavailable
+      description: 工具运行时状态；创建时固定 unverified，B1 不提供调试/标记可用端点。
+    ToolSort:
+      type: string
+      enum:
+      - name:asc
+      - name:desc
+      - updatedAt:asc
+      - updatedAt:desc
+      default: updatedAt:desc
+      description: 工具列表排序字段与方向。
+    ToolParam:
+      type: object
+      required:
+      - key
+      - type
+      - description
+      properties:
+        key:
+          type: string
+          minLength: 1
+          description: 参数名，工具内唯一
+        type:
+          type: string
+          enum:
+          - string
+          - int
+          description: 参数类型
+        description:
+          type: string
+          description: 参数说明
+      description: 工具参数；HTTP 字段 key 对应领域字段 paramKey。
+    ToolListItem:
+      type: object
+      required:
+      - id
+      - name
+      - kind
+      - invocation
+      - harnessId
+      - harnessName
+      - timeoutMs
+      - status
+      - lastDebugAt
+      - paramCount
+      - usedByCount
+      - revision
+      - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: UUIDv7
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: 名称，大小写不敏感唯一
+        kind:
+          "$ref": "#/components/schemas/ToolKind"
+          description: 工具类型
+        invocation:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: 命令模板或端点
+        harnessId:
+          type: string
+          format: uuid
+          description: 所属 Harness ID
+        harnessName:
+          type: string
+          description: 所属 Harness 名称，派生
+        timeoutMs:
+          type: integer
+          minimum: 1000
+          maximum: 600000
+          description: 超时时间，1000–600000 毫秒
+        status:
+          "$ref": "#/components/schemas/ToolStatus"
+          description: 运行时状态，只读
+        lastDebugAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 最近调试时间，只读；可为 null
+        paramCount:
+          type: integer
+          minimum: 0
+          description: 参数数量，派生
+        usedByCount:
+          type: integer
+          minimum: 0
+          description: 引用专家数，派生
+        revision:
+          type: integer
+          minimum: 1
+          description: 乐观锁版本，从 1 开始
+        updatedAt:
+          type: string
+          format: date-time
+          description: 更新时间，ISO-8601 UTC
+      description: 工具列表项；参数数、引用数和运行时状态由服务端派生。
+    ToolDetail:
+      allOf:
+      - "$ref": "#/components/schemas/ToolListItem"
+      - type: object
+        required:
+        - description
+        - params
+        - createdAt
+        properties:
+          description:
+            type: string
+            maxLength: 500
+            description: 描述
+          params:
+            type: array
+            items:
+              "$ref": "#/components/schemas/ToolParam"
+            description: 参数数组，按顺序
+          createdAt:
+            type: string
+            format: date-time
+            description: 创建时间，ISO-8601 UTC
+      description: 工具详情；列表项字段加参数、描述与创建时间。
+    ToolCreate:
+      type: object
+      required:
+      - name
+      - kind
+      - invocation
+      - harnessId
+      - timeoutMs
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: 名称，1–80 字，大小写不敏感唯一
+        kind:
+          "$ref": "#/components/schemas/ToolKind"
+          description: 工具类型
+        invocation:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: 命令模板或端点，1–500 字
+        description:
+          type: string
+          maxLength: 500
+          description: 描述，≤500 字
+        harnessId:
+          type: string
+          format: uuid
+          description: 所属 Harness ID，必须存在
+        timeoutMs:
+          type: integer
+          minimum: 1000
+          maximum: 600000
+          description: 超时时间，1000–600000 毫秒
+        params:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ToolParam"
+          description: 参数数组，按顺序整体写入
+      description: 创建工具请求；params 按数组顺序整体写入。
+    ToolUpdate:
+      description: 全量更新工具请求；字段与创建相同，不接收 status/lastDebugAt。
+      allOf:
+      - "$ref": "#/components/schemas/ToolCreate"
+    ToolList:
+      type: object
+      required:
+      - items
+      - total
+      - limit
+      - offset
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ToolListItem"
+          description: 当前页工具
+        total:
+          type: integer
+          minimum: 0
+          description: 匹配总数
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 200
+          description: 每页数量
+        offset:
+          type: integer
+          minimum: 0
+          description: 偏移量
+      description: 工具分页列表。
+    SkillSort:
+      type: string
+      enum:
+      - name:asc
+      - name:desc
+      - updatedAt:asc
+      - updatedAt:desc
+      - version:asc
+      - version:desc
+      default: updatedAt:desc
+      description: Skill 列表排序字段与方向。
+    SkillSections:
+      type: object
+      required:
+      - overview
+      - steps
+      - examples
+      - scripts
+      - verification
+      properties:
+        overview:
+          type: string
+          description: 概览
+        steps:
+          type: string
+          description: 步骤
+        examples:
+          type: string
+          description: 示例
+        scripts:
+          type: string
+          description: 脚本
+        verification:
+          type: string
+          description: 验证
+      description: Skill 五章；五个字段全部必填。
+    SkillRef:
+      type: object
+      required:
+      - label
+      - refType
+      - path
+      properties:
+        label:
+          type: string
+          description: 展示名称
+        refType:
+          type: string
+          description: 引用类型
+        path:
+          type: string
+          nullable: true
+          description: 引用路径；可为 null
+      description: Skill 引用链接；path 可为 null。
+    SkillListItem:
+      type: object
+      required:
+      - id
+      - name
+      - categoryCode
+      - categoryLabel
+      - summary
+      - version
+      - enabled
+      - tags
+      - usedByCount
+      - revision
+      - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: UUIDv7
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: 名称，大小写不敏感唯一
+        categoryCode:
+          type: string
+          description: 分类代码
+        categoryLabel:
+          type: string
+          description: 分类展示名，派生
+        summary:
+          type: string
+          maxLength: 200
+          description: 摘要，≤200 字
+        version:
+          type: string
+          pattern: "^v[0-9]+\\.[0-9]+$"
+          description: 版本，形如 vX.Y
+        enabled:
+          type: boolean
+          description: 是否启用
+        tags:
+          type: array
+          items:
+            type: string
+          description: 标签，有序
+        usedByCount:
+          type: integer
+          minimum: 0
+          description: 引用专家数，派生
+        revision:
+          type: integer
+          minimum: 1
+          description: 乐观锁版本，从 1 开始
+        updatedAt:
+          type: string
+          format: date-time
+          description: 更新时间，ISO-8601 UTC
+      description: Skill 列表项；版本由服务端维护，引用数实时派生。
+    SkillDetail:
+      allOf:
+      - "$ref": "#/components/schemas/SkillListItem"
+      - type: object
+        required:
+        - triggers
+        - sections
+        - pitfalls
+        - refs
+        - createdAt
+        properties:
+          triggers:
+            type: array
+            items:
+              type: string
+            description: 触发条件，有序且唯一
+          sections:
+            "$ref": "#/components/schemas/SkillSections"
+            description: 五章，全部必填
+          pitfalls:
+            type: array
+            items:
+              type: string
+            description: 踩坑，有序
+          refs:
+            type: array
+            items:
+              "$ref": "#/components/schemas/SkillRef"
+            description: 引用，有序
+          createdAt:
+            type: string
+            format: date-time
+            description: 创建时间，ISO-8601 UTC
+      description: Skill 详情；列表项字段加五章、触发、踩坑与引用。
+    SkillCreate:
+      type: object
+      required:
+      - name
+      - categoryCode
+      - summary
+      - sections
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: 名称，1–80 字，大小写不敏感唯一
+        categoryCode:
+          type: string
+          description: 分类代码，必须存在
+        summary:
+          type: string
+          maxLength: 200
+          description: 摘要，≤200 字
+        tags:
+          type: array
+          items:
+            type: string
+          description: 标签，有序
+        triggers:
+          type: array
+          items:
+            type: string
+          description: 触发条件，有序且唯一
+        sections:
+          "$ref": "#/components/schemas/SkillSections"
+          description: 五章，全部必填
+        pitfalls:
+          type: array
+          items:
+            type: string
+          description: 踩坑，有序
+        refs:
+          type: array
+          items:
+            "$ref": "#/components/schemas/SkillRef"
+          description: 引用，有序
+      description: 创建 Skill 请求；不接收 version/enabled，服务端生成 v1.0 并默认启用。
+    SkillUpdate:
+      description: 全量更新 Skill 请求；不接收 version/enabled，服务端递增 minor 版本。
+      allOf:
+      - "$ref": "#/components/schemas/SkillCreate"
+    SkillList:
+      type: object
+      required:
+      - items
+      - total
+      - limit
+      - offset
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/SkillListItem"
+          description: 当前页 Skill
+        total:
+          type: integer
+          minimum: 0
+          description: 匹配总数
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 200
+          description: 每页数量
+        offset:
+          type: integer
+          minimum: 0
+          description: 偏移量
+      description: Skill 分页列表。
+    SkillCategory:
+      type: object
+      required:
+      - code
+      - label
+      - position
+      properties:
+        code:
+          type: string
+          description: 分类代码
+        label:
+          type: string
+          description: 展示名
+        position:
+          type: integer
+          description: 展示顺序
+      description: Skill 分类参考数据。
+    SkillCategoryList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/SkillCategory"
+          description: 全部分类
+      description: Skill 分类列表；无分页。
+    ExpertSort:
+      type: string
+      enum:
+      - name:asc
+      - name:desc
+      - updatedAt:asc
+      - updatedAt:desc
+      default: updatedAt:desc
+      description: 专家列表排序字段与方向。
+    ExpertRef:
+      type: object
+      required:
+      - label
+      - refType
+      - path
+      properties:
+        label:
+          type: string
+          description: 展示名称
+        refType:
+          type: string
+          description: 引用类型
+        path:
+          type: string
+          nullable: true
+          description: 引用路径；可为 null
+      description: 专家引用链接；path 可为 null。
+    ExpertSkillSummary:
+      type: object
+      required:
+      - id
+      - name
+      - categoryCode
+      - categoryLabel
+      - summary
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Skill ID
+        name:
+          type: string
+          description: Skill 名称
+        categoryCode:
+          type: string
+          description: 分类代码
+        categoryLabel:
+          type: string
+          description: 分类展示名
+        summary:
+          type: string
+          description: 摘要
+      description: 专家装配的 Skill 摘要。
+    ExpertToolSummary:
+      type: object
+      required:
+      - id
+      - name
+      - kind
+      - status
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: 工具 ID
+        name:
+          type: string
+          description: 工具名称
+        kind:
+          "$ref": "#/components/schemas/ToolKind"
+          description: 工具类型
+        status:
+          "$ref": "#/components/schemas/ToolStatus"
+          description: 运行时状态
+      description: 专家装配的工具摘要。
+    ExpertListItem:
+      type: object
+      required:
+      - id
+      - name
+      - color
+      - role
+      - enabled
+      - persona
+      - skillCount
+      - toolCount
+      - refCount
+      - revision
+      - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: UUIDv7
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: 名称，大小写不敏感唯一
+        color:
+          type: string
+          pattern: "^#[0-9A-Fa-f]{6}$"
+          description: "#RRGGBB 颜色"
+        role:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: 角色定位，1–200 字
+        enabled:
+          type: boolean
+          description: 是否启用
+        persona:
+          type: array
+          items:
+            type: string
+          description: 性格/视角标签，有序
+        skillCount:
+          type: integer
+          minimum: 0
+          description: 装配 Skill 数，派生
+        toolCount:
+          type: integer
+          minimum: 0
+          description: 装配工具数，派生
+        refCount:
+          type: integer
+          minimum: 0
+          description: 引用数，B1 固定为 0
+        revision:
+          type: integer
+          minimum: 1
+          description: 乐观锁版本，从 1 开始
+        updatedAt:
+          type: string
+          format: date-time
+          description: 更新时间，ISO-8601 UTC
+      description: 专家列表项；装配计数由关系实时派生，refCount 在 B1 固定为 0。
+    ExpertDetail:
+      allOf:
+      - "$ref": "#/components/schemas/ExpertListItem"
+      - type: object
+        required:
+        - duty
+        - skillOrder
+        - verifyOrder
+        - notes
+        - skills
+        - tools
+        - refs
+        - createdAt
+        properties:
+          duty:
+            type: string
+            description: 主要职责/工作内容
+          skillOrder:
+            type: string
+            description: Skill 配合顺序说明
+          verifyOrder:
+            type: string
+            description: 验证顺序说明
+          notes:
+            type: string
+            description: 任务解读/备注
+          skills:
+            type: array
+            items:
+              "$ref": "#/components/schemas/ExpertSkillSummary"
+            description: 装配 Skill 摘要
+          tools:
+            type: array
+            items:
+              "$ref": "#/components/schemas/ExpertToolSummary"
+            description: 装配工具摘要
+          refs:
+            type: array
+            items:
+              "$ref": "#/components/schemas/ExpertRef"
+            description: 引用，B1 无引用方
+          createdAt:
+            type: string
+            format: date-time
+            description: 创建时间，ISO-8601 UTC
+      description: 专家详情；列表项字段加五区、装配摘要与引用。
+    ExpertCreate:
+      type: object
+      required:
+      - name
+      - color
+      - role
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: 名称，1–80 字，大小写不敏感唯一
+        color:
+          type: string
+          pattern: "^#[0-9A-Fa-f]{6}$"
+          description: "#RRGGBB 颜色"
+        role:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: 角色定位，1–200 字
+        enabled:
+          type: boolean
+          default: true
+          description: 是否启用；省略时默认 true
+        persona:
+          type: array
+          items:
+            type: string
+          description: 性格/视角标签，有序
+        duty:
+          type: string
+          description: 主要职责/工作内容
+        skillOrder:
+          type: string
+          description: Skill 配合顺序说明
+        verifyOrder:
+          type: string
+          description: 验证顺序说明
+        notes:
+          type: string
+          description: 任务解读/备注
+        refs:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ExpertRef"
+          description: 引用，有序
+      description: 创建专家请求；不接收 skills/tools，装配走独立端点。
+    ExpertUpdate:
+      type: object
+      required:
+      - name
+      - color
+      - role
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: 名称，1–80 字，大小写不敏感唯一
+        color:
+          type: string
+          pattern: "^#[0-9A-Fa-f]{6}$"
+          description: "#RRGGBB 颜色"
+        role:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: 角色定位，1–200 字
+        persona:
+          type: array
+          items:
+            type: string
+          description: 性格/视角标签，有序
+        duty:
+          type: string
+          description: 主要职责/工作内容
+        skillOrder:
+          type: string
+          description: Skill 配合顺序说明
+        verifyOrder:
+          type: string
+          description: 验证顺序说明
+        notes:
+          type: string
+          description: 任务解读/备注
+        refs:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ExpertRef"
+          description: 引用，有序
+      description: 全量更新专家请求；不接收 skills/tools/enabled。
+    ExpertSkillAssembly:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required:
+            - skillId
+            properties:
+              skillId:
+                type: string
+                format: uuid
+          description: 按顺序排列的 Skill 目标
+      description: 整体替换专家 Skill 装配；items 顺序即装配顺序。
+    ExpertToolAssembly:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required:
+            - toolId
+            properties:
+              toolId:
+                type: string
+                format: uuid
+          description: 按顺序排列的工具目标
+      description: 整体替换专家工具装配；items 顺序即装配顺序。
+    ExpertList:
+      type: object
+      required:
+      - items
+      - total
+      - limit
+      - offset
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ExpertListItem"
+          description: 当前页专家
+        total:
+          type: integer
+          minimum: 0
+          description: 匹配总数
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 200
+          description: 每页数量
+        offset:
+          type: integer
+          minimum: 0
+          description: 偏移量
+      description: 专家分页列表。
+    ReferenceAsset:
+      type: object
+      required:
+      - type
+      - id
+      - name
+      properties:
+        type:
+          type: string
+          enum:
+          - harness
+          - tool
+          - skill
+          description: 源资产类型
+        id:
+          type: string
+          format: uuid
+          description: 源资产 ID
+        name:
+          type: string
+          description: 源资产名称
+      description: 引用页的源资产；type 为 harness/tool/skill。
+    ReferenceItem:
+      type: object
+      required:
+      - type
+      - id
+      - name
+      properties:
+        type:
+          type: string
+          enum:
+          - tool
+          - expert
+          description: 引用方类型
+        id:
+          type: string
+          format: uuid
+          description: 引用方 ID
+        name:
+          type: string
+          description: 引用方名称
+      description: 引用页条目；type 为 tool/expert。
+    ReferencePage:
+      type: object
+      required:
+      - asset
+      - total
+      - items
+      properties:
+        asset:
+          "$ref": "#/components/schemas/ReferenceAsset"
+          description: 被检查的源资产
+        total:
+          type: integer
+          minimum: 0
+          description: 引用方总数
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ReferenceItem"
+          description: 引用方列表
+      description: 删除前的引用检查页；total 与 items 由引用关系实时生成。
+  responses:
+    BadRequest:
+      description: 请求形状/字段/枚举/范围错误，或请求体引用的目标不存在。
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: 路径资源不存在。
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: 名称重复、revision 冲突，或删除时仍被引用；`error.code` 区分。
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    PreconditionRequired:
+      description: 缺少 `If-Match` 请求头。
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    InternalError:
+      description: 未分类服务端错误；不返回堆栈或 SQL。
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    ServiceUnavailable:
+      description: 数据库不可用。
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"

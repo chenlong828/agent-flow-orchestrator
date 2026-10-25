@@ -20,7 +20,7 @@ updated: 2026-10-25
 
 **数据所有权**：无表、无缓存、不写数据库。
 
-**机器可读契约**：[`openapi.yaml`](openapi.yaml)。它由本文导出，供 Swagger UI、Postman 或前端适配层导入；两者冲突时以本文为准。运行时通过 `/openapi.yaml` 提供该文件，Swagger UI 页面在 `/docs`。
+**机器可读契约**：由本组件在运行时通过 `GET /openapi.yaml` 直接导出，供 Swagger UI、Postman 或外部接口项目导入；文件是 `CMP-http-gateway` 的组件内资产，不在 `docs/` 维护静态副本。`spec.md` 仍是契约权威，两者冲突时以本文为准。Swagger UI 页面在 `/docs`。
 
 ## 2 契约原则
 
@@ -449,9 +449,9 @@ B1 不提供的页面动作：Harness 连接测试/心跳刷新、工具调试/�
 
 ## 9 预算与运行
 
-- 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 21 KB，OpenAPI 派生文档约 55 KB（不计入组件预算）；Swagger UI 静态资源约 2.14 MB，单独 vendor，也不计入。
+- 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 23 KB；OpenAPI 运行时资产约 69 KB、Swagger UI 静态资源约 2.14 MB，均单独计量，不计入组件预算。
 - 单独验证命令：`bun test tests/components/http-gateway`。
-- 文档入口：启动后访问 `/docs`；机器可读契约：`/openapi.yaml`。
+- 文档入口：启动后访问 `/docs`；机器可读契约：`/openapi.yaml`。OpenAPI 资产随组件发布，包含 30 个 operation 的说明、48 个 schema 的说明与核心 DTO 的字段说明。
 - 当前状态：`current`；已实现并通过契约测试，验证入口见 [`result.md`](../../../works/2026-10-24-db-backend-infra/result.md)。
 
 ## 10 B1 实现口径与剩余问题

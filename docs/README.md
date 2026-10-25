@@ -21,9 +21,7 @@ docs/
 │       ├── skill/spec.md
 │       ├── expert/spec.md
 │       ├── catalog/spec.md
-│       └── http-gateway/
-│           ├── spec.md
-│           └── openapi.yaml
+│       └── http-gateway/spec.md
 ├── works/                                  ← 执行：正在做什么
 │   ├── 2026-10-24-agentflow-execution-concept/
 │   │   ├── brief.md
@@ -48,7 +46,7 @@ docs/
 
 - `requirements/`：一卡一文件 `REQ-0001-<slug>.md`，只回答「为什么做」；
 - `design/scenarios/`：`<领域>/<价值流>/<场景>/scenario.md`，业务功能树按需建立；
-- `design/components/` 与未来的 `design/scenarios/` 是**按文档类型分的兄弟目录**：前者是单组件规格（可附派生的机器可读契约），后者是跨组件运行序；`architecture.md` 是系统视图。三者不混放，也不因为“一切皆组件”而扁平化。
+- `design/components/` 与未来的 `design/scenarios/` 是**按文档类型分的兄弟目录**：前者是单组件规格，后者是跨组件运行序；`architecture.md` 是系统视图。三者不混放，也不因为“一切皆组件”而扁平化。
 - `works/`：一级只有工序目录 `YYYY-MM-DD-<短名>/`，含 `brief.md`，收口后补 `result.md` 再整目录归档。
 
 `plan/risks.md` 在首条真实风险出现时创建；`plan/` 一级只放这三个固定主题，不建子目录。
@@ -61,11 +59,12 @@ docs/
 4. [`plan/open-questions.md`](plan/open-questions.md) —— 开放问题登记；当前无开放问题，历史条目已关闭归档
 5. [`design/architecture.md`](design/architecture.md) —— 现行组件边界、依赖与数据所有权
 6. [`design/components/kernel/spec.md`](design/components/kernel/spec.md) 与 [`config/spec.md`](design/components/config/spec.md) —— 共享错误/分页/端口，以及 TOML 启动配置
-7. [`design/components/http-gateway/spec.md`](design/components/http-gateway/spec.md) 与 [`openapi.yaml`](design/components/http-gateway/openapi.yaml) —— 对外 REST 契约；Swagger UI 在 `/docs`；UI 为独立项目，若接入按此消费
+7. [`design/components/http-gateway/spec.md`](design/components/http-gateway/spec.md) —— 对外 REST 契约；运行时 `/openapi.yaml` 与 Swagger UI `/docs` 由 `CMP-http-gateway` 直接提供；外部项目若接入按此消费
 8. [`works/2026-10-24-db-backend-infra/result.md`](works/2026-10-24-db-backend-infra/result.md) —— B1 实现结果、验证命令与偏差
 9. [`works/2026-10-25-api-swagger/result.md`](works/2026-10-25-api-swagger/result.md) —— Swagger UI、OpenAPI 端点与验证结果
-10. [`history/decisions/2026-10-23-project-init.md`](history/decisions/2026-10-23-project-init.md) —— 初始化时的取舍与被否决方案
-11. [`history/decisions/2026-10-25-project-boundary-and-open-questions.md`](history/decisions/2026-10-25-project-boundary-and-open-questions.md) —— 仅 HTTP API、无 CLI/库/产品 UI，以及早期开放问题归档
+10. [`works/2026-10-25-runtime-openapi-export/result.md`](works/2026-10-25-runtime-openapi-export/result.md) —— OpenAPI 资产移入 HTTP 组件，以及方法/字段说明补齐结果
+11. [`history/decisions/2026-10-23-project-init.md`](history/decisions/2026-10-23-project-init.md) —— 初始化时的取舍与被否决方案
+12. [`history/decisions/2026-10-25-project-boundary-and-open-questions.md`](history/decisions/2026-10-25-project-boundary-and-open-questions.md) —— 仅 HTTP API、无 CLI/库/产品 UI，以及早期开放问题归档
 
 ## 维护纪律（速记）
 

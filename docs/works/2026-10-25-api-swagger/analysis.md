@@ -14,7 +14,7 @@ updated: 2026-10-25
 
 ### 1.1 契约
 
-[`openapi.yaml`](../../design/components/http-gateway/openapi.yaml) 已覆盖 B1 的 29 个业务端点 + `/healthz`：
+[`openapi.yaml`](../../../src/components/http-gateway/openapi.yaml) 已覆盖 B1 的 29 个业务端点 + `/healthz`：
 
 | 项 | 实测值 |
 |---|---:|
@@ -154,7 +154,7 @@ servers:
 
 - `createApiDocs` 在启动时读取 `openapi.yaml` 到内存，并检查 4 个静态资源是否存在；缺失则启动失败，不带病提供半套文档。
 - `createHttpApp` 新增可选 `docs?: ApiDocs`；无 docs 时 `/docs` 走现有 404，现有测试不受影响。
-- `main.ts` 用 `process.cwd()` 拼 `docs/design/components/http-gateway/openapi.yaml` 与 `src/components/http-gateway/docs-assets/`，与迁移目录的相对约定一致。
+- `main.ts` 用 `process.cwd()` 定位 `src/components/http-gateway/docs-assets/`；`docs.ts` 默认从组件目录读取 `openapi.yaml`，与迁移目录的相对约定一致。
 
 ## 5 风险与处理
 
@@ -179,7 +179,7 @@ servers:
 - `src/components/http-gateway/index.ts`（导出）
 - `src/main.ts`（注入文档）
 - `src/components/http-gateway/docs-assets/*`（vendor 资源与许可证）
-- `docs/design/components/http-gateway/openapi.yaml`（`servers`、边界说明）
+- `src/components/http-gateway/openapi.yaml`（`servers`、边界说明）
 - `docs/design/components/http-gateway/spec.md`（文档端点与边界）
 - `README.md`（入口与边界）
 - `tests/components/http-gateway/docs.test.ts`、`tests/contracts/openapi.test.ts`（新增）

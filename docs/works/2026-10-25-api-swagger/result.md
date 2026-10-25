@@ -30,7 +30,7 @@ updated: 2026-10-25
 ### 代码
 
 - 新增 [`src/components/http-gateway/docs.ts`](../../../src/components/http-gateway/docs.ts)：
-  - 启动时读取 `openapi.yaml`，并检查 4 个静态资源；缺失则启动失败。
+  - 启动时读取组件内 `openapi.yaml`，并检查 4 个静态资源；缺失则启动失败。
   - 只接受 `GET`；固定白名单；未知 `/docs/*` 返回 `null`，由网关映射 404。
   - 文档响应带 `cache-control: no-cache` 与 `x-content-type-options: nosniff`。
 - [`app.ts`](../../../src/components/http-gateway/app.ts)：`HttpDeps` 增加可选 `docs`，在业务路由前委托；不注入时保持原 404。
@@ -52,7 +52,7 @@ updated: 2026-10-25
 
 ### 契约与文档
 
-- [`openapi.yaml`](../../design/components/http-gateway/openapi.yaml)：`servers` 改为 `/`；说明 Swagger UI 是开发者文档。
+- [`openapi.yaml`](../../../src/components/http-gateway/openapi.yaml)：`servers` 改为 `/`；说明 Swagger UI 是开发者文档。
 - [`spec.md`](../../design/components/http-gateway/spec.md)：新增 §4.3 文档端点，说明不计入业务端点、无鉴权/CORS、本地资源与白名单。
 - [`README.md`](../../../README.md)：新增“API 文档”入口、`Try it out` 会改数据、非产品 UI 的边界。
 - [`architecture.md`](../../design/architecture.md)、[`AGENTS.md`](../../../AGENTS.md)、[`open-questions.md`](../../plan/open-questions.md) 同步“产品 UI”边界。
@@ -99,14 +99,14 @@ bun run typecheck
 - 页面增加“开发者 API 文档（非产品 UI）/ Try it out 会修改数据”的提示，满足边界与风险提示要求。
 - 没有补 30 个 operation 的请求示例；现有 schema 可驱动 UI，示例完善不在本工序。
 - 没有新增独立开关或鉴权；与现有 API 一样默认只监听本机，生产暴露前另行处理。
-- `openapi.yaml` 仍标 `x-generated: true` 但仓库没有生成脚本；本次手工同步 `servers` 与说明，生成器缺失仍是遗留风险。
+- `openapi.yaml` 已移入 `src/components/http-gateway/`；它仍没有生成脚本，属手工维护资产，生成器缺失仍是遗留风险。
 
 ## 结论落点
 
 | 内容 | 位置 |
 |---|---|
 | 文档端点契约 | [`http-gateway/spec.md`](../../design/components/http-gateway/spec.md) §4.3 |
-| 机器可读契约 | [`openapi.yaml`](../../design/components/http-gateway/openapi.yaml) |
+| 机器可读契约 | [`openapi.yaml`](../../../src/components/http-gateway/openapi.yaml) |
 | 文档实现 | [`docs.ts`](../../../src/components/http-gateway/docs.ts) |
 | 静态资源与版本 | [`docs-assets/`](../../../src/components/http-gateway/docs-assets/) |
 | 自动化验证 | [`docs.test.ts`](../../../tests/components/http-gateway/docs.test.ts)、[`openapi.test.ts`](../../../tests/components/http-gateway/openapi.test.ts) |
