@@ -21,6 +21,7 @@ import type {
   CreateExpert,
   ExpertService,
   UpdateExpert,
+  UpdateExpertAggregate,
 } from "../expert/index.ts";
 import type { ApiDocs } from "./docs.ts";
 import {
@@ -91,7 +92,13 @@ const EXPERT_WRITE_FIELDS = [
   "notes",
   "refs",
 ] as const;
-const EXPERT_CREATE_FIELDS = [...EXPERT_WRITE_FIELDS, "enabled"] as const;
+const EXPERT_CREATE_FIELDS = [
+  ...EXPERT_WRITE_FIELDS,
+  "enabled",
+  "skillIds",
+  "toolIds",
+] as const;
+const EXPERT_PATCH_FIELDS = [...EXPERT_WRITE_FIELDS, "skillIds", "toolIds"] as const;
 const HARNESS_SORT = {
   "name:asc": "name",
   "name:desc": "-name",
@@ -212,6 +219,17 @@ function assemblyIds(body: Record<string, unknown>, key: "skillId" | "toolId"): 
       throw new ValidationError(`items[${index}].${key}`, "必须是 UUID");
     }
     return assertUuid(value, `items[${index}].${key}`);
+  });
+}
+
+function validateOptionalIdArray(body: Record<string, unknown>, field: string): void {
+  if (body[field] === undefined) return;
+  if (!Array.isArray(body[field])) throw new ValidationError(field, "必须是 UUID 数组");
+  body[field] = (body[field] as unknown[]).map((value, index) => {
+    if (typeof value !== "string") {
+      throw new ValidationError(`${field}[${index}]`, "必须是 UUID");
+    }
+    return assertUuid(value, `${field}[${index}]`);
   });
 }
 
@@ -365,6 +383,8 @@ export function createHttpApp(deps: HttpDeps): (request: Request) => Promise<Res
           if (request.method === "POST") {
             const body = await readJsonObject(request, EXPERT_CREATE_FIELDS);
             validateNestedRefs(body, "refs");
+            validateOptionalIdArray(body, "skillIds");
+            validateOptionalIdArray(body, "toolIds");
             const created = await expertService.create(body as unknown as CreateExpert, actorFrom(request, actor));
             const detail = await catalog.getExpert(created.id);
             return json(detail, 201, { Location: `/api/v1/experts/${created.id}` });
@@ -434,6 +454,20 @@ export function createHttpApp(deps: HttpDeps): (request: Request) => Promise<Res
             const body = await readJsonObject(request, EXPERT_WRITE_FIELDS);
             validateNestedRefs(body, "refs");
             await expertService.update(id, revision, body as unknown as UpdateExpert, actorFrom(request, actor));
+            return json(await catalog.getExpert(id));
+          }
+          if (request.method === "PATCH") {
+            const revision = parseIfMatch(request);
+            const body = await readJsonObject(request, EXPERT_PATCH_FIELDS);
+            validateNestedRefs(body, "refs");
+            validateOptionalIdArray(body, "skillIds");
+            validateOptionalIdArray(body, "toolIds");
+            await expertService.updateAggregate(
+              id,
+              revision,
+              body as unknown as UpdateExpertAggregate,
+              actorFrom(request, actor),
+            );
             return json(await catalog.getExpert(id));
           }
           if (request.method === "DELETE") {

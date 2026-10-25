@@ -99,6 +99,36 @@ describe("专家 HTTP 契约", () => {
     ]);
   });
 
+  test("POST 可带有序装配，创建与装配一次返回", async () => {
+    const response = await call(ctx.app, "POST", "/api/v1/experts", {
+      body: {
+        ...expertBody("带装配专家"),
+        skillIds: [...skillIds].reverse(),
+        toolIds,
+      },
+    });
+    expect(response.status).toBe(201);
+    expect(response.body.revision).toBe(1);
+    expect(response.body.skills.map((skill: any) => skill.id)).toEqual([...skillIds].reverse());
+    expect(response.body.tools.map((tool: any) => tool.id)).toEqual(toolIds);
+    expect(response.body.skillCount).toBe(2);
+    expect(response.body.toolCount).toBe(2);
+  });
+
+  test("POST 装配目标不存在返回 400，专家根回滚", async () => {
+    const response = await call(ctx.app, "POST", "/api/v1/experts", {
+      body: {
+        ...expertBody("坏装配专家"),
+        skillIds: ["0191f2f0-0000-7000-8000-000000000000"],
+      },
+    });
+    expect(response.status).toBe(400);
+    expect(response.body.error.details.field).toBe("skillIds");
+
+    const list = await call(ctx.app, "GET", "/api/v1/experts?q=坏装配专家");
+    expect(list.body.total).toBe(0);
+  });
+
   test("GET 列表返回计数与人设，并支持筛选", async () => {
     await createExpert("expert-a");
     await createExpert("expert-b");
@@ -158,6 +188,80 @@ describe("专家 HTTP 契约", () => {
       headers: withRevision(1),
     });
     expect(stale.status).toBe(409);
+  });
+
+  test("PATCH 聚合更新只改提交字段并一次递增 revision；缺 If-Match 428、旧版本 409", async () => {
+    const created = await createExpert();
+    await ctx.expertService.setSkills(created.id, 1, [skillIds[0]!]);
+
+    const updated = await call(ctx.app, "PATCH", `/api/v1/experts/${created.id}`, {
+      body: {
+        duty: "只改职责",
+        skillIds: [...skillIds].reverse(),
+        toolIds,
+      },
+      headers: withRevision(2),
+    });
+    expect(updated.status).toBe(200);
+    expect(updated.body.name).toBe("方案设计专家");
+    expect(updated.body.role).toBe("在遗留方案基础上给出变更方案");
+    expect(updated.body.duty).toBe("只改职责");
+    expect(updated.body.revision).toBe(3);
+    expect(updated.body.skills.map((skill: any) => skill.id)).toEqual([...skillIds].reverse());
+    expect(updated.body.tools.map((tool: any) => tool.id)).toEqual(toolIds);
+
+    const missing = await call(ctx.app, "PATCH", `/api/v1/experts/${created.id}`, {
+      body: { duty: "没有版本" },
+    });
+    expect(missing.status).toBe(428);
+
+    const stale = await call(ctx.app, "PATCH", `/api/v1/experts/${created.id}`, {
+      body: { duty: "旧版本" },
+      headers: withRevision(2),
+    });
+    expect(stale.status).toBe(409);
+    expect(stale.body.error.details.currentRevision).toBe(3);
+
+    const unknown = await call(ctx.app, "PATCH", `/api/v1/experts/${created.id}`, {
+      body: { enabled: false },
+      headers: withRevision(3),
+    });
+    expect(unknown.status).toBe(400);
+    expect(unknown.body.error.details.field).toBe("body");
+  });
+
+  test("PATCH 空对象、非法 UUID 与不存在目标返回 400；失败时主体与装配不变", async () => {
+    const created = await createExpert("patch-invalid");
+    await ctx.expertService.setSkills(created.id, 1, [skillIds[0]!]);
+
+    const empty = await call(ctx.app, "PATCH", `/api/v1/experts/${created.id}`, {
+      body: {},
+      headers: withRevision(2),
+    });
+    expect(empty.status).toBe(400);
+    expect(empty.body.error.details.field).toBe("body");
+
+    const badId = await call(ctx.app, "PATCH", `/api/v1/experts/${created.id}`, {
+      body: { skillIds: ["not-a-uuid"] },
+      headers: withRevision(2),
+    });
+    expect(badId.status).toBe(400);
+    expect(badId.body.error.details.field).toBe("skillIds[0]");
+
+    const missingTarget = await call(ctx.app, "PATCH", `/api/v1/experts/${created.id}`, {
+      body: {
+        duty: "不应写入",
+        skillIds: ["0191f2f0-0000-7000-8000-000000000000"],
+      },
+      headers: withRevision(2),
+    });
+    expect(missingTarget.status).toBe(400);
+    expect(missingTarget.body.error.details.field).toBe("skillIds");
+
+    const detail = await call(ctx.app, "GET", `/api/v1/experts/${created.id}`);
+    expect(detail.body.duty).toBe("输出技术方案与任务拆分");
+    expect(detail.body.skills.map((skill: any) => skill.id)).toEqual([skillIds[0]]);
+    expect(detail.body.revision).toBe(2);
   });
 
   test("PATCH enabled 200；非法颜色 400", async () => {

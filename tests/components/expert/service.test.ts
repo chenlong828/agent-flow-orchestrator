@@ -251,6 +251,93 @@ describe("专家写入规则", () => {
     expect(afterToolError.revision).toBe(1);
   });
 
+  test("创建可带有序装配，revision=1 且一次回读完整", async () => {
+    const created = await ctx.expertService.create({
+      ...expertBody("带装配专家"),
+      skillIds: [...skillIds].reverse(),
+      toolIds,
+    });
+    expect(created.revision).toBe(1);
+    const detail = await ctx.catalog.getExpert(created.id);
+    expect(detail.skills.map((skill) => skill.id)).toEqual([...skillIds].reverse());
+    expect(detail.tools.map((tool) => tool.id)).toEqual(toolIds);
+    expect(detail.skillCount).toBe(2);
+    expect(detail.toolCount).toBe(2);
+  });
+
+  test("创建装配目标不存在时整批回滚，专家根也不留下", async () => {
+    const missing = "0191f2f0-0000-7000-8000-000000000000";
+    const error = await ctx.expertService
+      .create({ ...expertBody("坏装配专家"), skillIds: [missing] })
+      .catch((e) => e);
+    expect(error).toBeInstanceOf(SkillNotFoundError);
+    expect(error.details.field).toBe("skillIds");
+
+    const listed = await ctx.catalog.listExperts({
+      q: "坏装配专家",
+      page: normalizePageQuery(),
+    });
+    expect(listed.total).toBe(0);
+  });
+
+  test("聚合更新省略字段不变，装配只递增一次 revision", async () => {
+    const created = await ctx.expertService.create({
+      ...expertBody("聚合更新专家"),
+      skillIds: [skillIds[0]!],
+      toolIds: [toolIds[0]!],
+    });
+    const updated = await ctx.expertService.updateAggregate(created.id, 1, {
+      duty: "只改职责",
+      skillIds: [...skillIds].reverse(),
+      toolIds: [],
+    });
+    expect(updated.revision).toBe(2);
+
+    const detail = await ctx.catalog.getExpert(created.id);
+    expect(detail.name).toBe("聚合更新专家");
+    expect(detail.duty).toBe("只改职责");
+    expect(detail.skills.map((skill) => skill.id)).toEqual([...skillIds].reverse());
+    expect(detail.tools).toEqual([]);
+    expect(detail.revision).toBe(2);
+
+    const stale = await ctx.expertService
+      .updateAggregate(created.id, 1, { notes: "旧版本" })
+      .catch((e) => e);
+    expect(stale).toBeInstanceOf(RevisionConflictError);
+    expect(stale.details.currentRevision).toBe(2);
+  });
+
+  test("聚合更新任一装配目标无效时主体、另一类装配与 revision 全部回滚", async () => {
+    const created = await ctx.expertService.create({
+      ...expertBody("聚合回滚专家"),
+      skillIds: [skillIds[0]!],
+    });
+    const missing = "0191f2f0-0000-7000-8000-000000000000";
+    const error = await ctx.expertService
+      .updateAggregate(created.id, 1, {
+        duty: "不应写入",
+        skillIds: [skillIds[1]!],
+        toolIds: [missing],
+      })
+      .catch((e) => e);
+    expect(error).toBeInstanceOf(ToolNotFoundError);
+    expect(error.details.field).toBe("toolIds");
+
+    const detail = await ctx.catalog.getExpert(created.id);
+    expect(detail.duty).toBe("输出技术方案与任务拆分");
+    expect(detail.skills.map((skill) => skill.id)).toEqual([skillIds[0]!]);
+    expect(detail.tools).toEqual([]);
+    expect(detail.revision).toBe(1);
+  });
+
+  test("聚合更新空对象被拒绝，不产生写入", async () => {
+    const created = await ctx.expertService.create(expertBody("空更新专家"));
+    const error = await ctx.expertService.updateAggregate(created.id, 1, {}).catch((e) => e);
+    expect(error).toBeInstanceOf(ValidationError);
+    expect(error.details.field).toBe("body");
+    expect((await ctx.catalog.getExpert(created.id)).revision).toBe(1);
+  });
+
   test("删除专家级联装配关系，删除后不可读", async () => {
     const created = await ctx.expertService.create(expertBody());
     await ctx.expertService.setSkills(created.id, 1, [skillIds[0]!]);

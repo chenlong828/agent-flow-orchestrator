@@ -38,6 +38,11 @@ updated: 2026-10-25
 type ExpertService = {
   create(input: CreateExpert): Promise<{ id: string; revision: number }>;
   update(id: string, revision: number, input: UpdateExpert): Promise<{ id: string; revision: number }>;
+  updateAggregate(
+    id: string,
+    revision: number,
+    input: UpdateExpertAggregate,
+  ): Promise<{ revision: number }>;
   setEnabled(id: string, revision: number, enabled: boolean): Promise<{ id: string; revision: number }>;
   delete(id: string, revision: number): Promise<void>;
   setSkills(id: string, revision: number, skillIds: string[]): Promise<{ revision: number }>;
@@ -53,8 +58,9 @@ type ExpertRead = {
 ```
 
 - 输入/输出使用领域字段；不出现 HTTP DTO、SQL 列名。
-- `create` / `update` 不接收 Skill/工具列表；装配走 `setSkills` / `setTools`，两者各自原子替换并递增 `revision`。
-- `setSkills` / `setTools` 校验目标存在、无重复、顺序数组即位置；任一失败整批回滚。
+- `create` 可带可选的有序 `skillIds` / `toolIds`，与专家根同事务写入；省略则为空装配。
+- `update` 是五区/人设/引用的全量替换，不接收 Skill/工具列表；`updateAggregate` 是聚合部分更新：省略字段不变，数组字段传入即整体替换，空数组清空，一次事务、一次递增 `revision`。
+- `setSkills` / `setTools` 保留为独立装配端点；内部与 `create` / `updateAggregate` 共用原子替换逻辑。校验目标存在、无重复、顺序数组即位置；任一失败整批回滚。
 - `listExpertsUsingSkill` / `listExpertsUsingTool` 供 `catalog` 与引用检查使用，返回专家摘要，不返回装配内部行。
 - B1 专家删除不做引用检查；后续出现节点引用时再补。
 
@@ -78,9 +84,15 @@ type CreateExpert = {
   verifyOrder?: string;
   notes?: string;
   refs?: ExpertRefInput[];
+  skillIds?: string[];
+  toolIds?: string[];
 };
 
-type UpdateExpert = Omit<CreateExpert, "enabled">;
+type UpdateExpert = Omit<CreateExpert, "enabled" | "skillIds" | "toolIds">;
+type UpdateExpertAggregate = Partial<UpdateExpert> & {
+  skillIds?: string[];
+  toolIds?: string[];
+};
 
 type ExpertSummary = {
   id: string;
@@ -123,8 +135,9 @@ type ExpertReference = { id: string; name: string };
 
 | 方法 | 目的 | 输入 | 输出 | 错误 | 事务/并发 |
 |---|---|---|---|---|---|
-| `create` | 创建专家与五区子表 | `CreateExpert` | `{ id, revision }` | `ValidationError`、`NameConflictError` | 单事务插入根与子表 |
-| `update` | 更新专家，整体替换人设/引用 | `id`、`revision`、`UpdateExpert` | `{ id, revision }` | `NotFoundError`、`RevisionConflictError`、`NameConflictError`、`ValidationError` | 单事务；`revision` 乐观锁 |
+| `create` | 创建专家、五区子表与可选装配 | `CreateExpert` | `{ id, revision }` | `ValidationError`、`NameConflictError`、`SkillNotFoundError`、`ToolNotFoundError` | 单事务插入根、子表与装配 |
+| `update` | 全量更新专家，整体替换人设/引用 | `id`、`revision`、`UpdateExpert` | `{ id, revision }` | `NotFoundError`、`RevisionConflictError`、`NameConflictError`、`ValidationError` | 单事务；`revision` 乐观锁 |
+| `updateAggregate` | 聚合部分更新五区、人设、引用与有序装配 | `id`、`revision`、`UpdateExpertAggregate` | `{ revision }` | `NotFoundError`、`RevisionConflictError`、`NameConflictError`、`ValidationError`、`SkillNotFoundError`、`ToolNotFoundError` | 单事务；省略不变，数组替换，`revision` 只递增一次 |
 | `setEnabled` | 启停 | `id`、`revision`、`enabled` | `{ id, revision }` | `NotFoundError`、`RevisionConflictError` | 单行更新并递增 `revision` |
 | `delete` | 删除专家 | `id`、`revision` | `void` | `NotFoundError`、`RevisionConflictError` | B1 无引用保护 |
 | `setSkills` | 整体替换 Skill 装配 | `id`、`revision`、`skillIds[]` | `{ revision }` | `NotFoundError`、`RevisionConflictError`、`ValidationError`、`SkillNotFoundError` | 单事务；顺序即位置；重复/不存在整批失败 |
@@ -146,10 +159,10 @@ type ExpertReference = { id: string; name: string };
 ## 5 验证
 
 - 规则：名称唯一、颜色、角色、人设顺序、装配唯一/顺序。
-- 存储：创建五区、更新整体替换人设/引用、启停、删除级联。
-- 装配：整体替换 Skill/工具；重复/不存在目标；事务回滚；`revision` 递增。
+- 存储：创建五区、创建即装配、更新整体替换人设/引用、聚合部分更新、启停、删除级联。
+- 装配：整体替换 Skill/工具；重复/不存在目标；`create` / `updateAggregate` 任一步失败整批回滚；`revision` 只递增一次。
 - 读契约：列表筛选、详情、`listExpertsUsingSkill/Tool`、`refCount=0`。
-- 契约：对应 REST 端点 3 正 1 反在 `http-gateway` 规格中列明。
+- 契约：对应 REST 端点 3 正 1 反在 `http-gateway` 规格中列明；`PATCH /experts/{id}` 覆盖省略不变、数组替换、空数组清空与旧版本冲突。
 
 ## 6 预算与运行
 

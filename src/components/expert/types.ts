@@ -17,9 +17,25 @@ export type CreateExpert = {
   verifyOrder?: string;
   notes?: string;
   refs?: ExpertRefInput[];
+  skillIds?: string[];
+  toolIds?: string[];
 };
 
-export type UpdateExpert = Omit<CreateExpert, "enabled">;
+export type UpdateExpert = Omit<CreateExpert, "enabled" | "skillIds" | "toolIds">;
+
+export type UpdateExpertAggregate = {
+  name?: string;
+  color?: string;
+  role?: string;
+  persona?: string[];
+  duty?: string;
+  skillOrder?: string;
+  verifyOrder?: string;
+  notes?: string;
+  refs?: ExpertRefInput[];
+  skillIds?: string[];
+  toolIds?: string[];
+};
 
 export type ExpertSummary = {
   id: string;
@@ -61,6 +77,12 @@ export type ExpertService = {
     id: string,
     revision: number,
     input: UpdateExpert,
+    actor?: string,
+  ): Promise<{ id: string; revision: number }>;
+  updateAggregate(
+    id: string,
+    revision: number,
+    input: UpdateExpertAggregate,
     actor?: string,
   ): Promise<{ id: string; revision: number }>;
   setEnabled(

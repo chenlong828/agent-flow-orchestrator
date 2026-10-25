@@ -18,7 +18,7 @@ info:
     - 无登录/鉴权；`X-Actor` 仅用于显示，不是身份。请求可带 `X-Request-Id`，响应可回显。无 CORS 配置。
   x-source-spec: docs/design/components/http-gateway/spec.md
   x-contract-status: current
-  x-api-count: 29
+  x-api-count: 30
   license:
     name: Internal use only
   x-runtime-asset: true
@@ -808,7 +808,7 @@ paths:
       operationId: createExpert
       x-api-id: API-24
       x-component-method: expert.create + catalog.getExpert
-      description: 创建时不接收 `skills`/`tools`；装配使用 API-28/API-29。
+      description: 创建时可带可选的有序 `skillIds`/`toolIds`，与专家根同事务写入；也可省略后使用 API-28/API-29。
       requestBody:
         required: true
         content:
@@ -878,6 +878,41 @@ paths:
           application/json:
             schema:
               "$ref": "#/components/schemas/ExpertUpdate"
+      responses:
+        '200':
+          description: 更新后的专家详情。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ExpertDetail"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '428':
+          "$ref": "#/components/responses/PreconditionRequired"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+    patch:
+      tags:
+      - Expert
+      summary: API-30 聚合更新专家
+      operationId: patchExpertAggregate
+      x-api-id: API-30
+      x-component-method: expert.updateAggregate + catalog.getExpert
+      description: 按提交字段更新五区、引用与有序装配；一次事务、一次递增 revision。省略字段不变，数组传入即整体替换，空数组清空。
+      parameters:
+      - "$ref": "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ExpertAggregatePatch"
       responses:
         '200':
           description: 更新后的专家详情。
@@ -2102,7 +2137,21 @@ components:
           items:
             "$ref": "#/components/schemas/ExpertRef"
           description: 引用，有序
-      description: 创建专家请求；不接收 skills/tools，装配走独立端点。
+        skillIds:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+          description: 创建时可选的有序 Skill ID；与专家根同事务写入
+        toolIds:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+          description: 创建时可选的有序工具 ID；与专家根同事务写入
+      description: 创建专家请求；可带初始有序装配，也可省略后走独立装配端点。
     ExpertUpdate:
       type: object
       required:
@@ -2147,6 +2196,61 @@ components:
             "$ref": "#/components/schemas/ExpertRef"
           description: 引用，有序
       description: 全量更新专家请求；不接收 skills/tools/enabled。
+    ExpertAggregatePatch:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: 名称，1–80 字，大小写不敏感唯一
+        color:
+          type: string
+          pattern: "^#[0-9A-Fa-f]{6}$"
+          description: "#RRGGBB 颜色"
+        role:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: 角色定位，1–200 字
+        persona:
+          type: array
+          items:
+            type: string
+          description: 性格/视角标签，有序；传入即整体替换
+        duty:
+          type: string
+          description: 主要职责/工作内容
+        skillOrder:
+          type: string
+          description: Skill 配合顺序说明
+        verifyOrder:
+          type: string
+          description: 验证顺序说明
+        notes:
+          type: string
+          description: 任务解读/备注
+        refs:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ExpertRef"
+          description: 引用，有序；传入即整体替换
+        skillIds:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+          description: 有序 Skill ID；传入即整体替换，空数组清空
+        toolIds:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+          description: 有序工具 ID；传入即整体替换，空数组清空
+      description: 专家聚合部分更新请求；省略字段不变，数组字段传入即整体替换，空数组清空。
     ExpertSkillAssembly:
       type: object
       required:

@@ -101,7 +101,7 @@ updated: 2026-10-25
 
 ## 4 端点总表
 
-29 个 B1 业务端点；`/healthz` 单独列在 §4.2；开发者文档端点见 §4.3，不计入业务端点。
+30 个 B1 业务端点；`/healthz` 单独列在 §4.2；开发者文档端点见 §4.3，不计入业务端点。
 
 ### 4.1 业务端点
 
@@ -130,12 +130,13 @@ updated: 2026-10-25
 | `API-21` | GET | `/skill-categories` | `UC-B1-03` | 分类参考数据 | 200 列表 |
 | `API-22` | GET | `/experts` | `UC-B1-04` | 专家列表/检索 | 200 列表 |
 | `API-23` | GET | `/experts/{id}` | `UC-B1-04` | 专家详情（含装配摘要） | 200 详情 |
-| `API-24` | POST | `/experts` | `UC-B1-04` | 创建专家 | 201 + Location |
+| `API-24` | POST | `/experts` | `UC-B1-04` | 创建专家；可带初始有序装配 | 201 + Location |
 | `API-25` | PUT | `/experts/{id}` | `UC-B1-04` | 全量更新（不含装配） | 200 详情 |
 | `API-26` | PATCH | `/experts/{id}/enabled` | `UC-B1-04` | 启用/停用 | 200 详情 |
 | `API-27` | DELETE | `/experts/{id}` | `UC-B1-04` | 删除；B1 无引用方 | 204 |
 | `API-28` | PUT | `/experts/{id}/skills` | `UC-B1-05` | 整体替换有序 Skill | 200 专家详情 |
 | `API-29` | PUT | `/experts/{id}/tools` | `UC-B1-05` | 整体替换有序工具 | 200 专家详情 |
+| `API-30` | PATCH | `/experts/{id}` | `UC-B1-04` / `UC-B1-05` | 聚合部分更新五区、引用与装配；一次事务 | 200 专家详情 |
 
 ### 4.2 健康检查
 
@@ -304,7 +305,7 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 | `revision` | number | 乐观锁 |
 | `updatedAt` | string | ISO-8601 |
 
-**详情 `ExpertDetail`**：列表项 + `duty`、`skillOrder`、`verifyOrder`、`notes`、`skills: ExpertSkillSummary[]`、`tools: ExpertToolSummary[]`、`refs: ExpertRef[]`、`createdAt`。
+**详情 `ExpertDetail`**：共享字段 + `duty`、`skillOrder`、`verifyOrder`、`notes`、`skills: ExpertSkillSummary[]`、`tools: ExpertToolSummary[]`、`refs: ExpertRef[]`、`createdAt`。
 
 **`ExpertSkillSummary`**：`{id,name,categoryCode,categoryLabel,summary}`。
 **`ExpertToolSummary`**：`{id,name,kind,status}`。
@@ -326,9 +327,12 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 | `verifyOrder` | string | 否 | 验证顺序说明 |
 | `notes` | string | 否 | 任务解读/备注 |
 | `refs` | `ExpertRef[]` | 否 | 有序 |
+| `skillIds` | string[] | 否 | 创建时可选的有序 Skill ID；同事务写入 |
+| `toolIds` | string[] | 否 | 创建时可选的有序工具 ID；同事务写入 |
 
-- 创建/更新不接收 `skills` / `tools`；装配走 `API-28` / `API-29`。
-- `GET /experts/{id}` 返回装配摘要；`skillCount` / `toolCount` 由装配关系派生。
+- `POST` 可带初始有序装配；`PUT` 只更新五区/人设/引用，不接收 `skills`/`tools`/`skillIds`/`toolIds`。
+- `PATCH /experts/{id}` 是聚合部分更新：省略字段不变，数组字段传入即整体替换，空数组清空；一次事务、一次递增 `revision`。独立装配端点 `API-28`/`API-29` 保留。
+- `skillCount` / `toolCount` 由装配关系派生。
 
 **装配请求/响应**：
 
@@ -402,10 +406,11 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 | `API-27` | `expert.delete` |
 | `API-28` | `expert.setSkills` + `catalog.getExpert` |
 | `API-29` | `expert.setTools` + `catalog.getExpert` |
+| `API-30` | `expert.updateAggregate` + `catalog.getExpert` |
 | `API-H` | `platform.Health.check` |
 
 - 写端点由 `http-gateway` 调用领域写方法，再用 `catalog` 回读详情；路由层不拼字段。
-- `API-28/29` 的请求体只表达装配顺序；`catalog` 负责把 `skillIds`/`toolIds` 解析为摘要。
+- `API-28/29` 的请求体只表达装配顺序；`API-30` 的请求体可同时表达五区、引用与两类装配顺序；`catalog` 负责把 `skillIds`/`toolIds` 解析为摘要。
 - 领域方法表见各组件规格的「方法契约」章节。
 
 ## 6 外部 UI 页面映射（参考，不属于本仓库交付与验收）
@@ -415,7 +420,7 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 | `harnesses.html` / `CMP-harnesses` | `API-01`～`API-07` | 列表、详情、注册、编辑、启停、删除、工具引用 |
 | `tools.html` / `CMP-tools` | `API-08`～`API-13` | 列表、详情、注册、编辑、删除、专家引用；无启停/调试 |
 | `skills.html` / `CMP-skills` | `API-14`～`API-21` | 列表、详情、五章、启停、删除、专家引用、分类 |
-| `experts.html` / `CMP-experts` | `API-22`～`API-29` | 列表、详情、五区、启停、删除、Skill/工具装配 |
+| `experts.html` / `CMP-experts` | `API-22`～`API-30` | 列表、详情、五区、启停、删除、Skill/工具装配、聚合保存 |
 | 其他页面 | 无 B1 端点 | Key/工作区/工作流/实例/看板不在 B1 |
 
 外部 UI 夹具与契约字段不同（如 `k`→`key`、`desc`→`description`、`harness`→`harnessId`/`harnessName`、`usedBy`→`usedByCount`、`CLI/MCP/脚本`→`cli/mcp/script`、中文状态→英文代码）；若接入，由该项目适配层映射，不把 `MOCK` 形状带进契约。
@@ -430,7 +435,7 @@ B1 不提供的页面动作：Harness 连接测试/心跳刷新、工具调试/�
 2. 用 `If-Match` 验证并发：缺失 428、旧版本 409。
 3. 用删除引用场景验证 409 `referenced` 与 `details.references`。
 4. 用 Skill 保存验证 `version` 递增；客户端不传 `version`。
-5. 用专家装配验证顺序与 `revision`；Skill/工具列表整体替换。
+5. 用专家装配验证顺序与 `revision`；Skill/工具列表整体替换；一次保存五区与两类装配时使用 `PATCH /experts/{id}`，确认只递增一次 `revision`。
 6. 忽略未知字段；遇到契约缺口先改本文，不跨项目改代码。
 
 ## 7 契约测试
@@ -438,7 +443,7 @@ B1 不提供的页面动作：Harness 连接测试/心跳刷新、工具调试/�
 - 每个端点 3 正 1 反；断言具体状态码、字段值、列表顺序、错误 `code`。
 - 公共：分页、筛选、排序、404、400、409、428、500 映射。
 - 删除：Harness 被工具引用、工具/Skill 被专家引用；无引用 204。
-- 装配：重复目标、目标不存在、旧 `revision`、顺序回读。
+- 装配：重复目标、目标不存在、旧 `revision`、顺序回读；聚合保存的省略/替换/清空语义。
 - 契约快照：响应字段集合与 DTO 表一致；新增字段必须更新本文。
 - 外部 UI 若接入，可用同一份端点/DTO 表做适配层契约测试；不共享代码。
 
@@ -453,13 +458,13 @@ B1 不提供的页面动作：Harness 连接测试/心跳刷新、工具调试/�
 
 - 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 23 KB；OpenAPI 运行时资产约 69 KB、Swagger UI 静态资源约 2.14 MB，均单独计量，不计入组件预算。
 - 单独验证命令：`bun test tests/components/http-gateway`。
-- 文档入口：启动后访问 `/docs`；机器可读契约：`/openapi.yaml`。OpenAPI 资产随组件发布，包含 30 个 operation 的说明、48 个 schema 的说明与核心 DTO 的字段说明。
+- 文档入口：启动后访问 `/docs`；机器可读契约：`/openapi.yaml`。OpenAPI 资产随组件发布，包含 31 个 operation 的说明、49 个 schema 的说明与核心 DTO 的字段说明。
 - 当前状态：`current`；已实现并通过契约测试，验证入口见 [`result.md`](../../../works/2026-10-24-db-backend-infra/result.md)。
 
 ## 10 B1 实现口径与剩余问题
 
 - `API-21` 保留为独立只读资源 `GET /skill-categories`，便于外部客户端下拉直接消费。
-- `API-28` / `API-29` 保持分开，避免一次保存两类装配关系时互相覆盖。
+- `API-28` / `API-29` 保持分开，避免一次保存两类装配关系时互相覆盖；`API-30` 提供一次保存五区、引用与两类装配的聚合入口，领域内仍是单事务、单 `revision`。
 - 错误体不新增顶层 `fieldErrors`，字段级错误仍放在 `details`：单字段为 `details.field` / `details.reason`，多字段为 `details.fieldErrors` 数组。
 - 本仓库不配置 CORS；外部浏览器若跨源调用，由部署层同源代理或调用方处理，不在本仓库范围。
 - Swagger UI 是开发者文档，不是产品 UI；`/docs` 与 `/openapi.yaml` 不改变“只提供 HTTP API、无 CLI/库/产品 UI”的边界。

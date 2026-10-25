@@ -8,6 +8,7 @@ export type {
   ExpertService,
   ExpertSummary,
   UpdateExpert,
+  UpdateExpertAggregate,
 } from "./types.ts";
 export { SkillNotFoundError, ToolNotFoundError, createExpertRead, createExpertService } from "./service.ts";
 export type { ExpertDeps } from "./service.ts";

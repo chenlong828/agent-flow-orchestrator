@@ -33,8 +33,8 @@ describe("OpenAPI 契约结构", () => {
   test("版本、路径与 operation 数量稳定", () => {
     expect(spec.openapi).toBe("3.0.3");
     expect(Object.keys(spec.paths)).toHaveLength(18);
-    expect(operations).toHaveLength(30);
-    expect(spec.info["x-api-count"]).toBe(29);
+    expect(operations).toHaveLength(31);
+    expect(spec.info["x-api-count"]).toBe(30);
   });
 
   test("operation 介绍、schema 说明与 tag 齐全", () => {
@@ -59,7 +59,7 @@ describe("OpenAPI 契约结构", () => {
     const apiIds = operations
       .map(({ operation }) => operation["x-api-id"])
       .filter((id: unknown) => typeof id === "string" && /^API-\d+$/.test(id));
-    expect(apiIds).toHaveLength(29);
+    expect(apiIds).toHaveLength(30);
 
     for (const [name, schema] of Object.entries<any>(spec.components.schemas)) {
       expect(typeof schema.description, name).toBe("string");
@@ -80,6 +80,7 @@ describe("OpenAPI 契约结构", () => {
       "SkillDetail",
       "ExpertListItem",
       "ExpertCreate",
+      "ExpertAggregatePatch",
       "ExpertDetail",
       "ReferencePage",
       "ErrorDetail",
@@ -112,13 +113,13 @@ describe("OpenAPI 契约结构", () => {
 
   test("components 完整，所有 $ref 都可解析", () => {
     expect(Object.keys(spec.components.parameters)).toHaveLength(7);
-    expect(Object.keys(spec.components.schemas)).toHaveLength(48);
+    expect(Object.keys(spec.components.schemas)).toHaveLength(49);
     expect(Object.keys(spec.components.responses)).toHaveLength(6);
 
     const refs = [...text.matchAll(/\$ref['"]?\s*:\s*['"]?#\/components\/([^'"]+)['"]?/g)].map(
       (match) => match[1]!,
     );
-    expect(refs.length).toBe(290);
+    expect(refs.length).toBe(300);
     const missing: string[] = [];
     for (const ref of new Set(refs)) {
       let current: any = spec.components;

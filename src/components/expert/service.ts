@@ -27,17 +27,18 @@ import type {
   ExpertService,
   ExpertSummary,
   UpdateExpert,
+  UpdateExpertAggregate,
 } from "./types.ts";
 
 export class SkillNotFoundError extends ValidationError {
-  constructor(skillId: string) {
-    super("items", `Skill ${skillId} 不存在`);
+  constructor(skillId: string, field = "items") {
+    super(field, `Skill ${skillId} 不存在`);
   }
 }
 
 export class ToolNotFoundError extends ValidationError {
-  constructor(toolId: string) {
-    super("items", `工具 ${toolId} 不存在`);
+  constructor(toolId: string, field = "items") {
+    super(field, `工具 ${toolId} 不存在`);
   }
 }
 
@@ -170,6 +171,51 @@ function enabledFrom(input: CreateExpert): boolean {
   return input.enabled;
 }
 
+type NormalizedPatch = {
+  name?: string;
+  color?: string;
+  role?: string;
+  duty?: string;
+  skillOrder?: string;
+  verifyOrder?: string;
+  notes?: string;
+  persona?: string[];
+  refs?: { label: string; refType: string; path: string | null }[];
+  skillIds?: string[];
+  toolIds?: string[];
+};
+
+function normalizePatch(input: UpdateExpertAggregate): NormalizedPatch {
+  if (input === null || typeof input !== "object") {
+    throw new ValidationError("body", "必须是对象");
+  }
+  const patch: NormalizedPatch = {};
+  if (input.name !== undefined) patch.name = ensureText(input.name, "name", 80);
+  if (input.color !== undefined) {
+    if (typeof input.color !== "string" || !/^#[0-9A-Fa-f]{6}$/.test(input.color)) {
+      throw new ValidationError("color", "必须是 #RRGGBB 格式");
+    }
+    patch.color = input.color;
+  }
+  if (input.role !== undefined) patch.role = ensureText(input.role, "role", 200);
+  if (input.duty !== undefined) patch.duty = ensureOptionalText(input.duty, "duty");
+  if (input.skillOrder !== undefined) {
+    patch.skillOrder = ensureOptionalText(input.skillOrder, "skillOrder");
+  }
+  if (input.verifyOrder !== undefined) {
+    patch.verifyOrder = ensureOptionalText(input.verifyOrder, "verifyOrder");
+  }
+  if (input.notes !== undefined) patch.notes = ensureOptionalText(input.notes, "notes");
+  if (input.persona !== undefined) patch.persona = ensureStringList(input.persona, "persona");
+  if (input.refs !== undefined) patch.refs = ensureRefs(input.refs);
+  if (input.skillIds !== undefined) patch.skillIds = normalizeIds(input.skillIds, "skillIds");
+  if (input.toolIds !== undefined) patch.toolIds = normalizeIds(input.toolIds, "toolIds");
+  if (Object.keys(patch).length === 0) {
+    throw new ValidationError("body", "至少提供一个字段");
+  }
+  return patch;
+}
+
 function normalizeIds(value: unknown, field: string): string[] {
   if (!Array.isArray(value)) throw new ValidationError(field, "必须是字符串数组");
   const ids: string[] = [];
@@ -190,10 +236,46 @@ export function createExpertService(deps: ExpertDeps): ExpertService {
   const { db, clock, ids, actor } = deps;
   const store = createExpertStore(db);
 
+  async function replaceSkills(
+    tx: Db,
+    expertId: string,
+    skillIds: string[],
+    field = "items",
+  ): Promise<void> {
+    await store.clearSkillLinks(tx, expertId);
+    for (const [position, skillId] of skillIds.entries()) {
+      try {
+        await store.insertSkillLink(tx, expertId, skillId, position);
+      } catch (error) {
+        if (isForeignKeyViolation(error)) throw new SkillNotFoundError(skillId, field);
+        throw error;
+      }
+    }
+  }
+
+  async function replaceTools(
+    tx: Db,
+    expertId: string,
+    toolIds: string[],
+    field = "items",
+  ): Promise<void> {
+    await store.clearToolLinks(tx, expertId);
+    for (const [position, toolId] of toolIds.entries()) {
+      try {
+        await store.insertToolLink(tx, expertId, toolId, position);
+      } catch (error) {
+        if (isForeignKeyViolation(error)) throw new ToolNotFoundError(toolId, field);
+        throw error;
+      }
+    }
+  }
+
   return {
     async create(input, requestActor) {
       const normalized = normalizeWrite(input);
       const enabled = enabledFrom(input);
+      const skillIds = input.skillIds === undefined ? [] : normalizeIds(input.skillIds, "skillIds");
+      const toolIds = input.toolIds === undefined ? [] : normalizeIds(input.toolIds, "toolIds");
       const id = ids.next();
       const now = clock.now();
       const actorValue = requestActor ?? actor;
@@ -215,6 +297,8 @@ export function createExpertService(deps: ExpertDeps): ExpertService {
           await store.insertRoot(tx, write);
           await store.replacePersona(tx, id, normalized.persona);
           await store.replaceRefs(tx, id, normalized.refs);
+          await replaceSkills(tx, id, skillIds, "skillIds");
+          await replaceTools(tx, id, toolIds, "toolIds");
         });
       } catch (error) {
         if (isUniqueViolation(error)) throw new NameConflictError(normalized.name);
@@ -257,6 +341,56 @@ export function createExpertService(deps: ExpertDeps): ExpertService {
         });
       } catch (error) {
         if (isUniqueViolation(error)) throw new NameConflictError(normalized.name);
+        throw error;
+      }
+    },
+
+    async updateAggregate(id, revision, input, requestActor) {
+      const patch = normalizePatch(input);
+      const now = clock.now();
+      const actorValue = requestActor ?? actor;
+      try {
+        return await db.transaction(async (tx) => {
+          const current = await store.findRoot(tx, id, true);
+          if (current === null) throw new NotFoundError("专家", id);
+          if (current.revision !== revision) {
+            throw new RevisionConflictError(current.revision);
+          }
+          const changed = await store.updateRoot(tx, {
+            id,
+            name: patch.name ?? current.name,
+            color: patch.color ?? current.color,
+            role: patch.role ?? current.role,
+            duty: patch.duty ?? current.duty,
+            skillOrder: patch.skillOrder ?? current.skill_order,
+            verifyOrder: patch.verifyOrder ?? current.verify_order,
+            notes: patch.notes ?? current.notes,
+            revision,
+            now,
+            actor: actorValue,
+          });
+          if (changed === 0) {
+            const latest = await store.findRoot(tx, id);
+            throw new RevisionConflictError(latest?.revision ?? revision);
+          }
+          if (patch.persona !== undefined) {
+            await store.replacePersona(tx, id, patch.persona);
+          }
+          if (patch.refs !== undefined) {
+            await store.replaceRefs(tx, id, patch.refs);
+          }
+          if (patch.skillIds !== undefined) {
+            await replaceSkills(tx, id, patch.skillIds, "skillIds");
+          }
+          if (patch.toolIds !== undefined) {
+            await replaceTools(tx, id, patch.toolIds, "toolIds");
+          }
+          return { id, revision: revision + 1 };
+        });
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          throw new NameConflictError(patch.name ?? "");
+        }
         throw error;
       }
     },
@@ -305,15 +439,7 @@ export function createExpertService(deps: ExpertDeps): ExpertService {
         if (current.revision !== revision) {
           throw new RevisionConflictError(current.revision);
         }
-        await store.clearSkillLinks(tx, id);
-        for (const [position, skillId] of normalizedIds.entries()) {
-          try {
-            await store.insertSkillLink(tx, id, skillId, position);
-          } catch (error) {
-            if (isForeignKeyViolation(error)) throw new SkillNotFoundError(skillId);
-            throw error;
-          }
-        }
+        await replaceSkills(tx, id, normalizedIds);
         const next = await store.bumpRevision(tx, id, revision, now, actorValue);
         if (next === null) throw new RevisionConflictError(revision);
         return { revision: next };
@@ -330,15 +456,7 @@ export function createExpertService(deps: ExpertDeps): ExpertService {
         if (current.revision !== revision) {
           throw new RevisionConflictError(current.revision);
         }
-        await store.clearToolLinks(tx, id);
-        for (const [position, toolId] of normalizedIds.entries()) {
-          try {
-            await store.insertToolLink(tx, id, toolId, position);
-          } catch (error) {
-            if (isForeignKeyViolation(error)) throw new ToolNotFoundError(toolId);
-            throw error;
-          }
-        }
+        await replaceTools(tx, id, normalizedIds);
         const next = await store.bumpRevision(tx, id, revision, now, actorValue);
         if (next === null) throw new RevisionConflictError(revision);
         return { revision: next };

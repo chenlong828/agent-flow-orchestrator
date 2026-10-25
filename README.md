@@ -14,7 +14,7 @@ AgentFlow 研发智能体工作流编排服务的编排侧工程：目标是把�
 
 - Bun 1.4.4 + PostgreSQL 18.4；模块化单体，9 个组件（新增 `CMP-config`）。
 - 16 张业务表；4 个只向前迁移。
-- 29 个 B1 业务端点 + `/healthz`，契约见 [`http-gateway/spec.md`](docs/design/components/http-gateway/spec.md)；运行时 `/openapi.yaml` 与 Swagger UI `/docs` 由 HTTP 组件直接提供。
+- 30 个 B1 业务端点 + `/healthz`，契约见 [`http-gateway/spec.md`](docs/design/components/http-gateway/spec.md)；运行时 `/openapi.yaml` 与 Swagger UI `/docs` 由 HTTP 组件直接提供。
 - 开发者 API 文档：`/docs`（Swagger UI）与 `/openapi.yaml`，Swagger UI 资源已 vendor 到仓库，可离线使用。
 - 演示种子：5 Harness / 10 工具 / 12 Skill / 8 专家，Skill 与工具装配边各 23 条。
 - 实现结果与验证记录：[`result.md`](docs/works/2026-10-24-db-backend-infra/result.md)。
@@ -67,7 +67,7 @@ curl http://127.0.0.1:3100/healthz
 验证：
 
 ```bash
-bun test --max-concurrency=1   # 188 个测试
+bun test --max-concurrency=1   # 197 个测试
 bun run typecheck              # tsc --noEmit
 ```
 
