@@ -3,7 +3,7 @@ layer: design
 module: catalog
 status: current
 component: CMP-catalog
-updated: 2026-10-25
+updated: 2026-10-26
 ---
 
 # `CMP-catalog` 组件规格
@@ -45,6 +45,7 @@ type CatalogRead = {
 
   listSkills(query: SkillQuery): Promise<Page<SkillListItem>>;
   getSkill(id: string): Promise<SkillDetailView>;
+  getSkillDocument(id: string): Promise<SkillDocument>;
   listSkillCategories(): Promise<SkillCategoryView[]>;
   listExpertsUsingSkill(skillId: string): Promise<Reference[]>;
 
@@ -112,11 +113,10 @@ type SkillListItem = {
   name: string;
   categoryCode: string;
   categoryLabel: string;
-  summary: string;
+  description: string;
   version: string;
   enabled: boolean;
   tags: string[];
-  triggers: string[];
   usedByCount: number;
   revision: number;
   updatedAt: string;
@@ -151,7 +151,7 @@ type ExpertSkillSummaryView = {
   name: string;
   categoryCode: string;
   categoryLabel: string;
-  summary: string;
+  description: string;
 };
 
 type ExpertToolSummaryView = {
@@ -206,6 +206,7 @@ type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
 | `listToolsByHarness` | Harness 下工具引用 | `harnessId` | `Reference[]` | 无 | `ToolRead.listByHarness` |
 | `listSkills` | Skill 列表 | `SkillQuery` | `Page<SkillListItem>` | `ValidationError` | `SkillRead.list` + `ExpertRead.listExpertsUsingSkill` |
 | `getSkill` | Skill 详情 | `id` | `SkillDetailView` | `NotFoundError` | `SkillRead.get` + `ExpertRead.listExpertsUsingSkill` |
+| `getSkillDocument` | Skill 编排文档 | `id` | `SkillDocument` | `NotFoundError` | `SkillRead.getDocument`（原样透传，不二次加工） |
 | `listSkillCategories` | 分类参考数据 | 无 | `SkillCategoryView[]` | 无 | `SkillRead.listCategories` |
 | `listExpertsUsingSkill` | Skill 的引用专家 | `skillId` | `Reference[]` | 无 | `ExpertRead.listExpertsUsingSkill` |
 | `listExperts` | 专家列表 | `ExpertQuery` | `Page<ExpertListItem>` | `ValidationError` | `ExpertRead.list` + `SkillRead.getSummary`（前 3 个预览） |
@@ -223,7 +224,8 @@ type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
 |---|---|
 | Harness 列表/详情 | `HarnessRead` + `ToolRead.listByHarness` |
 | 工具列表/详情 | `ToolRead` + `HarnessRead.get`（名称）+ `ExpertRead.listExpertsUsingTool` |
-| Skill 列表/详情 | `SkillRead`（列表摘要含 `triggers`）+ `ExpertRead.listExpertsUsingSkill` |
+| Skill 列表/详情 | `SkillRead`（列表摘要含 `description`）+ `ExpertRead.listExpertsUsingSkill` |
+| Skill 编排文档 | `SkillRead.getDocument`（原样透传；不做跨资产组合） |
 | 专家列表/详情 | `ExpertRead`（列表含 `skillIds`）+ `SkillRead.getSummary` + `ToolRead.getSummary` |
 | 分类列表 | `SkillRead.listCategories` |
 | 引用查询 | `ToolRead.listByHarness` / `ExpertRead.listExpertsUsing*` |
@@ -231,7 +233,7 @@ type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
 - 不直接 SQL；不导入任何 store。
 - 单次请求内的多次读尽量在同一数据库快照/事务中完成；是否使用只读事务在实现时定，契约不承诺强一致。
 - 计数口径：Harness `toolCount` = 引用工具数；工具/Skill `usedByCount` = 引用专家数；专家 `refCount=0`（B1）。
-- 专家列表只为前 3 个 `skillIds` 解析名称，不把完整摘要塞进列表；Skill 列表的 `triggers` 由 `SkillRead` 摘要直接提供，不需要逐条详情。
+- 专家列表只为前 3 个 `skillIds` 解析名称，不把完整摘要塞进列表；Skill 列表的 `description` 由 `SkillRead` 摘要直接提供，不需要逐条详情。
 
 ## 5 依赖与边界
 
@@ -249,7 +251,7 @@ type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
 
 ## 7 预算与运行
 
-- 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 6 KB。
+- 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 10 KB。
 - 单独验证命令：`bun test tests/components/catalog`。
 - 当前状态：`current`；已实现并通过契约测试，验证入口见 [`result.md`](../../../works/2026-10-24-db-backend-infra/result.md)。
 

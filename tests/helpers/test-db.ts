@@ -55,7 +55,6 @@ const BUSINESS_TABLES = [
   "skill_pitfall",
   "skill_ref",
   "skill_section",
-  "skill_trigger",
   "skill_tag",
   "skill",
   "tool_param",

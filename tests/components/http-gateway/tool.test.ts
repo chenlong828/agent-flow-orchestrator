@@ -169,7 +169,7 @@ describe("工具 HTTP 契约", () => {
     const skill = await ctx.skillService.create({
       name: "CRES 技能",
       categoryCode: "coding",
-      summary: "s",
+      description: "s",
       sections: {
         overview: "o",
         steps: "s",

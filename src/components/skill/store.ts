@@ -5,7 +5,7 @@ export type SkillRootRow = {
   id: string;
   name: string;
   category_code: string;
-  summary: string;
+  description: string;
   version: string;
   enabled: boolean;
   revision: number;
@@ -31,7 +31,7 @@ export type SkillRootWrite = {
   id: string;
   name: string;
   categoryCode: string;
-  summary: string;
+  description: string;
   version: string;
   enabled: boolean;
   now: Date;
@@ -40,7 +40,6 @@ export type SkillRootWrite = {
 
 export type SkillChildren = {
   tags: string[];
-  triggers: string[];
   sections: { kind: SkillSectionKind; content: string }[];
   pitfalls: string[];
   refs: { label: string; refType: string; path: string | null }[];
@@ -55,7 +54,9 @@ function buildFilters(query: SkillQuery): { where: string; params: unknown[] } {
   const params: unknown[] = [];
   if (query.q !== undefined && query.q !== "") {
     params.push(`%${escapeLike(query.q)}%`);
-    clauses.push(`name ilike $${params.length} escape '\\'`);
+    clauses.push(
+      `(name ilike $${params.length} escape '\\' or description ilike $${params.length} escape '\\')`,
+    );
   }
   if (query.categoryCode !== undefined) {
     params.push(query.categoryCode);
@@ -106,14 +107,14 @@ export function createSkillStore(db: Db) {
     async insertRoot(tx: Db, input: SkillRootWrite): Promise<void> {
       await tx.query(
         `insert into skill
-          (id, name, category_code, summary, version, enabled, revision,
+          (id, name, category_code, description, version, enabled, revision,
            created_at, updated_at, created_by, updated_by)
          values ($1, $2, $3, $4, $5, $6, 1, $7, $7, $8, $8)`,
         [
           input.id,
           input.name,
           input.categoryCode,
-          input.summary,
+          input.description,
           input.version,
           input.enabled,
           input.now,
@@ -128,14 +129,14 @@ export function createSkillStore(db: Db) {
     ): Promise<number> {
       const rows = await tx.query<{ id: string }>(
         `update skill set
-           name = $1, category_code = $2, summary = $3, version = $4,
+           name = $1, category_code = $2, description = $3, version = $4,
            revision = revision + 1, updated_at = $5, updated_by = $6
          where id = $7 and revision = $8
          returning id`,
         [
           input.name,
           input.categoryCode,
-          input.summary,
+          input.description,
           input.version,
           input.now,
           input.actor,
@@ -209,7 +210,6 @@ export function createSkillStore(db: Db) {
 
     async replaceChildren(tx: Db, skillId: string, children: SkillChildren): Promise<void> {
       await tx.query("delete from skill_tag where skill_id = $1", [skillId]);
-      await tx.query("delete from skill_trigger where skill_id = $1", [skillId]);
       await tx.query("delete from skill_section where skill_id = $1", [skillId]);
       await tx.query("delete from skill_pitfall where skill_id = $1", [skillId]);
       await tx.query("delete from skill_ref where skill_id = $1", [skillId]);
@@ -217,12 +217,6 @@ export function createSkillStore(db: Db) {
         await tx.query(
           "insert into skill_tag (skill_id, position, tag) values ($1, $2, $3)",
           [skillId, position, tag],
-        );
-      }
-      for (const [position, keyword] of children.triggers.entries()) {
-        await tx.query(
-          "insert into skill_trigger (skill_id, position, keyword) values ($1, $2, $3)",
-          [skillId, position, keyword],
         );
       }
       for (const section of children.sections) {
@@ -252,14 +246,6 @@ export function createSkillStore(db: Db) {
         [skillId],
       );
       return rows.map((row) => row.tag);
-    },
-
-    async triggersFor(tx: Db, skillId: string): Promise<string[]> {
-      const rows = await tx.query<{ keyword: string }>(
-        "select keyword from skill_trigger where skill_id = $1 order by position asc",
-        [skillId],
-      );
-      return rows.map((row) => row.keyword);
     },
 
     async sectionsFor(tx: Db, skillId: string): Promise<SkillSectionRow[]> {

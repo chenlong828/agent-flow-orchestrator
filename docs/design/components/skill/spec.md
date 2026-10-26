@@ -3,14 +3,20 @@ layer: design
 module: skill
 status: current
 component: CMP-skill
-updated: 2026-10-25
+updated: 2026-10-26
 ---
 
 # `CMP-skill` 组件规格
 
 ## 1 主目标
 
-维护 Skill 聚合：分类引用、五章、标签、触发词、踩坑、引用资料与版本递增；它是 `skill` 及其子表的唯一写入口。
+维护 Skill 聚合：分类引用、描述、五章、标签、踩坑、引用资料、版本递增，以及供编排器直接载入的合成文档；它是 `skill` 及其子表的唯一写入口。
+
+Skill 有两种消费方式，契约按面拆分：
+
+- **管理面**：`catalog` 组合的列表/详情，给管理界面做增删改查与导航。
+- **编排面**：`getDocument` 合成的 markdown，给编排器按整篇载入。
+- 两面只有 `description` 共享，它同时承担路由（触发）作用。
 
 **不负责**：专家装配、版本历史、跨资产读模型、HTTP 路由。
 
@@ -19,9 +25,8 @@ updated: 2026-10-25
 | 表 | 关键字段 | 说明 |
 |---|---|---|
 | `skill_category` | `code`、`label`、`position` | 参考数据，种子只读，无写接口 |
-| `skill` | `id`、`name`、`category_code`、`summary`、`version`、`enabled`、`revision`、审计字段 | 聚合根 |
+| `skill` | `id`、`name`、`category_code`、`description`、`version`、`enabled`、`revision`、审计字段 | 聚合根 |
 | `skill_tag` | `skill_id`、`position`、`tag` | 有序，级联删除 |
-| `skill_trigger` | `skill_id`、`position`、`keyword` | 有序，唯一 |
 | `skill_section` | `skill_id`、`kind`、`content_md` | 固定五章，恰好五条 |
 | `skill_pitfall` | `skill_id`、`position`、`content` | 有序，级联删除 |
 | `skill_ref` | `skill_id`、`position`、`label`、`ref_type`、`path` | 有序，`path` 可空 |
@@ -29,12 +34,13 @@ updated: 2026-10-25
 不变量：
 
 - `name` 大小写不敏感唯一；`category_code` 必须存在。
-- `summary` ≤200 字。
+- `description` 1–400 字；它是管理面与编排面唯一的共享字段，列表检索与编排路由都以它为依据。
 - `version` 形如 `vX.Y`；API 新建 `v1.0`；每次保存 minor+1；若 minor 超过 9，则 major+1、minor=0（如 `v1.9` → `v2.0`）；客户端不可写；种子保留演示版本。
 - 五章齐全：`overview / steps / examples / scripts / verification`。
-- 标签/触发词/踩坑/引用有序；标签与触发词各自唯一；章节主键 `(skill_id, kind)`。
+- 标签/踩坑/引用有序；标签唯一；章节主键 `(skill_id, kind)`。
 - 有专家引用时不可删除；删除前调用 `ReferenceGuard`，非空抛 `ReferencedError`。
 - B1 不建版本历史表。
+- 触发词不再单独建表：迁移 `0005_skill_description.sql` 把旧 `skill.summary` 与 `skill_trigger.keyword` 合并为 `skill.description`，随后删除 `summary` 列与 `skill_trigger` 表；合并文本为 `summary + " 触发：" + keywords.join("、")`，不做截断。
 
 ## 3 公共契约
 
@@ -50,6 +56,7 @@ type SkillRead = {
   list(query: SkillQuery): Promise<Page<SkillSummary>>;
   get(id: string): Promise<SkillDetail>;
   getSummary(id: string): Promise<SkillSummary>;
+  getDocument(id: string): Promise<SkillDocument>;
   listCategories(): Promise<SkillCategory[]>;
 };
 ```
@@ -81,9 +88,8 @@ type SkillRefInput = {
 type CreateSkill = {
   name: string;
   categoryCode: string;
-  summary: string;
+  description: string;
   tags?: string[];
-  triggers?: string[];
   sections: SkillSections;
   pitfalls?: string[];
   refs?: SkillRefInput[];
@@ -96,11 +102,10 @@ type SkillSummary = {
   id: string;
   name: string;
   categoryCode: string;
-  summary: string;
+  description: string;
   version: string;
   enabled: boolean;
   tags: string[];
-  triggers: string[];
   revision: number;
   updatedAt: string;
 };
@@ -110,6 +115,11 @@ type SkillDetail = SkillSummary & {
   pitfalls: string[];
   refs: SkillRefInput[];
   createdAt: string;
+};
+
+type SkillDocument = {
+  markdown: string;
+  revision: number;
 };
 
 type SkillCategory = {
@@ -128,7 +138,7 @@ type SkillQuery = {
 };
 ```
 
-`SkillSummary` 不包含 `usedByCount`；由 `catalog` 组合。`triggers` 进入摘要，供列表检索/导航直接使用；完整子表仍只在详情读取。`version` 由服务端计算，客户端不可写。
+`SkillSummary` 不包含 `usedByCount`；由 `catalog` 组合。`q` 同时匹配 `name` 与 `description`；`triggers` 字段已从契约移除，写请求出现该字段按未知字段拒绝。`version` 由服务端计算，客户端不可写。
 
 ### 3.2 方法契约
 
@@ -141,6 +151,7 @@ type SkillQuery = {
 | `list` | 列表查询 | `SkillQuery` | `Page<SkillSummary>` | `ValidationError` | 读 |
 | `get` | 详情查询 | `id` | `SkillDetail` | `NotFoundError` | 读 |
 | `getSummary` | 摘要查询，供 catalog 使用 | `id` | `SkillSummary` | `NotFoundError` | 读 |
+| `getDocument` | 合成编排文档 | `id` | `SkillDocument` | `NotFoundError` | 读；每次按当前数据合成，不缓存、不落库 |
 | `listCategories` | 分类参考数据 | 无 | `SkillCategory[]` | 无 | 读 |
 
 `CategoryNotFoundError` 是组件内对“`categoryCode` 不存在”的可读错误，继承 `ValidationError`。
@@ -154,15 +165,16 @@ type SkillQuery = {
 
 ## 5 验证
 
-- 规则：名称唯一、分类存在、摘要长度、五章完整、版本进位、子表唯一/顺序。
+- 规则：名称唯一、分类存在、描述 1–400 字、五章完整、版本进位、标签唯一。
 - 存储：创建完整五章、更新整体替换子表、启停、删除级联。
 - 删除保护：假的 `ReferenceGuard` 返回专家列表，断言不删除并抛 `ReferencedError`。
-- 读契约：列表按分类/标签/启停筛选、详情、`getSummary`、分类列表。
+- 读契约：列表按分类/标签/启停筛选、`q` 命中名称与描述、详情、`getSummary`、分类列表。
+- 文档：`getDocument` 的 frontmatter、五章顺序、踩坑/引用节、空节省略、转义、`revision` 与详情同步、缺失资源 404。
 - 契约：对应 REST 端点 3 正 1 反在 `http-gateway` 规格中列明。
 
 ## 6 预算与运行
 
-- 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 6 KB。
+- 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 9 KB。
 - 单独验证命令：`bun test tests/components/skill`。
 - 当前状态：`current`；已实现并通过契约测试，验证入口见 [`result.md`](../../../works/2026-10-24-db-backend-infra/result.md)。
 
@@ -170,4 +182,15 @@ type SkillQuery = {
 
 - `skill_category` 固定为 `coding/retrieval/review/testing` 四个代码与中文标签。
 - `ref_type` 先按字符串存储，不固定枚举。
-- 标签/触发词/踩坑/引用不设业务数量上限，只做字段级长度与请求体校验。
+- 标签/踩坑/引用不设业务数量上限，只做字段级长度与请求体校验。
+
+## 8 编排文档结构
+
+`getDocument` 输出的是给编排器直接载入的机器入口，也是唯一需要“整篇可读”的产物；结构固定，不跟管理界面的字段变化。
+
+- frontmatter 三键 `name` / `description` / `version`，值一律双引号字符串，`\`、`"`、回车与换行转义。
+- 正文顺序固定为五个二级标题：`流程总述`、`执行步骤`、`示例`、`脚本`、`完成验证`；对应章节为空时标题保留、内容留空。
+- 有踩坑时追加 `常见踩坑`，每条 `- 内容`；有引用时追加 `参考资料`，每条 `- <label>（<refType>） — <path>`，`path` 为空时省略 ` — <path>`。
+- 空踩坑与空引用两个整节省略，不写空标题。
+- 不包含 `categoryCode`、`categoryLabel`、`tags`、`enabled`、`revision` 等管理面字段；不按 `enabled` 过滤，停用技能照常输出。
+- 末尾恰好一个换行。

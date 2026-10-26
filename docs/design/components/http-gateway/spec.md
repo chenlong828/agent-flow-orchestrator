@@ -3,7 +3,7 @@ layer: design
 module: http-gateway
 status: current
 component: CMP-http-gateway
-updated: 2026-10-25
+updated: 2026-10-26
 ---
 
 # `CMP-http-gateway` 组件规格与 REST API 契约
@@ -36,6 +36,7 @@ updated: 2026-10-25
 ### 3.1 请求/响应
 
 - `Content-Type: application/json; charset=utf-8`；响应 JSON UTF-8。
+- 例外：`GET /skills/{id}/document` 返回 `text/markdown; charset=utf-8`，带 `ETag: "<revision>"`；请求带相同 `If-None-Match` 时返回 304、无响应体。该端点不做 `enabled` 过滤。
 - ID 为 UUIDv7 字符串；时间为 ISO-8601 UTC 字符串；金额不涉及。
 - 创建：`POST` 成功 201，响应体为资源详情（同 `GET` 详情），`Location: /api/v1/<resource>/<id>`。
 - 更新：`PUT` 成功 200，返回资源详情。
@@ -101,7 +102,7 @@ updated: 2026-10-25
 
 ## 4 端点总表
 
-30 个 B1 业务端点；`/healthz` 单独列在 §4.2；开发者文档端点见 §4.3，不计入业务端点。
+31 个 B1 业务端点；`/healthz` 单独列在 §4.2；开发者文档端点见 §4.3，不计入业务端点。
 
 ### 4.1 业务端点
 
@@ -137,6 +138,7 @@ updated: 2026-10-25
 | `API-28` | PUT | `/experts/{id}/skills` | `UC-B1-05` | 整体替换有序 Skill | 200 专家详情 |
 | `API-29` | PUT | `/experts/{id}/tools` | `UC-B1-05` | 整体替换有序工具 | 200 专家详情 |
 | `API-30` | PATCH | `/experts/{id}` | `UC-B1-04` / `UC-B1-05` | 聚合部分更新五区、引用与装配；一次事务 | 200 专家详情 |
+| `API-31` | GET | `/skills/{id}/document` | `UC-B1-03` | Skill 编排文档（markdown，供编排器整篇载入） | 200 markdown |
 
 ### 4.2 健康检查
 
@@ -256,11 +258,10 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 | `name` | string | 唯一 |
 | `categoryCode` | string | 分类代码 |
 | `categoryLabel` | string | 分类展示名 |
-| `summary` | string | ≤200 字 |
+| `description` | string | 1–400 字；路由描述（适用场景、触发条件、不适用场景），列表检索使用 |
 | `version` | string | `vX.Y`，服务端维护 |
 | `enabled` | boolean | 启停 |
 | `tags` | string[] | 标签，有序 |
-| `triggers` | string[] | 触发条件，有序且唯一；列表检索使用 |
 | `usedByCount` | number | 派生：引用专家数 |
 | `revision` | number | 乐观锁 |
 | `updatedAt` | string | ISO-8601 |
@@ -271,7 +272,7 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 
 **`SkillRef`**：`{label:string, refType:string, path?: string|null}`；`path` 可省略或为 null。
 
-**查询参数**：`q`、`category`、`enabled`、`tag`、`limit`、`offset`、`sort`（`name`、`updatedAt`、`version`）。
+**查询参数**：`q`（匹配 `name` 或 `description`）、`category`、`enabled`、`tag`、`limit`、`offset`、`sort`（`name`、`updatedAt`、`version`）。
 
 **创建/更新请求**：
 
@@ -279,15 +280,21 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 |---|---|---|---|
 | `name` | string | 是 | 1–80 字，唯一 |
 | `categoryCode` | string | 是 | 必须存在 |
-| `summary` | string | 是 | ≤200 字 |
+| `description` | string | 是 | 1–400 字；路由描述 |
 | `tags` | string[] | 否 | 有序 |
-| `triggers` | string[] | 否 | 有序、唯一 |
 | `sections` | `SkillSections` | 是 | 五章齐全 |
 | `pitfalls` | string[] | 否 | 有序 |
 | `refs` | `SkillRef[]` | 否 | 有序；`path` 可空 |
 
+- 请求体出现 `summary` / `triggers` 等未在表内的字段按未知字段返回 400。
 - `version` 不在请求中；`POST` 生成 `v1.0`，默认 `enabled=true`；`PUT` 服务端 minor+1；若 minor 超过 9，则 major+1、minor=0（如 `v1.9` → `v2.0`）。
 - `GET /skill-categories` 返回 `{items:[{code,label,position}]}`；无分页。
+
+**编排文档 `GET /skills/{id}/document`**（`API-31`）
+
+- 响应 `text/markdown; charset=utf-8`；`ETag` 与 `If-Match` 同格式（`"<revision>"`）；`If-None-Match` 命中返回 304。
+- 结构：frontmatter（`name` / `description` / `version`）+ 五个固定二级标题（`流程总述`、`执行步骤`、`示例`、`脚本`、`完成验证`），有踩坑追加 `常见踩坑`、有引用追加 `参考资料`；空踩坑/空引用整节省略，空章节保留标题。
+- 不含管理面字段（分类、标签、启停、revision）；停用技能照常返回；缺失资源 404 JSON 错误体。
 
 ### 5.4 专家
 
@@ -311,7 +318,7 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 **详情 `ExpertDetail`**：共享字段 + `duty`、`skillOrder`、`verifyOrder`、`notes`、`skills: ExpertSkillSummary[]`、`tools: ExpertToolSummary[]`、`refs: ExpertRef[]`、`createdAt`。
 
 **`ExpertSkillPreview`**：`{id,name}`，仅用于列表选择/导航。
-**`ExpertSkillSummary`**：`{id,name,categoryCode,categoryLabel,summary}`。
+**`ExpertSkillSummary`**：`{id,name,categoryCode,categoryLabel,description}`。
 **`ExpertToolSummary`**：`{id,name,kind,status}`。
 **`ExpertRef`**：`{label,refType,path?: string|null}`；`path` 可省略或为 null。
 
@@ -412,6 +419,7 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 | `API-28` | `expert.setSkills` + `catalog.getExpert` |
 | `API-29` | `expert.setTools` + `catalog.getExpert` |
 | `API-30` | `expert.updateAggregate` + `catalog.getExpert` |
+| `API-31` | `catalog.getSkillDocument` |
 | `API-H` | `platform.Health.check` |
 
 - 写端点由 `http-gateway` 调用领域写方法，再用 `catalog` 回读详情；路由层不拼字段。
@@ -424,7 +432,7 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 |---|---|---|
 | `harnesses.html` / `CMP-harnesses` | `API-01`～`API-07` | 列表、详情、注册、编辑、启停、删除、工具引用 |
 | `tools.html` / `CMP-tools` | `API-08`～`API-13` | 列表、详情、注册、编辑、删除、专家引用；无启停/调试 |
-| `skills.html` / `CMP-skills` | `API-14`～`API-21` | 列表、详情、五章、启停、删除、专家引用、分类 |
+| `skills.html` / `CMP-skills` | `API-14`～`API-21`、`API-31` | 列表、详情、五章、启停、删除、专家引用、分类；`API-31` 提供全文展示数据 |
 | `experts.html` / `CMP-experts` | `API-22`～`API-30` | 列表、详情、五区、启停、删除、Skill/工具装配、聚合保存 |
 | 其他页面 | 无 B1 端点 | Key/工作区/工作流/实例/看板不在 B1 |
 
@@ -461,7 +469,7 @@ B1 不提供的页面动作：Harness 连接测试/心跳刷新、工具调试/�
 
 ## 9 预算与运行
 
-- 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 23 KB；OpenAPI 运行时资产约 69 KB、Swagger UI 静态资源约 2.14 MB，均单独计量，不计入组件预算。
+- 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 26 KB；OpenAPI 运行时资产约 73 KB、Swagger UI 静态资源约 2.14 MB，均单独计量，不计入组件预算。
 - 单独验证命令：`bun test tests/components/http-gateway`。
 - 文档入口：启动后访问 `/docs`；机器可读契约：`/openapi.yaml`。OpenAPI 资产随组件发布，包含 31 个 operation 的说明、51 个 schema 的说明与核心 DTO 的字段说明。
 - 当前状态：`current`；已实现并通过契约测试，验证入口见 [`result.md`](../../../works/2026-10-24-db-backend-infra/result.md)。

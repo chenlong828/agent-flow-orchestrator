@@ -2,6 +2,7 @@ export type {
   CreateSkill,
   SkillCategory,
   SkillDetail,
+  SkillDocument,
   SkillQuery,
   SkillRead,
   SkillRefInput,

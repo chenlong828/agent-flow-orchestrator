@@ -24,9 +24,9 @@ export type SkillRefInput = {
 export type CreateSkill = {
   name: string;
   categoryCode: string;
-  summary: string;
+  /** 路由描述：何时使用 / 何时不适用；1–400 字。 */
+  description: string;
   tags?: string[];
-  triggers?: string[];
   sections: SkillSections;
   pitfalls?: string[];
   refs?: SkillRefInput[];
@@ -39,11 +39,10 @@ export type SkillSummary = {
   id: string;
   name: string;
   categoryCode: string;
-  summary: string;
+  description: string;
   version: string;
   enabled: boolean;
   tags: string[];
-  triggers: string[];
   revision: number;
   updatedAt: string;
 };
@@ -70,6 +69,12 @@ export type SkillQuery = {
   sort?: "name" | "-name" | "updatedAt" | "-updatedAt" | "version" | "-version";
 };
 
+/** 编排面文档：合成文本 + 合成时的 revision（供 ETag）。 */
+export type SkillDocument = {
+  markdown: string;
+  revision: number;
+};
+
 export type SkillService = {
   create(
     input: CreateSkill,
@@ -94,5 +99,6 @@ export type SkillRead = {
   list(query: SkillQuery): Promise<Page<SkillSummary>>;
   get(id: string): Promise<SkillDetail>;
   getSummary(id: string): Promise<SkillSummary>;
+  getDocument(id: string): Promise<SkillDocument>;
   listCategories(): Promise<SkillCategory[]>;
 };

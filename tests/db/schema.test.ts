@@ -17,7 +17,6 @@ const BUSINESS_TABLES = [
   "skill_ref",
   "skill_section",
   "skill_tag",
-  "skill_trigger",
   "tool",
   "tool_param",
 ];
@@ -31,7 +30,7 @@ afterAll(async () => {
 });
 
 describe("数据库结构", () => {
-  test("业务表恰好 16 张，另有 schema_migrations", async () => {
+  test("业务表恰好 15 张，另有 schema_migrations", async () => {
     const rows = await db.query<{ table_name: string }>(
       `select table_name from information_schema.tables
        where table_schema = 'public' and table_type = 'BASE TABLE'
@@ -41,7 +40,7 @@ describe("数据库结构", () => {
     expect(names).toEqual([...BUSINESS_TABLES, "schema_migrations"].sort());
   });
 
-  test("4 个迁移按顺序记录，分类参考数据为 4 条", async () => {
+  test("5 个迁移按顺序记录，分类参考数据为 4 条", async () => {
     const migrations = await db.query<{ version: string }>(
       "select version from schema_migrations order by version",
     );
@@ -50,6 +49,7 @@ describe("数据库结构", () => {
       "0002_tool.sql",
       "0003_skill.sql",
       "0004_expert.sql",
+      "0005_skill_description.sql",
     ]);
 
     const categories = await db.query<{ code: string; position: number }>(

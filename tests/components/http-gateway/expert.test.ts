@@ -45,13 +45,13 @@ beforeEach(async () => {
   const skill1 = await ctx.skillService.create({
     name: "CRES 技能",
     categoryCode: "coding",
-    summary: "s",
+    description: "s",
     sections: { overview: "o", steps: "s", examples: "e", scripts: "sc", verification: "v" },
   });
   const skill2 = await ctx.skillService.create({
     name: "调用链分析",
     categoryCode: "retrieval",
-    summary: "s",
+    description: "s",
     sections: { overview: "o", steps: "s", examples: "e", scripts: "sc", verification: "v" },
   });
   skillIds = [skill1.id, skill2.id];

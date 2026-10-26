@@ -25,9 +25,11 @@ import type {
   CreateSkill,
   SkillCategory,
   SkillDetail,
+  SkillDocument,
   SkillQuery,
   SkillRead,
   SkillRefInput,
+  SkillSectionKind,
   SkillSections,
   SkillService,
   SkillSummary,
@@ -60,16 +62,15 @@ function toIso(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
 
-function toSummary(row: SkillRootRow, tags: string[], triggers: string[]): SkillSummary {
+function toSummary(row: SkillRootRow, tags: string[]): SkillSummary {
   return {
     id: row.id,
     name: row.name,
     categoryCode: row.category_code,
-    summary: row.summary,
+    description: row.description,
     version: row.version,
     enabled: row.enabled,
     tags,
-    triggers,
     revision: row.revision,
     updatedAt: toIso(row.updated_at),
   };
@@ -90,6 +91,55 @@ function toSections(rows: SkillSectionRow[]): SkillSections {
   };
 }
 
+/** 编排面文档的章节标题；属于 API 契约，不随展示端文案变化。 */
+const SECTION_LABELS: Record<SkillSectionKind, string> = {
+  overview: "流程总述",
+  steps: "执行步骤",
+  examples: "示例",
+  scripts: "脚本",
+  verification: "完成验证",
+};
+
+function yamlScalar(value: string): string {
+  const escaped = value
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\r/g, "\\r")
+    .replace(/\n/g, "\\n");
+  return `"${escaped}"`;
+}
+
+/** 合成编排面文档：frontmatter + 五章 + 可选踩坑/参考资料；不落库。 */
+function composeDocument(detail: SkillDetail): string {
+  const lines: string[] = [
+    "---",
+    `name: ${yamlScalar(detail.name)}`,
+    `description: ${yamlScalar(detail.description)}`,
+    `version: ${yamlScalar(detail.version)}`,
+    "---",
+    "",
+  ];
+  for (const kind of SECTION_KINDS) {
+    lines.push(`## ${SECTION_LABELS[kind]}`, "");
+    const content = detail.sections[kind].trim();
+    if (content !== "") lines.push(content, "");
+  }
+  if (detail.pitfalls.length > 0) {
+    lines.push("## 常见踩坑", "");
+    for (const pitfall of detail.pitfalls) lines.push(`- ${pitfall.trim()}`);
+    lines.push("");
+  }
+  if (detail.refs.length > 0) {
+    lines.push("## 参考资料", "");
+    for (const ref of detail.refs) {
+      const suffix = ref.path === undefined || ref.path === "" ? "" : ` — ${ref.path}`;
+      lines.push(`- ${ref.label}（${ref.refType}）${suffix}`);
+    }
+    lines.push("");
+  }
+  return `${lines.join("\n").replace(/\n+$/, "")}\n`;
+}
+
 function ensureText(value: unknown, field: string, maxLength: number): string {
   if (typeof value !== "string") throw new ValidationError(field, "必须是字符串");
   const trimmed = value.trim();
@@ -98,13 +148,6 @@ function ensureText(value: unknown, field: string, maxLength: number): string {
     throw new ValidationError(field, `长度不能超过 ${maxLength}`);
   }
   return trimmed;
-}
-
-function ensureOptionalText(value: unknown, field: string, maxLength: number): string {
-  if (value === undefined || value === null) return "";
-  if (typeof value !== "string") throw new ValidationError(field, "必须是字符串");
-  if (value.length > maxLength) throw new ValidationError(field, `长度不能超过 ${maxLength}`);
-  return value;
 }
 
 function ensureEnum<T extends string>(value: unknown, field: string, allowed: readonly T[]): T {
@@ -182,9 +225,8 @@ function ensureRefs(value: unknown, field: string): { label: string; refType: st
 type NormalizedWrite = {
   name: string;
   categoryCode: string;
-  summary: string;
+  description: string;
   tags: string[];
-  triggers: string[];
   sections: SkillSections;
   pitfalls: string[];
   refs: { label: string; refType: string; path: string | null }[];
@@ -197,14 +239,12 @@ function normalizeWrite(input: CreateSkill): NormalizedWrite {
   }
   const name = ensureText(input.name, "name", 80);
   const categoryCode = ensureText(input.categoryCode, "categoryCode", 50);
-  const summary = ensureOptionalText(input.summary, "summary", 200);
-  if (summary.trim().length === 0) throw new ValidationError("summary", "不能为空");
+  const description = ensureText(input.description, "description", 400);
   const tags = ensureStringList(input.tags, "tags", { unique: true });
-  const triggers = ensureStringList(input.triggers, "triggers", { unique: true });
   const sections = ensureSections(input.sections);
   const pitfalls = ensureStringList(input.pitfalls, "pitfalls", { unique: false });
   const refs = ensureRefs(input.refs, "refs");
-  return { name, categoryCode, summary, tags, triggers, sections, pitfalls, refs };
+  return { name, categoryCode, description, tags, sections, pitfalls, refs };
 }
 
 function enabledFrom(input: CreateSkill): boolean {
@@ -230,7 +270,6 @@ function nextVersion(version: string): string {
 function toChildren(normalized: NormalizedWrite): SkillChildren {
   return {
     tags: normalized.tags,
-    triggers: normalized.triggers,
     sections: SECTION_KINDS.map((kind) => ({
       kind,
       content: normalized.sections[kind],
@@ -260,7 +299,7 @@ export function createSkillService(deps: SkillDeps): SkillService {
             id,
             name: normalized.name,
             categoryCode: normalized.categoryCode,
-            summary: normalized.summary,
+            description: normalized.description,
             version: "v1.0",
             enabled,
             now,
@@ -298,7 +337,7 @@ export function createSkillService(deps: SkillDeps): SkillService {
             id,
             name: normalized.name,
             categoryCode: normalized.categoryCode,
-            summary: normalized.summary,
+            description: normalized.description,
             version,
             revision,
             now,
@@ -379,52 +418,52 @@ export function createSkillRead(deps: { db: Db }): SkillRead {
   const { db } = deps;
   const store = createSkillStore(db);
 
+  async function readDetail(id: string): Promise<SkillDetail> {
+    const row = await store.findRoot(db, id);
+    if (row === null) throw new NotFoundError("Skill", id);
+    const [tags, sections, pitfalls, refs] = await Promise.all([
+      store.tagsFor(db, id),
+      store.sectionsFor(db, id),
+      store.pitfallsFor(db, id),
+      store.refsFor(db, id),
+    ]);
+    const refsInput: SkillRefInput[] = refs.map((ref) => ({
+      label: ref.label,
+      refType: ref.ref_type,
+      path: ref.path ?? undefined,
+    }));
+    return {
+      ...toSummary(row, tags),
+      sections: toSections(sections),
+      pitfalls,
+      refs: refsInput,
+      createdAt: toIso(row.created_at),
+    };
+  }
+
   return {
     async list(query: SkillQuery): Promise<Page<SkillSummary>> {
       const { rows, total } = await store.listRoots(db, query);
       const items: SkillSummary[] = [];
       for (const row of rows) {
-        const [tags, triggers] = await Promise.all([
-          store.tagsFor(db, row.id),
-          store.triggersFor(db, row.id),
-        ]);
-        items.push(toSummary(row, tags, triggers));
+        items.push(toSummary(row, await store.tagsFor(db, row.id)));
       }
       return { items, total, limit: query.page.limit, offset: query.page.offset };
     },
 
-    async get(id): Promise<SkillDetail> {
-      const row = await store.findRoot(db, id);
-      if (row === null) throw new NotFoundError("Skill", id);
-      const [tags, triggers, sections, pitfalls, refs] = await Promise.all([
-        store.tagsFor(db, id),
-        store.triggersFor(db, id),
-        store.sectionsFor(db, id),
-        store.pitfallsFor(db, id),
-        store.refsFor(db, id),
-      ]);
-      const refsInput: SkillRefInput[] = refs.map((ref) => ({
-        label: ref.label,
-        refType: ref.ref_type,
-        path: ref.path ?? undefined,
-      }));
-      return {
-        ...toSummary(row, tags, triggers),
-        sections: toSections(sections),
-        pitfalls,
-        refs: refsInput,
-        createdAt: toIso(row.created_at),
-      };
+    get(id): Promise<SkillDetail> {
+      return readDetail(id);
     },
 
     async getSummary(id): Promise<SkillSummary> {
       const row = await store.findRoot(db, id);
       if (row === null) throw new NotFoundError("Skill", id);
-      const [tags, triggers] = await Promise.all([
-        store.tagsFor(db, id),
-        store.triggersFor(db, id),
-      ]);
-      return toSummary(row, tags, triggers);
+      return toSummary(row, await store.tagsFor(db, id));
+    },
+
+    async getDocument(id): Promise<SkillDocument> {
+      const detail = await readDetail(id);
+      return { markdown: composeDocument(detail), revision: detail.revision };
     },
 
     async listCategories(): Promise<SkillCategory[]> {

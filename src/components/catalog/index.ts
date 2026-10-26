@@ -6,7 +6,7 @@ import type {
 } from "../../core/kernel/index.ts";
 import type { HarnessQuery, HarnessRead } from "../harness/index.ts";
 import type { ToolQuery, ToolRead } from "../tool/index.ts";
-import type { SkillQuery, SkillRead, SkillCategory } from "../skill/index.ts";
+import type { SkillCategory, SkillDocument, SkillQuery, SkillRead } from "../skill/index.ts";
 import type { ExpertQuery, ExpertRead } from "../expert/index.ts";
 
 export type ReferenceAsset = {
@@ -76,11 +76,10 @@ export type SkillListItem = {
   name: string;
   categoryCode: string;
   categoryLabel: string;
-  summary: string;
+  description: string;
   version: string;
   enabled: boolean;
   tags: string[];
-  triggers: string[];
   usedByCount: number;
   revision: number;
   updatedAt: string;
@@ -106,7 +105,7 @@ export type ExpertSkillSummaryView = {
   name: string;
   categoryCode: string;
   categoryLabel: string;
-  summary: string;
+  description: string;
 };
 
 export type ExpertSkillPreviewView = {
@@ -157,6 +156,7 @@ export type CatalogRead = {
 
   listSkills(query: SkillQuery): Promise<Page<SkillListItem>>;
   getSkill(id: string): Promise<SkillDetailView>;
+  getSkillDocument(id: string): Promise<SkillDocument>;
   listSkillCategories(): Promise<SkillCategoryView[]>;
   listExpertsUsingSkill(skillId: string): Promise<Reference[]>;
 
@@ -317,11 +317,10 @@ export function createCatalog(deps: CatalogDeps): CatalogRead & ReferenceGuard {
           name: skill.name,
           categoryCode: skill.categoryCode,
           categoryLabel: requireCategoryLabel(labels, skill.categoryCode),
-          summary: skill.summary,
+          description: skill.description,
           version: skill.version,
           enabled: skill.enabled,
           tags: skill.tags,
-          triggers: skill.triggers,
           usedByCount: usedBy.length,
           revision: skill.revision,
           updatedAt: skill.updatedAt,
@@ -342,14 +341,13 @@ export function createCatalog(deps: CatalogDeps): CatalogRead & ReferenceGuard {
         name: skill.name,
         categoryCode: skill.categoryCode,
         categoryLabel: requireCategoryLabel(labels, skill.categoryCode),
-        summary: skill.summary,
+        description: skill.description,
         version: skill.version,
         enabled: skill.enabled,
         tags: skill.tags,
         usedByCount: usedBy.length,
         revision: skill.revision,
         updatedAt: skill.updatedAt,
-        triggers: skill.triggers,
         sections: skill.sections,
         pitfalls: skill.pitfalls,
         refs: skill.refs.map((ref) => ({
@@ -359,6 +357,10 @@ export function createCatalog(deps: CatalogDeps): CatalogRead & ReferenceGuard {
         })),
         createdAt: skill.createdAt,
       };
+    },
+
+    async getSkillDocument(id) {
+      return skillRead.getDocument(id);
     },
 
     async listSkillCategories() {
@@ -410,7 +412,7 @@ export function createCatalog(deps: CatalogDeps): CatalogRead & ReferenceGuard {
           name: skill.name,
           categoryCode: skill.categoryCode,
           categoryLabel: requireCategoryLabel(labels, skill.categoryCode),
-          summary: skill.summary,
+          description: skill.description,
         });
       }
       const tools: ExpertToolSummaryView[] = [];

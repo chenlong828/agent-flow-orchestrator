@@ -18,7 +18,7 @@ info:
     - 无登录/鉴权；`X-Actor` 仅用于显示，不是身份。请求可带 `X-Request-Id`，响应可回显。无 CORS 配置。
   x-source-spec: docs/design/components/http-gateway/spec.md
   x-contract-status: current
-  x-api-count: 30
+  x-api-count: 31
   license:
     name: Internal use only
   x-runtime-asset: true
@@ -510,7 +510,7 @@ paths:
       operationId: listSkills
       x-api-id: API-14
       x-component-method: catalog.listSkills
-      description: 按名称、分类、启停状态、标签筛选；支持分页与排序。
+      description: 按名称或描述（`q`）、分类、启停状态、标签筛选；支持分页与排序。
       parameters:
       - "$ref": "#/components/parameters/Q"
       - name: category
@@ -612,7 +612,7 @@ paths:
           "$ref": "#/components/responses/InternalError"
         '503':
           "$ref": "#/components/responses/ServiceUnavailable"
-      description: 按 ID 返回 Skill 详情；包含五章、触发、踩坑与 `refs`。
+      description: 按 ID 返回 Skill 详情；包含描述、五章、踩坑与 `refs`。
     put:
       tags:
       - Skill
@@ -711,6 +711,48 @@ paths:
         '503':
           "$ref": "#/components/responses/ServiceUnavailable"
       description: 设置 Skill 启停；请求体为 `{enabled:boolean}`，成功返回更新后的详情。
+  "/api/v1/skills/{id}/document":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    get:
+      tags:
+      - Skill
+      summary: API-31 获取 Skill 编排文档
+      operationId: getSkillDocument
+      x-api-id: API-31
+      x-component-method: catalog.getSkillDocument
+      parameters:
+      - name: If-None-Match
+        in: header
+        required: false
+        description: 上次响应的 `ETag`；一致时返回 304。
+        schema:
+          type: string
+          example: '"3"'
+      responses:
+        '200':
+          description: Skill 编排文档；纯文本 markdown，不含管理面字段。
+          headers:
+            ETag:
+              description: 当前 revision，与 `If-Match` 同格式。
+              schema:
+                type: string
+                example: '"3"'
+          content:
+            text/markdown:
+              schema:
+                type: string
+        '304':
+          description: 文档未变化，无响应体。
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      description: 返回供编排器直接载入的合成文档；停用 Skill 同样可读。
   "/api/v1/skills/{id}/references":
     parameters:
     - "$ref": "#/components/parameters/Id"
@@ -1719,11 +1761,10 @@ components:
       - name
       - categoryCode
       - categoryLabel
-      - summary
+      - description
       - version
       - enabled
       - tags
-      - triggers
       - usedByCount
       - revision
       - updatedAt
@@ -1743,10 +1784,11 @@ components:
         categoryLabel:
           type: string
           description: 分类展示名，派生
-        summary:
+        description:
           type: string
-          maxLength: 200
-          description: 摘要，≤200 字
+          minLength: 1
+          maxLength: 400
+          description: 路由描述：适用场景、触发条件与不适用场景，≤400 字；列表检索使用
         version:
           type: string
           pattern: "^v[0-9]+\\.[0-9]+$"
@@ -1759,11 +1801,6 @@ components:
           items:
             type: string
           description: 标签，有序
-        triggers:
-          type: array
-          items:
-            type: string
-          description: 触发条件，有序且唯一；列表检索使用
         usedByCount:
           type: integer
           minimum: 0
@@ -1810,7 +1847,7 @@ components:
       required:
       - name
       - categoryCode
-      - summary
+      - description
       - sections
       properties:
         name:
@@ -1821,20 +1858,16 @@ components:
         categoryCode:
           type: string
           description: 分类代码，必须存在
-        summary:
+        description:
           type: string
-          maxLength: 200
-          description: 摘要，≤200 字
+          minLength: 1
+          maxLength: 400
+          description: 路由描述：适用场景、触发条件与不适用场景，1–400 字
         tags:
           type: array
           items:
             type: string
           description: 标签，有序
-        triggers:
-          type: array
-          items:
-            type: string
-          description: 触发条件，有序且唯一
         sections:
           "$ref": "#/components/schemas/SkillSections"
           description: 五章，全部必填
@@ -1941,7 +1974,7 @@ components:
       - name
       - categoryCode
       - categoryLabel
-      - summary
+      - description
       properties:
         id:
           type: string
@@ -1956,9 +1989,9 @@ components:
         categoryLabel:
           type: string
           description: 分类展示名
-        summary:
+        description:
           type: string
-          description: 摘要
+          description: 路由描述
       description: 专家装配的 Skill 摘要。
     ExpertToolSummary:
       type: object

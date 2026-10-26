@@ -2,7 +2,7 @@
 layer: design
 module: global
 status: current
-updated: 2026-10-25
+updated: 2026-10-26
 ---
 
 # B1 架构与契约边界
@@ -16,7 +16,7 @@ updated: 2026-10-25
 2. 外部契约只有 **REST API `/api/v1`**；本仓库不提供 CLI、库或产品 UI。UI 是独立项目，若接入只按契约调用；双方互不进入对方项目改代码。Swagger UI 仅作为开发者文档，不是产品界面。
 3. 内部契约按同一原则逐层收窄：函数/类 → 组件 → 模块 → 进程/项目；每层只通过公开契约交互，不越过边界读写对方内部。
 4. 每个组件只有一个主目标；数据只有一个写入口；读模型通过公开读契约组合。
-5. 30 个 B1 业务端点 + `/healthz`；另有开发者文档端点 `/docs`、`/docs/*`、`/openapi.yaml`，不计入业务端点。
+5. 31 个 B1 业务端点 + `/healthz`；另有开发者文档端点 `/docs`、`/docs/*`、`/openapi.yaml`，不计入业务端点。
 
 ## 2 契约边界原则
 
@@ -53,7 +53,7 @@ updated: 2026-10-25
 | `CMP-platform` | 提供数据库连接/事务、迁移、ID/时钟实现、健康检查与测试库 | `schema_migrations` | `kernel`、Bun、PostgreSQL |
 | `CMP-harness` | 维护 Harness 聚合的生命周期、标签与不变量 | `harness`、`harness_tag` | `platform`、`kernel` |
 | `CMP-tool` | 维护工具聚合、参数与 Harness 归属 | `tool`、`tool_param` | `platform`、`kernel` |
-| `CMP-skill` | 维护 Skill 聚合、分类引用、五章、触发、踩坑与引用 | `skill_category`（只读种子）、`skill` 及其子表 | `platform`、`kernel` |
+| `CMP-skill` | 维护 Skill 聚合、分类引用、描述、五章、踩坑与引用，并合成编排文档 | `skill_category`（只读种子）、`skill` 及其子表 | `platform`、`kernel` |
 | `CMP-expert` | 维护专家聚合、五区、有序装配与引用 | `expert`、`expert_persona`、`expert_skill`、`expert_tool`、`expert_ref` | `platform`、`kernel` |
 | `CMP-catalog` | 组合跨资产的列表/详情/引用只读投影，并实现 `ReferenceGuard` | 无 | 四类资产的公开读契约、`kernel` |
 | `CMP-http-gateway` | 把 HTTP 请求翻译为用例调用、映射 DTO/错误，并托管开发者 API 文档 | 无 | `catalog`、四类资产写服务、`platform`（健康检查）、`kernel`、Bun 文件 API |
@@ -107,7 +107,7 @@ config
 | `CMP-platform` | `schema_migrations` | 迁移执行器 |
 | `CMP-harness` | `harness`、`harness_tag` | Harness 服务 |
 | `CMP-tool` | `tool`、`tool_param` | 工具服务 |
-| `CMP-skill` | `skill_category`（种子只读）、`skill`、`skill_tag`、`skill_trigger`、`skill_section`、`skill_pitfall`、`skill_ref` | Skill 服务 |
+| `CMP-skill` | `skill_category`（种子只读）、`skill`、`skill_tag`、`skill_section`、`skill_pitfall`、`skill_ref` | Skill 服务 |
 | `CMP-expert` | `expert`、`expert_persona`、`expert_skill`、`expert_tool`、`expert_ref` | 专家服务 |
 | `CMP-catalog` | 无 | 无，只读组合 |
 | `CMP-http-gateway` | 无 | 无，只做协议翻译与 OpenAPI / Swagger UI 托管 |
@@ -119,7 +119,7 @@ config
 ## 6 外部 REST 契约
 
 - 基础路径：`/api/v1`；健康检查：`/healthz`（不在 `/api/v1` 下）。
-- 30 个 B1 业务端点：Harness 7、工具 6、Skill 8、专家 9。
+- 31 个 B1 业务端点：Harness 7、工具 6、Skill 9（含编排文档）、专家 9。
 - 开发者文档：Swagger UI `/docs`、静态资源 `/docs/*`、OpenAPI `/openapi.yaml`；OpenAPI 资产由 `CMP-http-gateway` 直接提供，不在 `docs/` 维护设计副本；不计入业务端点，不写入 OpenAPI `paths`。
 - 契约明细：方法、路径、查询参数、请求/响应 DTO、错误码、并发头、删除引用列表，全部在 [`components/http-gateway/spec.md`](components/http-gateway/spec.md)。
 - 外部 UI 页面映射（参考）：Harness 页、工具页、Skill 页、专家页；本仓库无 Key/工作区/工作流/实例/看板端点。
@@ -152,7 +152,7 @@ config
 
 ## 10 实施状态与下一步
 
-- `T-B1-D04` 已完成：16 张业务表落入 [`db/migrations/`](../../db/migrations/)，未改变本文与 REST DTO 的字段语义。
+- `T-B1-D04` 已完成：业务表落入 [`db/migrations/`](../../db/migrations/)，未改变本文与 REST DTO 的字段语义；`0005` 后为 15 张（`skill_trigger` 合并进 `skill.description`）。
 - `ReferenceGuard` 已按端口方案实现：端口在 `kernel`，由 `catalog` 实现，领域删除服务经组合根注入；未新增 L2 删除组件。
 - REST API 已按 [`http-gateway/spec.md`](components/http-gateway/spec.md) 实现；Swagger 文档已挂到 `/docs` 与 `/openapi.yaml`，结果见 [`api-swagger/result.md`](../works/2026-10-25-api-swagger/result.md) 与 [`runtime-openapi-export/result.md`](../works/2026-10-25-runtime-openapi-export/result.md)。UI 是独立项目，是否接入由该项目决定，契约反馈只改本仓库契约。
 - 组件状态均为 `current`；实现与验证结果见 [`result.md`](../works/2026-10-24-db-backend-infra/result.md)。

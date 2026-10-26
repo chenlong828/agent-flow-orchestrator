@@ -14,13 +14,14 @@ function sections(prefix = "") {
   };
 }
 
+const DESCRIPTION = "适用：产出需求与方案文档；触发词：写需求、出方案；不适用：纯技术重构。";
+
 function skillBody(name = "CRES 技能") {
   return {
     name,
     categoryCode: "coding",
-    summary: "按 CRES 规范产出需求与方案文档",
+    description: DESCRIPTION,
     tags: ["规范", "文档"],
-    triggers: ["写需求", "出方案"],
     sections: sections(),
     pitfalls: ["跳过步骤 2"],
     refs: [
@@ -34,6 +35,13 @@ async function createSkill(name = "CRES 技能") {
   const response = await call(ctx.app, "POST", "/api/v1/skills", { body: skillBody(name) });
   expect(response.status).toBe(201);
   return response.body as Record<string, any>;
+}
+
+async function callText(path: string, headers: Record<string, string> = {}) {
+  const response = await ctx.app(
+    new Request(`http://127.0.0.1:3000${path}`, { headers: new Headers(headers) }),
+  );
+  return { status: response.status, text: await response.text(), headers: response.headers };
 }
 
 beforeAll(async () => {
@@ -86,7 +94,8 @@ describe("Skill HTTP 契约", () => {
     expect(coding.status).toBe(200);
     expect(coding.body.total).toBe(1);
     expect(coding.body.items[0].categoryLabel).toBe("编码");
-    expect(coding.body.items[0].triggers).toEqual(["写需求", "出方案"]);
+    expect(coding.body.items[0].description).toBe(DESCRIPTION);
+    expect(coding.body.items[0].triggers).toBeUndefined();
 
     const tagged = await call(ctx.app, "GET", "/api/v1/skills?tag=检索&enabled=true");
     expect(tagged.body.total).toBe(1);
@@ -97,7 +106,8 @@ describe("Skill HTTP 契约", () => {
     const created = await createSkill();
     const detail = await call(ctx.app, "GET", `/api/v1/skills/${created.id}`);
     expect(detail.status).toBe(200);
-    expect(detail.body.triggers).toEqual(["写需求", "出方案"]);
+    expect(detail.body.description).toBe(DESCRIPTION);
+    expect(detail.body.triggers).toBeUndefined();
     expect(detail.body.pitfalls).toEqual(["跳过步骤 2"]);
 
     const missing = await call(
@@ -111,13 +121,13 @@ describe("Skill HTTP 契约", () => {
   test("PUT 200 递增版本并整体替换子表；缺 If-Match 428；旧版本 409", async () => {
     const created = await createSkill();
     const updated = await call(ctx.app, "PUT", `/api/v1/skills/${created.id}`, {
-      body: { ...skillBody("CRES 技能 v2"), tags: ["新标签"], triggers: [], refs: [] },
+      body: { ...skillBody("CRES 技能 v2"), tags: ["新标签"], refs: [] },
       headers: withRevision(1),
     });
     expect(updated.status).toBe(200);
     expect(updated.body.version).toBe("v1.1");
     expect(updated.body.tags).toEqual(["新标签"]);
-    expect(updated.body.triggers).toEqual([]);
+    expect(updated.body.refs).toEqual([]);
     expect(updated.body.revision).toBe(2);
 
     const missing = await call(ctx.app, "PUT", `/api/v1/skills/${created.id}`, {
@@ -145,7 +155,7 @@ describe("Skill HTTP 契约", () => {
     expect(detail.body.enabled).toBe(false);
   });
 
-  test("POST 拒绝 version/enabled 未知字段、非法分类、五章缺失与超长摘要", async () => {
+  test("POST 拒绝 version/enabled 未知字段、非法分类、五章缺失、超长描述与旧字段", async () => {
     const versionField = await call(ctx.app, "POST", "/api/v1/skills", {
       body: { ...skillBody("x1"), version: "v9.9" },
     });
@@ -166,11 +176,17 @@ describe("Skill HTTP 契约", () => {
     });
     expect(missingSection.status).toBe(400);
 
-    const longSummary = await call(ctx.app, "POST", "/api/v1/skills", {
-      body: { ...skillBody("x4"), summary: "字".repeat(201) },
+    const longDescription = await call(ctx.app, "POST", "/api/v1/skills", {
+      body: { ...skillBody("x4"), description: "字".repeat(401) },
     });
-    expect(longSummary.status).toBe(400);
-    expect(longSummary.body.error.details.field).toBe("summary");
+    expect(longDescription.status).toBe(400);
+    expect(longDescription.body.error.details.field).toBe("description");
+
+    const legacyFields = await call(ctx.app, "POST", "/api/v1/skills", {
+      body: { ...skillBody("x5"), summary: "旧摘要", triggers: ["旧触发"] },
+    });
+    expect(legacyFields.status).toBe(400);
+    expect(legacyFields.body.error.details.field).toBe("body");
   });
 
   test("DELETE 204；被专家引用 409；重复删除 404", async () => {
@@ -253,7 +269,7 @@ describe("Skill HTTP 契约", () => {
 
     const bound = await call(ctx.app, "GET", `/api/v1/skills/${created.id}`);
     expect(bound.body.usedByCount).toBe(1);
-    expect(bound.body.triggers).toEqual(["写需求", "出方案"]);
+    expect(bound.body.description).toBe(DESCRIPTION);
 
     await ctx.expertService.setSkills(expert.id, 2, []);
     const cleared = await call(ctx.app, "GET", `/api/v1/skills/${created.id}`);
@@ -265,7 +281,7 @@ describe("Skill HTTP 契约", () => {
       body: {
         name: "minimal-skill",
         categoryCode: "review",
-        summary: "最小技能",
+        description: "最小技能",
         sections: sections(),
       },
     });
@@ -274,7 +290,6 @@ describe("Skill HTTP 契约", () => {
       version: "v1.0",
       enabled: true,
       tags: [],
-      triggers: [],
       pitfalls: [],
       refs: [],
       usedByCount: 0,
@@ -285,7 +300,6 @@ describe("Skill HTTP 契约", () => {
       body: {
         ...skillBody("ordered-skill"),
         tags: ["第二标签", "第一标签"],
-        triggers: ["第二触发", "第一触发"],
         refs: [
           { label: "参考乙", refType: "经验" },
           { label: "参考甲", refType: "规范", path: "/knowledge/a.md" },
@@ -294,19 +308,18 @@ describe("Skill HTTP 契约", () => {
     });
     expect(full.status).toBe(201);
     expect(full.body.tags).toEqual(["第二标签", "第一标签"]);
-    expect(full.body.triggers).toEqual(["第二触发", "第一触发"]);
     expect(full.body.refs).toEqual([
       { label: "参考乙", refType: "经验", path: null },
       { label: "参考甲", refType: "规范", path: "/knowledge/a.md" },
     ]);
   });
 
-  test("API-16 拒绝重复触发词与非法引用 path", async () => {
-    const duplicateTrigger = await call(ctx.app, "POST", "/api/v1/skills", {
-      body: { ...skillBody("trigger-dup"), triggers: ["同一触发", "同一触发"] },
+  test("API-16 拒绝旧字段 summary/triggers 与非法引用 path", async () => {
+    const legacyField = await call(ctx.app, "POST", "/api/v1/skills", {
+      body: { ...skillBody("trigger-dup"), triggers: ["同一触发"] },
     });
-    expect(duplicateTrigger.status).toBe(400);
-    expect(duplicateTrigger.body.error.details.field).toBe("triggers");
+    expect(legacyField.status).toBe(400);
+    expect(legacyField.body.error.details.field).toBe("body");
 
     const badPath = await call(ctx.app, "POST", "/api/v1/skills", {
       body: {
@@ -426,6 +439,45 @@ describe("Skill HTTP 契约", () => {
     );
     expect(missing.status).toBe(404);
     expect(missing.body.error.code).toBe("not_found");
+  });
+
+  test("API-31 文档输出：markdown、ETag、304、404", async () => {
+    const created = await createSkill();
+    const response = await callText(`/api/v1/skills/${created.id}/document`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("text/markdown; charset=utf-8");
+    expect(response.headers.get("etag")).toBe('"1"');
+    expect(response.text).toContain('name: "CRES 技能"');
+    expect(response.text).toContain(`description: "${DESCRIPTION}"`);
+    expect(response.text).toContain('version: "v1.0"');
+    expect(response.text.indexOf("## 流程总述")).toBeLessThan(
+      response.text.indexOf("## 执行步骤"),
+    );
+    expect(response.text).toContain("- 跳过步骤 2");
+    expect(response.text).toContain("## 参考资料");
+
+    const cached = await callText(`/api/v1/skills/${created.id}/document`, {
+      "if-none-match": '"1"',
+    });
+    expect(cached.status).toBe(304);
+    expect(cached.text).toBe("");
+
+    const missing = await callText(
+      "/api/v1/skills/0191f2f0-0000-7000-8000-000000000000/document",
+    );
+    expect(missing.status).toBe(404);
+  });
+
+  test("API-31 停用的 Skill 照常输出文档", async () => {
+    const created = await createSkill("disabled-skill");
+    await call(ctx.app, "PATCH", `/api/v1/skills/${created.id}/enabled`, {
+      body: { enabled: false },
+      headers: withRevision(1),
+    });
+    const response = await callText(`/api/v1/skills/${created.id}/document`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("etag")).toBe('"2"');
+    expect(response.text).toContain('name: "disabled-skill"');
   });
 
   test("API-21 分类参考数据返回稳定顺序与完整字段", async () => {

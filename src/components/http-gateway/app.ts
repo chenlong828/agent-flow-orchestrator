@@ -74,9 +74,8 @@ const TOOL_WRITE_FIELDS = [
 const SKILL_WRITE_FIELDS = [
   "name",
   "categoryCode",
-  "summary",
+  "description",
   "tags",
-  "triggers",
   "sections",
   "pitfalls",
   "refs",
@@ -125,6 +124,20 @@ function json(data: JsonValue | string, status = 200, headers: Record<string, st
 
 function noContent(): Response {
   return new Response(null, { status: 204 });
+}
+
+function markdown(text: string, headers: Record<string, string> = {}): Response {
+  return new Response(text, {
+    status: 200,
+    headers: {
+      "content-type": "text/markdown; charset=utf-8",
+      ...headers,
+    },
+  });
+}
+
+function notModified(): Response {
+  return new Response(null, { status: 304 });
 }
 
 function restCode(error: AppError): string {
@@ -482,6 +495,13 @@ export function createHttpApp(deps: HttpDeps): (request: Request) => Promise<Res
     }
 
     if (segments.length === 3) {
+      if (resource === "skills" && subresource === "document" && request.method === "GET") {
+        const document = await catalog.getSkillDocument(id);
+        const etag = `"${document.revision}"`;
+        if (request.headers.get("if-none-match")?.trim() === etag) return notModified();
+        return markdown(document.markdown, { etag, "cache-control": "no-cache" });
+      }
+
       if (subresource === "references" && request.method === "GET") {
         switch (resource) {
           case "harnesses":

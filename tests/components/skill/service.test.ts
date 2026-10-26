@@ -29,13 +29,14 @@ function sections(prefix = "") {
   };
 }
 
+const DESCRIPTION = "适用：产出需求与方案文档；触发词：写需求、出方案。";
+
 function skillBody(name = "CRES 技能") {
   return {
     name,
     categoryCode: "coding",
-    summary: "按 CRES 规范产出需求与方案文档",
+    description: DESCRIPTION,
     tags: ["规范", "文档"],
-    triggers: ["写需求", "出方案"],
     sections: sections(),
     pitfalls: ["跳过步骤 2"],
     refs: [
@@ -64,9 +65,10 @@ describe("Skill 写入规则", () => {
     const detail = await ctx.catalog.getSkill(created.id);
     expect(detail.version).toBe("v1.0");
     expect(detail.categoryLabel).toBe("编码");
+    expect(detail.description).toBe(DESCRIPTION);
     expect(detail.sections).toEqual(sections());
     expect(detail.tags).toEqual(["规范", "文档"]);
-    expect(detail.triggers).toEqual(["写需求", "出方案"]);
+    expect(detail).not.toHaveProperty("triggers");
     expect(detail.pitfalls).toEqual(["跳过步骤 2"]);
     expect(detail.refs[1]).toEqual({
       label: "workspace:/knowledge/cres.md",
@@ -75,18 +77,18 @@ describe("Skill 写入规则", () => {
     });
   });
 
-  test("分类不存在、摘要超长、五章缺失、标签重复都被拒绝", async () => {
+  test("分类不存在、描述超长、五章缺失、标签重复都被拒绝", async () => {
     const badCategory = await ctx.skillService
       .create({ ...skillBody("x1"), categoryCode: "unknown" })
       .catch((e) => e);
     expect(badCategory).toBeInstanceOf(CategoryNotFoundError);
     expect(badCategory.details.field).toBe("categoryCode");
 
-    const longSummary = await ctx.skillService
-      .create({ ...skillBody("x2"), summary: "字".repeat(201) })
+    const longDescription = await ctx.skillService
+      .create({ ...skillBody("x2"), description: "字".repeat(401) })
       .catch((e) => e);
-    expect(longSummary).toBeInstanceOf(ValidationError);
-    expect(longSummary.details.field).toBe("summary");
+    expect(longDescription).toBeInstanceOf(ValidationError);
+    expect(longDescription.details.field).toBe("description");
 
     const missingSection = await ctx.skillService
       .create({
@@ -104,19 +106,13 @@ describe("Skill 写入规则", () => {
     expect(duplicateTag.details.field).toBe("tags");
   });
 
-  test("名称与触发词唯一，引用 path 必须是字符串或空", async () => {
+  test("名称唯一，引用 path 必须是字符串或空", async () => {
     await ctx.skillService.create(skillBody("unique-skill"));
     const duplicateName = await ctx.skillService
       .create(skillBody("UNIQUE-SKILL"))
       .catch((e) => e);
     expect(duplicateName).toBeInstanceOf(NameConflictError);
     expect(duplicateName.code).toBe("name_conflict");
-
-    const duplicateTrigger = await ctx.skillService
-      .create({ ...skillBody("trigger-dup"), triggers: ["同一触发", "同一触发"] })
-      .catch((e) => e);
-    expect(duplicateTrigger).toBeInstanceOf(ValidationError);
-    expect(duplicateTrigger.details.field).toBe("triggers");
 
     const badRefPath = await ctx.skillService
       .create({
@@ -177,14 +173,14 @@ describe("Skill 写入规则", () => {
     const created = await ctx.skillService.create(skillBody());
     const updated = await ctx.skillService.update(created.id, 1, {
       ...skillBody("CRES 技能 v2"),
+      description: "新的路由描述",
       tags: ["新标签"],
-      triggers: [],
       refs: [],
     });
     expect(updated).toMatchObject({ revision: 2, version: "v1.1" });
     const detail = await ctx.catalog.getSkill(created.id);
+    expect(detail.description).toBe("新的路由描述");
     expect(detail.tags).toEqual(["新标签"]);
-    expect(detail.triggers).toEqual([]);
     expect(detail.refs).toEqual([]);
 
     const stale = await ctx.skillService.update(created.id, 1, skillBody()).catch((e) => e);
@@ -221,6 +217,93 @@ describe("Skill 写入规则", () => {
   });
 });
 
+describe("Skill 文档合成", () => {
+  test("frontmatter 三键 + 五章 + 踩坑 + 参考资料，顺序固定", async () => {
+    const created = await ctx.skillService.create(skillBody());
+    const document = await ctx.skillRead.getDocument(created.id);
+    expect(document.revision).toBe(1);
+    const expected =
+      [
+        "---",
+        'name: "CRES 技能"',
+        `description: "${DESCRIPTION}"`,
+        'version: "v1.0"',
+        "---",
+        "",
+        "## 流程总述",
+        "",
+        "概览",
+        "",
+        "## 执行步骤",
+        "",
+        "步骤",
+        "",
+        "## 示例",
+        "",
+        "示例",
+        "",
+        "## 脚本",
+        "",
+        "脚本",
+        "",
+        "## 完成验证",
+        "",
+        "验证",
+        "",
+        "## 常见踩坑",
+        "",
+        "- 跳过步骤 2",
+        "",
+        "## 参考资料",
+        "",
+        "- CRES 规范（规范）",
+        "- workspace:/knowledge/cres.md（运行期注入） — /knowledge/cres.md",
+      ].join("\n") + "\n";
+    expect(document.markdown).toBe(expected);
+  });
+
+  test("空五章保留标题；无踩坑与引用时两整节省略", async () => {
+    const created = await ctx.skillService.create({
+      ...skillBody("空文档"),
+      sections: { overview: "", steps: "", examples: "", scripts: "", verification: "" },
+      pitfalls: [],
+      refs: [],
+    });
+    const document = await ctx.skillRead.getDocument(created.id);
+    expect(document.markdown).toContain("## 流程总述\n\n## 执行步骤");
+    expect(document.markdown).not.toContain("## 常见踩坑");
+    expect(document.markdown).not.toContain("## 参考资料");
+    expect(document.markdown.endsWith("\n")).toBe(true);
+  });
+
+  test("frontmatter 对引号、反斜杠与换行做转义", async () => {
+    const created = await ctx.skillService.create({
+      ...skillBody("转义技能"),
+      description: '含 "引号" 与\\反斜杠\n第二行',
+    });
+    const document = await ctx.skillRead.getDocument(created.id);
+    expect(document.markdown).toContain(
+      'description: "含 \\"引号\\" 与\\\\反斜杠\\n第二行"',
+    );
+  });
+
+  test("文档读取与详情一致：版本变化后 revision 同步", async () => {
+    const created = await ctx.skillService.create(skillBody());
+    await ctx.skillService.update(created.id, 1, skillBody("CRES 技能 v2"));
+    const document = await ctx.skillRead.getDocument(created.id);
+    expect(document.revision).toBe(2);
+    expect(document.markdown).toContain('version: "v1.1"');
+    expect(document.markdown).toContain('name: "CRES 技能 v2"');
+  });
+
+  test("不存在的 Skill 读取文档返回 404", async () => {
+    const missing = await ctx.skillRead
+      .getDocument("0191f2f0-0000-7000-8000-000000000000")
+      .catch((e) => e);
+    expect(missing).toBeInstanceOf(NotFoundError);
+  });
+});
+
 describe("Skill 读契约", () => {
   test("列表按分类、标签、启停筛选并返回分类标签与引用计数", async () => {
     await ctx.skillService.create(skillBody("CRES 技能"));
@@ -246,6 +329,8 @@ describe("Skill 读契约", () => {
     expect(tagged.total).toBe(1);
     expect(tagged.items[0]?.name).toBe("业务功能树检索");
     expect(tagged.items[0]?.usedByCount).toBe(0);
+    expect(tagged.items[0]?.description).toBe(DESCRIPTION);
+    expect(tagged.items[0]).not.toHaveProperty("triggers");
   });
 
   test("分类列表为 4 条参考数据，顺序稳定", async () => {
@@ -258,7 +343,7 @@ describe("Skill 读契约", () => {
     ]);
   });
 
-  test("列表支持名称检索、启停筛选与排序分页，摘要可单独读取", async () => {
+  test("列表支持名称/描述检索、启停筛选与排序分页，摘要可单独读取", async () => {
     const first = await ctx.skillService.create(skillBody("read-a"));
     await ctx.skillService.create(skillBody("read-b"));
     await ctx.skillService.create(skillBody("read-c"));
@@ -266,6 +351,12 @@ describe("Skill 读契约", () => {
 
     const searched = await ctx.skillRead.list({ q: "READ", page: normalizePageQuery() });
     expect(searched.total).toBe(3);
+
+    const byDescription = await ctx.skillRead.list({
+      q: "方案文档",
+      page: normalizePageQuery(),
+    });
+    expect(byDescription.total).toBe(3);
 
     const disabled = await ctx.skillRead.list({
       enabled: false,
@@ -281,7 +372,12 @@ describe("Skill 读契约", () => {
     expect(page.items.map((item) => item.name)).toEqual(["read-c", "read-b"]);
 
     const summary = await ctx.skillRead.getSummary(first.id);
-    expect(summary).toMatchObject({ name: "read-a", version: "v1.0", tags: ["规范", "文档"] });
+    expect(summary).toMatchObject({
+      name: "read-a",
+      version: "v1.0",
+      tags: ["规范", "文档"],
+      description: DESCRIPTION,
+    });
 
     const missing = await ctx.skillRead
       .getSummary("0191f2f0-0000-7000-8000-000000000000")

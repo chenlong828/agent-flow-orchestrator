@@ -43,7 +43,7 @@ async function createSkill(name = "catalog-skill", categoryCode = "coding") {
   return ctx.skillService.create({
     name,
     categoryCode,
-    summary: `${name} 摘要`,
+    description: `${name} 描述`,
     tags: ["标签"],
     sections: sections(name),
   });
@@ -127,7 +127,7 @@ describe("catalog 只读组合", () => {
       categoryCode: "coding",
       categoryLabel: "编码",
       version: "v1.0",
-      triggers: [],
+      description: "skill-a 描述",
       usedByCount: 1,
     });
 
@@ -135,7 +135,7 @@ describe("catalog 只读组合", () => {
     expect(detail).toMatchObject({
       categoryLabel: "编码",
       usedByCount: 1,
-      triggers: [],
+      description: "skill-a 描述",
       pitfalls: [],
       refs: [],
     });
@@ -170,7 +170,7 @@ describe("catalog 只读组合", () => {
         name: "skill-a",
         categoryCode: "retrieval",
         categoryLabel: "检索",
-        summary: "skill-a 摘要",
+        description: "skill-a 描述",
       },
     ]);
     expect(detail.tools).toEqual([

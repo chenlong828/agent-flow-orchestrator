@@ -121,9 +121,8 @@ describe("B1 全链路旅程（仅通过 HTTP）", () => {
       body: {
         name: "journey-skill",
         categoryCode: "coding",
-        summary: "旅程技能",
+        description: "旅程技能",
         tags: ["旅程"],
-        triggers: ["旅程"],
         sections: {
           overview: "概览",
           steps: "步骤",
@@ -154,9 +153,8 @@ describe("B1 全链路旅程（仅通过 HTTP）", () => {
       body: {
         name: "journey-skill",
         categoryCode: "coding",
-        summary: "旅程技能（已改造）",
+        description: "旅程技能（已改造）",
         tags: [],
-        triggers: [],
         sections: {
           overview: "概览2",
           steps: "步骤2",
