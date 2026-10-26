@@ -13,8 +13,9 @@ AgentFlow 研发智能体工作流编排服务的编排侧工程：目标是把�
 控制面首批 **B1 资产注册中心**（Harness、工具、Skill、专家）已实现并通过验证：
 
 - Bun 1.4.4 + PostgreSQL 18.4；模块化单体，9 个组件（新增 `CMP-config`）。
-- 16 张业务表；4 个只向前迁移。
-- 30 个 B1 业务端点 + `/healthz`，契约见 [`http-gateway/spec.md`](docs/design/components/http-gateway/spec.md)；运行时 `/openapi.yaml` 与 Swagger UI `/docs` 由 HTTP 组件直接提供。
+- 15 张业务表；5 个只向前迁移。
+- 31 个 B1 业务端点 + `/healthz`，契约见 [`http-gateway/spec.md`](docs/design/components/http-gateway/spec.md)；运行时 `/openapi.yaml` 与 Swagger UI `/docs` 由 HTTP 组件直接提供。
+- Skill 契约 v2：`summary` 与 `triggers` 合并为 `description`（1–400 字），新增 `GET /skills/{id}/document` 输出 markdown 全文；见 [`result.md`](docs/works/2026-10-26-skill-contract-v2/result.md)。
 - 开发者 API 文档：`/docs`（Swagger UI）与 `/openapi.yaml`，Swagger UI 资源已 vendor 到仓库，可离线使用。
 - 演示种子：5 Harness / 10 工具 / 12 Skill / 8 专家，Skill 与工具装配边各 23 条。
 - 实现结果与验证记录：[`result.md`](docs/works/2026-10-24-db-backend-infra/result.md)。
