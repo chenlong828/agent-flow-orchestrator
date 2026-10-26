@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun run src/main.ts",
+    "dev": "bun --watch src/main.ts",
     "start": "bun run src/main.ts",
     "test": "bun test --max-concurrency=1",
     "typecheck": "tsc --noEmit",

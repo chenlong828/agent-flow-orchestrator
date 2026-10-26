@@ -38,7 +38,7 @@ bun run db:migrate
 bun run db:seed
 ```
 
-启动 API（默认 `127.0.0.1:3000`）：
+启动 API（默认 `127.0.0.1:3000`；`dev` 监听文件改动自动重启，`start` 不监听）：
 
 ```bash
 bun run dev
