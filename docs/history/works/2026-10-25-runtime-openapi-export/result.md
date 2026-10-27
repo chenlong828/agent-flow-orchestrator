@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: global
-status: closed
-updated: 2026-10-25
+status: frozen
+updated: 2026-10-27
 ---
 
 # 运行时 OpenAPI 资产与说明丰富度：结果
@@ -22,11 +22,11 @@ updated: 2026-10-25
 
 | 变更 | 落点 |
 |---|---|
-| OpenAPI 资产迁入组件 | [`src/components/http-gateway/openapi.yaml`](../../../src/components/http-gateway/openapi.yaml) |
-| 默认从组件目录读取 OpenAPI | [`docs.ts`](../../../src/components/http-gateway/docs.ts)；`specFile` 变为可选，默认 `import.meta.dir/openapi.yaml` |
-| 组合根去掉设计目录路径 | [`main.ts`](../../../src/main.ts) 只注入 `docs-assets` |
+| OpenAPI 资产迁入组件 | [`src/components/http-gateway/openapi.yaml`](../../../../src/components/http-gateway/openapi.yaml) |
+| 默认从组件目录读取 OpenAPI | [`docs.ts`](../../../../src/components/http-gateway/docs.ts)；`specFile` 变为可选，默认 `import.meta.dir/openapi.yaml` |
+| 组合根去掉设计目录路径 | [`main.ts`](../../../../src/main.ts) 只注入 `docs-assets` |
 | 设计目录文件删除 | `docs/design/components/http-gateway/openapi.yaml` 已删除 |
-| 契约与导航文档同步 | [`spec.md`](../../design/components/http-gateway/spec.md)、[`architecture.md`](../../design/architecture.md)、[`README.md`](../../../README.md)、[`docs/README.md`](../../README.md) |
+| 契约与导航文档同步 | [`spec.md`](../../../design/components/http-gateway/spec.md)、[`architecture.md`](../../../design/architecture.md)、[`README.md`](../../../../README.md)、[`docs/README.md`](../../../README.md) |
 
 ## 验证结果
 
@@ -41,13 +41,13 @@ updated: 2026-10-25
 
 - 没有引入 OpenAPI 生成器；资产由 `spec.md` 手工同步，后续契约变更仍需同步修改。原 `x-generated: true` 已移除，避免继续暗示存在自动生成流程。
 - 没有新增 `/openapi.json`；保留既有 `/openapi.yaml` 路径，避免改变已经记录的开发者入口。
-- `docs/works/2026-10-25-api-swagger/` 中关于旧路径的描述已改为组件内资产；该历史工序的结论不重写，仅同步失效链接与当前读取方式。
+- `docs/history/works/2026-10-25-api-swagger/` 中关于旧路径的描述已改为组件内资产；该历史工序的结论不重写，仅同步失效链接与当前读取方式。
 
 ## 结论落点
 
 | 内容 | 位置 |
 |---|---|
-| 运行时 OpenAPI | [`src/components/http-gateway/openapi.yaml`](../../../src/components/http-gateway/openapi.yaml) |
-| 文档端点实现 | [`docs.ts`](../../../src/components/http-gateway/docs.ts) |
-| 契约权威 | [`http-gateway/spec.md`](../../design/components/http-gateway/spec.md) |
-| 自动化验证 | [`openapi.test.ts`](../../../tests/components/http-gateway/openapi.test.ts)、[`docs.test.ts`](../../../tests/components/http-gateway/docs.test.ts) |
+| 运行时 OpenAPI | [`src/components/http-gateway/openapi.yaml`](../../../../src/components/http-gateway/openapi.yaml) |
+| 文档端点实现 | [`docs.ts`](../../../../src/components/http-gateway/docs.ts) |
+| 契约权威 | [`http-gateway/spec.md`](../../../design/components/http-gateway/spec.md) |
+| 自动化验证 | [`openapi.test.ts`](../../../../tests/components/http-gateway/openapi.test.ts)、[`docs.test.ts`](../../../../tests/components/http-gateway/docs.test.ts) |

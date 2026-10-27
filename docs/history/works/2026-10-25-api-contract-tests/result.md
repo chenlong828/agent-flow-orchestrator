@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: global
-status: closed
-updated: 2026-10-25
+status: frozen
+updated: 2026-10-27
 ---
 
 # B1 每端点正反例契约补测：结果
@@ -17,11 +17,11 @@ B1 的 HTTP 契约补测已收口。`API-01`～`API-29` 均有对应用例，覆
 
 | 内容 | 落点 |
 |---|---|
-| Harness / 工具 / Skill / 专家 HTTP 契约正反例 | [`tests/components/http-gateway/`](../../../tests/components/http-gateway/) |
-| 四类资产服务层边界与失败路径 | [`harness`](../../../tests/components/harness/service.test.ts)、[`tool`](../../../tests/components/tool/service.test.ts)、[`skill`](../../../tests/components/skill/service.test.ts)、[`expert`](../../../tests/components/expert/service.test.ts) |
-| 只读组合、错误分类、事务与迁移 | [`catalog`](../../../tests/components/catalog/read-model.test.ts)、[`kernel`](../../../tests/components/kernel/errors.test.ts)、[`platform`](../../../tests/components/platform/db.test.ts) |
-| 公共契约测试 | [`common-contract.test.ts`](../../../tests/components/http-gateway/common-contract.test.ts) |
-| 测试计数 | [`README.md`](../../../README.md) 更新为 188 |
+| Harness / 工具 / Skill / 专家 HTTP 契约正反例 | [`tests/components/http-gateway/`](../../../../tests/components/http-gateway) |
+| 四类资产服务层边界与失败路径 | [`harness`](../../../../tests/components/harness/service.test.ts)、[`tool`](../../../../tests/components/tool/service.test.ts)、[`skill`](../../../../tests/components/skill/service.test.ts)、[`expert`](../../../../tests/components/expert/service.test.ts) |
+| 只读组合、错误分类、事务与迁移 | [`catalog`](../../../../tests/components/catalog/read-model.test.ts)、[`kernel`](../../../../tests/components/kernel/errors.test.ts)、[`platform`](../../../../tests/components/platform/db.test.ts) |
+| 公共契约测试 | [`common-contract.test.ts`](../../../../tests/components/http-gateway/common-contract.test.ts) |
+| 测试计数 | [`README.md`](../../../../README.md) 更新为 188 |
 
 ## 覆盖结果
 
@@ -52,6 +52,6 @@ B1 的 HTTP 契约补测已收口。`API-01`～`API-29` 均有对应用例，覆
 | 内容 | 位置 |
 |---|---|
 | 补测范围与任务 | [`brief.md`](brief.md) |
-| HTTP 契约权威 | [`http-gateway/spec.md`](../../design/components/http-gateway/spec.md) |
+| HTTP 契约权威 | [`http-gateway/spec.md`](../../../design/components/http-gateway/spec.md) |
 | 全量验证 | 本文件「验证」表 |
 | 后续 UI 适配 | 不在本工序；属于 `agent-flow-ui` 独立项目任务 |

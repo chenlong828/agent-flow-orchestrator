@@ -1,15 +1,15 @@
 ---
-layer: works
+layer: history
 module: global
-status: closed
-updated: 2026-10-25
+status: frozen
+updated: 2026-10-27
 ---
 
 # API Swagger 文档（分析 + 实施计划）
 
 ## 背景
 
-- B1 已交付 29 个业务端点 + `/healthz`，契约权威在 [`http-gateway/spec.md`](../../design/components/http-gateway/spec.md)，机器可读导出在 [`openapi.yaml`](../../../src/components/http-gateway/openapi.yaml)。
+- B1 已交付 29 个业务端点 + `/healthz`，契约权威在 [`http-gateway/spec.md`](../../../design/components/http-gateway/spec.md)，机器可读导出在 [`openapi.yaml`](../../../../src/components/http-gateway/openapi.yaml)。
 - B1 当时明确“OpenAPI 只作为 REST 契约的机器可读导出，不做 Swagger UI 部署”；本次是后续补充，不修改 B1 的历史结论。
 - 2026-10-25 用户要求增加 API 的 Swagger 说明方案，先把分析与计划做完，再决定是否实现。
 - 项目边界不变：本仓库只提供 HTTP API，不提供产品 UI、CLI 或 SDK/库；Swagger UI 是**开发者文档工具**，不是 `agent-flow-ui` 的产品界面。
@@ -90,7 +90,7 @@ updated: 2026-10-25
 
 ## 关联
 
-- 契约：[`http-gateway/spec.md`](../../design/components/http-gateway/spec.md)、[`openapi.yaml`](../../../src/components/http-gateway/openapi.yaml)
-- 架构：[`architecture.md`](../../design/architecture.md)
+- 契约：[`http-gateway/spec.md`](../../../design/components/http-gateway/spec.md)、[`openapi.yaml`](../../../../src/components/http-gateway/openapi.yaml)
+- 架构：[`architecture.md`](../../../design/architecture.md)
 - 前序工序：[`2026-10-24-db-backend-infra/brief.md`](../2026-10-24-db-backend-infra/brief.md)
 - B1 结果：[`result.md`](../2026-10-24-db-backend-infra/result.md)

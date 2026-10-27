@@ -113,7 +113,7 @@ level = "info"
 
 - 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 3 KB。
 - 单独验证命令：`bun test tests/core/config.test.ts`。
-- 当前状态：`current`；实现与验证结果见 [`result.md`](../../../works/2026-10-25-core-config/result.md)。
+- 当前状态：`current`；实施与验证的历史记录见 [`result.md`](../../../history/works/2026-10-25-core-config/result.md)（归档件，仅作追溯）。
 
 ## 7 B1 实现口径
 

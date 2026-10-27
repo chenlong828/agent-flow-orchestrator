@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: global
-status: closed
-updated: 2026-10-25
+status: frozen
+updated: 2026-10-27
 ---
 
 # B1 数据领域对象清单

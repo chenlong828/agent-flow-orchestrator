@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: global
-status: closed
-updated: 2026-10-25
+status: frozen
+updated: 2026-10-27
 ---
 
 # B1 资产注册中心设计提议
@@ -55,7 +55,7 @@ updated: 2026-10-25
 |---|---|---|
 | `T-B1-D01` 用例清单 | [`use-cases.md`](use-cases.md) | 领域对象定稿 |
 | `T-B1-D02` 领域对象清单 | [`domain-objects.md`](domain-objects.md) | 组件规格与 REST 契约 |
-| `T-B1-D03` 组件规格与 REST API | [`design/architecture.md`](../../design/architecture.md) + 8 份组件规格 + REST API 列表 + [OpenAPI](../../../src/components/http-gateway/openapi.yaml) | 表级数据库设计 |
+| `T-B1-D03` 组件规格与 REST API | [`design/architecture.md`](../../../design/architecture.md) + 8 份组件规格 + REST API 列表 + [OpenAPI](../../../../src/components/http-gateway/openapi.yaml) | 表级数据库设计 |
 | `T-B1-D04` 表级数据库设计 | 各组件规格的 `数据模型` 章节（列/约束/索引/删除） | 契约复核与任务拆分 |
 | `T-B1-D05` 组件契约复核与任务拆分 | 组件卡复核、契约一致性检查、实现任务表 | 编码 |
 
@@ -119,7 +119,7 @@ updated: 2026-10-25
 - 创建：`POST` 返回 201 + `Location`；ID 服务端生成。
 - 删除：`DELETE`；被引用 409 + 引用列表；不存在 404。
 - 错误体统一为 `{error:{code,message,details,requestId}}`；B1 错误码：`validation_error`(400)、`not_found`(404)、`name_conflict`(409)、`referenced`(409)、`revision_conflict`(409)、`precondition_required`(428)、`internal`(500)、`service_unavailable`(503)。
-- 端点按用例分组；请求/响应 DTO、筛选字段、错误细节在 `T-B1-D03` 的 [`http-gateway/spec.md`](../../design/components/http-gateway/spec.md) 冻结并确认，UI 侧按此契约印证；机器可读版本见 [`openapi.yaml`](../../../src/components/http-gateway/openapi.yaml)。
+- 端点按用例分组；请求/响应 DTO、筛选字段、错误细节在 `T-B1-D03` 的 [`http-gateway/spec.md`](../../../design/components/http-gateway/spec.md) 冻结并确认，UI 侧按此契约印证；机器可读版本见 [`openapi.yaml`](../../../../src/components/http-gateway/openapi.yaml)。
 - B1 不提供心跳、调试、验证、标记可用等入口；不提供 B1 之外的端点。
 
 ## 7 组件化原则
@@ -162,11 +162,11 @@ updated: 2026-10-25
 | R4 | 没有 `psql` / `createdb` / `pg_dump` | 引导脚本 + 迁移执行器；备份工具不在本批 |
 | R5 | 测试库并发污染 | 每进程独立库 + 串行；稳定后再优化 |
 | R6 | 用例/对象确认后仍改契约 | 变更回到对应用例与对象清单，重新确认；不直接改代码 |
-| R7 | `OQ-2` / `OQ-3` 早期推断 | 2026-10-25 已关闭归档：仅 HTTP API，无 CLI/库/UI；UI 为独立项目，见[归档记录](../../history/decisions/2026-10-25-project-boundary-and-open-questions.md) |
+| R7 | `OQ-2` / `OQ-3` 早期推断 | 2026-10-25 已关闭归档：仅 HTTP API，无 CLI/库/UI；UI 为独立项目，见[归档记录](../../decisions/2026-10-25-project-boundary-and-open-questions.md) |
 
 ## 10 确认状态
 
 - 2026-10-24：用户确认首批只做 **B1**；后续批次不在本批。
 - 用户 2026-10-24 直接要求按当前 spec 分步实现 API，`T-B1-D05` 门据此通过；D01～D05 设计按本提议落地，未再逐项书面确认。
 - 表级数据库设计、契约复核与编码均已完成；结果见 [`result.md`](result.md)。
-- 外部契约：29 个 B1 业务端点 + `/healthz`，见 [`http-gateway/spec.md`](../../design/components/http-gateway/spec.md)。
+- 外部契约：29 个 B1 业务端点 + `/healthz`，见 [`http-gateway/spec.md`](../../../design/components/http-gateway/spec.md)。

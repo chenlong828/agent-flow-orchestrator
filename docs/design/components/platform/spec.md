@@ -73,7 +73,7 @@ type Health = { check(): Promise<{ status: "ok" | "degraded"; database: "up" | "
 
 - 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 4 KB。
 - 单独验证命令：`bun test tests/components/platform`。
-- 当前状态：`current`；平台命令已可执行，验证入口见 [`result.md`](../../../works/2026-10-24-db-backend-infra/result.md)。
+- 当前状态：`current`；平台命令已可执行，实施与验证的历史记录见 [`result.md`](../../../history/works/2026-10-24-db-backend-infra/result.md)（归档件，仅作追溯）。
 
 ## 7 B1 实现口径
 

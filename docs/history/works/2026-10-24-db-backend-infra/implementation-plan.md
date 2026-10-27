@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: global
-status: closed
-updated: 2026-10-25
+status: frozen
+updated: 2026-10-27
 ---
 
 # B1 组件规格、REST 契约与实施计划
@@ -35,7 +35,7 @@ updated: 2026-10-25
 |---|---|---|---|
 | D01 | `T-B1-D01` 用例清单 | [`use-cases.md`](use-cases.md) | 对象清单定稿 |
 | D02 | `T-B1-D02` 领域对象清单 | [`domain-objects.md`](domain-objects.md) | 组件规格与 REST 契约 |
-| D03 | `T-B1-D03` 组件规格与 REST API | [`design/architecture.md`](../../design/architecture.md) + 8 份组件规格 + REST API 列表 + [OpenAPI](../../../src/components/http-gateway/openapi.yaml) | 表级数据库设计 |
+| D03 | `T-B1-D03` 组件规格与 REST API | [`design/architecture.md`](../../../design/architecture.md) + 8 份组件规格 + REST API 列表 + [OpenAPI](../../../../src/components/http-gateway/openapi.yaml) | 表级数据库设计 |
 | D04 | `T-B1-D04` 表级数据库设计 | 各组件规格的 `数据模型` 章节（列/约束/索引/删除） | 契约复核与任务拆分 |
 | D05 | `T-B1-D05` 组件契约复核与任务拆分 | 组件卡复核、契约一致性检查、实现任务表 | 编码 |
 
@@ -56,7 +56,7 @@ updated: 2026-10-25
 ### 3.3 `T-B1-D03` 组件规格与 REST API
 
 - 产出：
-  - [`design/architecture.md`](../../design/architecture.md)：组件地图、依赖规则、数据所有权、契约边界。
+  - [`design/architecture.md`](../../../design/architecture.md)：组件地图、依赖规则、数据所有权、契约边界。
   - `design/components/{kernel,platform,harness,tool,skill,expert,catalog,http-gateway}/spec.md`。
   - `http-gateway` 规格中的 29 个 B1 业务端点 + `/healthz` 契约。
   - `http-gateway/openapi.yaml`：由上述契约导出的 OpenAPI 3.0 文档。
@@ -129,7 +129,7 @@ updated: 2026-10-25
 | `T-B1-D01` | design | `global` | completed | [`use-cases.md`](use-cases.md) |
 | `T-B1-D02` | design | `global` | completed | [`domain-objects.md`](domain-objects.md) |
 | `T-B1-D03` | design | `global` | completed | 架构 + 8 份组件规格 + REST API + OpenAPI |
-| `T-B1-D04` | design | 4 个聚合 | completed | 16 张表设计与 [`db/migrations/`](../../../db/migrations/) |
+| `T-B1-D04` | design | 4 个聚合 | completed | 16 张表设计与 [`db/migrations/`](../../../../db/migrations) |
 | `T-B1-D05` | design | `global` | completed | 契约复核与实现任务表 |
 | `T-B1-I01` | change | `kernel` | completed | 共享契约与端口，含契约测试 |
 | `T-B1-I02` | change | `platform` | completed | 平台骨架、迁移、健康检查与 `Bun.sql` 验证 |
@@ -210,11 +210,11 @@ updated: 2026-10-25
 
 1. **追溯方式**：按默认旁路执行，未补 `REQ`/`SCN`；`brief.md` + 本计划为锚点，实施结果见 [`result.md`](result.md)。
 2. **类型检查**：已采用推荐项，加入 `typescript`、`@types/bun` devDependency 与 `bun run typecheck`；`tsc --noEmit` 通过。
-3. **HTTP 默认**：按 HTTP JSON `/api/v1` 实现，行为以 [`http-gateway/spec.md`](../../design/components/http-gateway/spec.md) 为准。
+3. **HTTP 默认**：按 HTTP JSON `/api/v1` 实现，行为以 [`http-gateway/spec.md`](../../../design/components/http-gateway/spec.md) 为准。
 
 ## 10 下一步（不在本工序）
 
-- 外部 UI 若接入，由该项目按 [`http-gateway/spec.md`](../../design/components/http-gateway/spec.md) 与 [`openapi.yaml`](../../../src/components/http-gateway/openapi.yaml) 自行做适配层/契约测试。
+- 外部 UI 若接入，由该项目按 [`http-gateway/spec.md`](../../../design/components/http-gateway/spec.md) 与 [`openapi.yaml`](../../../../src/components/http-gateway/openapi.yaml) 自行做适配层/契约测试。
 - B2/B3/B4、ACP 执行模型与生产化事项另立工序，各自走确认门。
 - 本工序结论与验证记录见 [`result.md`](result.md)。
 

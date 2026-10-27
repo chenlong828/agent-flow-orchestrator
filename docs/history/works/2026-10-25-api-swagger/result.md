@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: global
-status: closed
-updated: 2026-10-25
+status: frozen
+updated: 2026-10-27
 ---
 
 # API Swagger 文档实现结果
@@ -29,13 +29,13 @@ updated: 2026-10-25
 
 ### 代码
 
-- 新增 [`src/components/http-gateway/docs.ts`](../../../src/components/http-gateway/docs.ts)：
+- 新增 [`src/components/http-gateway/docs.ts`](../../../../src/components/http-gateway/docs.ts)：
   - 启动时读取组件内 `openapi.yaml`，并检查 4 个静态资源；缺失则启动失败。
   - 只接受 `GET`；固定白名单；未知 `/docs/*` 返回 `null`，由网关映射 404。
   - 文档响应带 `cache-control: no-cache` 与 `x-content-type-options: nosniff`。
-- [`app.ts`](../../../src/components/http-gateway/app.ts)：`HttpDeps` 增加可选 `docs`，在业务路由前委托；不注入时保持原 404。
-- [`index.ts`](../../../src/components/http-gateway/index.ts)：导出 `createApiDocs` 与 `ApiDocs`。
-- [`main.ts`](../../../src/main.ts)：用 `process.cwd()` 定位 spec/资源并注入；启动日志增加文档地址。
+- [`app.ts`](../../../../src/components/http-gateway/app.ts)：`HttpDeps` 增加可选 `docs`，在业务路由前委托；不注入时保持原 404。
+- [`index.ts`](../../../../src/components/http-gateway/index.ts)：导出 `createApiDocs` 与 `ApiDocs`。
+- [`main.ts`](../../../../src/main.ts)：用 `process.cwd()` 定位 spec/资源并注入；启动日志增加文档地址。
 
 ### 静态资源
 
@@ -52,16 +52,16 @@ updated: 2026-10-25
 
 ### 契约与文档
 
-- [`openapi.yaml`](../../../src/components/http-gateway/openapi.yaml)：`servers` 改为 `/`；说明 Swagger UI 是开发者文档。
-- [`spec.md`](../../design/components/http-gateway/spec.md)：新增 §4.3 文档端点，说明不计入业务端点、无鉴权/CORS、本地资源与白名单。
-- [`README.md`](../../../README.md)：新增“API 文档”入口、`Try it out` 会改数据、非产品 UI 的边界。
-- [`architecture.md`](../../design/architecture.md)、[`AGENTS.md`](../../../AGENTS.md)、[`open-questions.md`](../../plan/open-questions.md) 同步“产品 UI”边界。
-- [`roadmap.md`](../../plan/roadmap.md) 记录本工序完成。
+- [`openapi.yaml`](../../../../src/components/http-gateway/openapi.yaml)：`servers` 改为 `/`；说明 Swagger UI 是开发者文档。
+- [`spec.md`](../../../design/components/http-gateway/spec.md)：新增 §4.3 文档端点，说明不计入业务端点、无鉴权/CORS、本地资源与白名单。
+- [`README.md`](../../../../README.md)：新增“API 文档”入口、`Try it out` 会改数据、非产品 UI 的边界。
+- [`architecture.md`](../../../design/architecture.md)、[`AGENTS.md`](../../../../AGENTS.md)、[`open-questions.md`](../../../plan/open-questions.md) 同步“产品 UI”边界。
+- [`roadmap.md`](../../../plan/roadmap.md) 记录本工序完成。
 
 ### 测试
 
-- 新增 [`docs.test.ts`](../../../tests/components/http-gateway/docs.test.ts)：HTML、YAML、4 个资源、404、路径穿越、错误方法、网关委托、缺少资源 fail fast。
-- 新增 [`openapi.test.ts`](../../../tests/components/http-gateway/openapi.test.ts)：30 operations、18 paths、6 tags、61 个 components 目标、290 个 `$ref`、无悬空引用、`servers: /`、文档路径不进业务 `paths`。
+- 新增 [`docs.test.ts`](../../../../tests/components/http-gateway/docs.test.ts)：HTML、YAML、4 个资源、404、路径穿越、错误方法、网关委托、缺少资源 fail fast。
+- 新增 [`openapi.test.ts`](../../../../tests/components/http-gateway/openapi.test.ts)：30 operations、18 paths、6 tags、61 个 components 目标、290 个 `$ref`、无悬空引用、`servers: /`、文档路径不进业务 `paths`。
 
 ## 验证
 
@@ -105,9 +105,9 @@ bun run typecheck
 
 | 内容 | 位置 |
 |---|---|
-| 文档端点契约 | [`http-gateway/spec.md`](../../design/components/http-gateway/spec.md) §4.3 |
-| 机器可读契约 | [`openapi.yaml`](../../../src/components/http-gateway/openapi.yaml) |
-| 文档实现 | [`docs.ts`](../../../src/components/http-gateway/docs.ts) |
-| 静态资源与版本 | [`docs-assets/`](../../../src/components/http-gateway/docs-assets/) |
-| 自动化验证 | [`docs.test.ts`](../../../tests/components/http-gateway/docs.test.ts)、[`openapi.test.ts`](../../../tests/components/http-gateway/openapi.test.ts) |
-| 使用入口 | [`README.md`](../../../README.md) “API 文档” |
+| 文档端点契约 | [`http-gateway/spec.md`](../../../design/components/http-gateway/spec.md) §4.3 |
+| 机器可读契约 | [`openapi.yaml`](../../../../src/components/http-gateway/openapi.yaml) |
+| 文档实现 | [`docs.ts`](../../../../src/components/http-gateway/docs.ts) |
+| 静态资源与版本 | [`docs-assets/`](../../../../src/components/http-gateway/docs-assets) |
+| 自动化验证 | [`docs.test.ts`](../../../../tests/components/http-gateway/docs.test.ts)、[`openapi.test.ts`](../../../../tests/components/http-gateway/openapi.test.ts) |
+| 使用入口 | [`README.md`](../../../../README.md) “API 文档” |

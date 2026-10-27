@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: global
-status: closed
-updated: 2026-10-25
+status: frozen
+updated: 2026-10-27
 ---
 
 # 核出配置组件并支持 TOML 启动配置
@@ -51,7 +51,7 @@ CMP-config
 **P1**：新增组件、移动配置职责、修改架构边界。
 
 - 2026-10-25 用户确认“拆出单独组件 OK”，并确认接受 TOML 与 `.env` 经 `process.env` 覆盖的语义。
-- 编码前先落本 brief、[`config/spec.md`](../../design/components/config/spec.md) 与[决策记录](../../history/decisions/2026-10-25-config-component.md)。
+- 编码前先落本 brief、[`config/spec.md`](../../../design/components/config/spec.md) 与[决策记录](../../decisions/2026-10-25-config-component.md)。
 - 完成后更新架构、平台规格、README 与 `result.md`。
 
 ## 任务表

@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: global
-status: closed
-updated: 2026-10-25
+status: frozen
+updated: 2026-10-27
 ---
 
 # B1 每端点正反例契约补测
@@ -55,7 +55,7 @@ updated: 2026-10-25
 
 ## 装载清单
 
-- [`http-gateway/spec.md`](../../design/components/http-gateway/spec.md)：端点表与「每个端点 3 正 1 反」要求。
-- [`architecture.md`](../../design/architecture.md)：契约测试分层与测试边界。
+- [`http-gateway/spec.md`](../../../design/components/http-gateway/spec.md)：端点表与「每个端点 3 正 1 反」要求。
+- [`architecture.md`](../../../design/architecture.md)：契约测试分层与测试边界。
 - [`2026-10-24-db-backend-infra/result.md`](../2026-10-24-db-backend-infra/result.md)：B1 既有验证结果。
 - [`2026-10-25-core-config/result.md`](../2026-10-25-core-config/result.md)：未补测缺口的来源说明。

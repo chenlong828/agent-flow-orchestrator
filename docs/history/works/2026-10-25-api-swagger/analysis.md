@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: global
-status: closed
-updated: 2026-10-25
+status: frozen
+updated: 2026-10-27
 ---
 
 # API Swagger 文档方案分析
@@ -14,7 +14,7 @@ updated: 2026-10-25
 
 ### 1.1 契约
 
-[`openapi.yaml`](../../../src/components/http-gateway/openapi.yaml) 已覆盖 B1 的 29 个业务端点 + `/healthz`：
+[`openapi.yaml`](../../../../src/components/http-gateway/openapi.yaml) 已覆盖 B1 的 29 个业务端点 + `/healthz`：
 
 | 项 | 实测值 |
 |---|---:|
@@ -41,8 +41,8 @@ servers:
 
 ### 1.2 运行时
 
-- 入口：[`src/main.ts`](../../../src/main.ts) 用 `Bun.serve({ fetch: app })` 启动；`app` 来自 `createHttpApp`。
-- 路由：[`src/components/http-gateway/app.ts`](../../../src/components/http-gateway/app.ts) 是命令式 `if` 路由；只处理 `/healthz` 与 `/api/v1/*`，其他路径抛 `NotFoundError`。
+- 入口：[`src/main.ts`](../../../../src/main.ts) 用 `Bun.serve({ fetch: app })` 启动；`app` 来自 `createHttpApp`。
+- 路由：[`src/components/http-gateway/app.ts`](../../../../src/components/http-gateway/app.ts) 是命令式 `if` 路由；只处理 `/healthz` 与 `/api/v1/*`，其他路径抛 `NotFoundError`。
 - 没有静态文件目录、没有模板引擎、没有前端构建、没有 Swagger/OpenAPI 依赖。
 - `HttpDeps` 目前只注入 catalog、四个写服务、health、actor；没有文档相关依赖。
 - 组合根只负责创建依赖并注入，不承载业务规则；适合把文档路径配置放在这里。
@@ -183,7 +183,7 @@ servers:
 - `docs/design/components/http-gateway/spec.md`（文档端点与边界）
 - `README.md`（入口与边界）
 - `tests/components/http-gateway/docs.test.ts`、`tests/contracts/openapi.test.ts`（新增）
-- `docs/works/2026-10-25-api-swagger/result.md`（收口时）
+- `docs/history/works/2026-10-25-api-swagger/result.md`（收口时）
 
 **不会改：**
 

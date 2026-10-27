@@ -37,23 +37,30 @@ docs/
 │   │   ├── brief.md
 │   │   ├── concept-design.md
 │   │   └── result.md
-│   ├── 2026-10-24-db-backend-infra/
+│   ├── 2026-10-25-scenario-index-pilot/
 │   │   ├── brief.md
-│   │   ├── analysis.md
-│   │   ├── use-cases.md
-│   │   ├── domain-objects.md
-│   │   ├── proposal.md
-│   │   ├── implementation-plan.md
 │   │   └── result.md
-│   └── 2026-10-25-scenario-index-pilot/
+│   └── 2026-10-26-skill-contract-v2/
 │       ├── brief.md
-│       └── result.md
+│       ├── contract-proposal.md
+│       ├── result.md
+│       ├── ui-brief.md
+│       └── ui-handoff.md
 └── history/                                ← 记忆：怎么走到这里（冻结只读）
-    └── decisions/
-        ├── 2026-10-23-project-init.md
-        ├── 2026-10-24-component-boundary-and-naming.md
-        ├── 2026-10-25-project-boundary-and-open-questions.md
-        └── 2026-10-25-playbook-method-layer.md
+    ├── decisions/
+    │   ├── 2026-10-23-project-init.md
+    │   ├── 2026-10-24-component-boundary-and-naming.md
+    │   ├── 2026-10-25-config-component.md
+    │   ├── 2026-10-25-project-boundary-and-open-questions.md
+    │   └── 2026-10-25-playbook-method-layer.md
+    └── works/
+        ├── 2026-10-24-db-backend-infra/
+        ├── 2026-10-25-api-contract-tests/
+        ├── 2026-10-25-api-swagger/
+        ├── 2026-10-25-core-config/
+        ├── 2026-10-25-expert-aggregate-write/
+        ├── 2026-10-25-list-read-model/
+        └── 2026-10-25-runtime-openapi-export/
 ```
 
 其余内容在诞生时创建，**不预建空目录、不预建索引行**：
@@ -78,9 +85,9 @@ docs/
 8. [`design/components/kernel/spec.md`](design/components/kernel/spec.md) 与 [`config/spec.md`](design/components/config/spec.md) —— 共享错误/分页/端口，以及 TOML 启动配置
 9. [`design/components/http-gateway/spec.md`](design/components/http-gateway/spec.md) —— 对外 REST 契约；运行时 `/openapi.yaml` 与 Swagger UI `/docs` 由 `CMP-http-gateway` 直接提供；外部项目若接入按此消费
 10. [`playbook/backend-contract-boundaries.md`](playbook/backend-contract-boundaries.md) —— 后端聚合写、列表读模型与 BFF 边界的可复用判定；与现行规格冲突时以规格为准
-11. [`works/2026-10-24-db-backend-infra/result.md`](works/2026-10-24-db-backend-infra/result.md) —— B1 实现结果、验证命令与偏差
-12. [`works/2026-10-25-api-swagger/result.md`](works/2026-10-25-api-swagger/result.md) —— Swagger UI、OpenAPI 端点与验证结果
-13. [`works/2026-10-25-runtime-openapi-export/result.md`](works/2026-10-25-runtime-openapi-export/result.md) —— OpenAPI 资产移入 HTTP 组件，以及方法/字段说明补齐结果
+11. [`history/works/2026-10-24-db-backend-infra/result.md`](history/works/2026-10-24-db-backend-infra/result.md) —— B1 实现结果、验证命令与偏差（已归档，历史证据，不作设计依据）
+12. [`history/works/2026-10-25-api-swagger/result.md`](history/works/2026-10-25-api-swagger/result.md) —— Swagger UI、OpenAPI 端点与验证结果（已归档）
+13. [`history/works/2026-10-25-runtime-openapi-export/result.md`](history/works/2026-10-25-runtime-openapi-export/result.md) —— OpenAPI 资产移入 HTTP 组件，以及方法/字段说明补齐结果（已归档）
 14. [`works/2026-10-25-scenario-index-pilot/result.md`](works/2026-10-25-scenario-index-pilot/result.md) —— 首个场景索引试点、生成器与校验结果
 15. [`history/decisions/2026-10-23-project-init.md`](history/decisions/2026-10-23-project-init.md) —— 初始化时的取舍与被否决方案
 16. [`history/decisions/2026-10-25-project-boundary-and-open-questions.md`](history/decisions/2026-10-25-project-boundary-and-open-questions.md) —— 仅 HTTP API、无 CLI/库/产品 UI，以及早期开放问题归档

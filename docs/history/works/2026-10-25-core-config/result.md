@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: global
-status: closed
-updated: 2026-10-25
+status: frozen
+updated: 2026-10-27
 ---
 
 # 结果：`CMP-config` 与 TOML 启动配置
@@ -23,17 +23,17 @@ updated: 2026-10-25
 
 | 落点 | 内容 |
 |---|---|
-| [`src/core/config/config.ts`](../../../src/core/config/config.ts) | TOML 读取、`default`/`local` 合并、环境覆盖、`CONFIG_FILE`、字段校验 |
-| [`src/core/config/errors.ts`](../../../src/core/config/errors.ts) | `ConfigError` 与 `config_read_error` / `config_parse_error` / `config_validation_error` |
-| [`src/core/config/index.ts`](../../../src/core/config/index.ts) | `Config`、`LoadConfigOptions`、`LogLevel`、`loadConfig`、`ConfigError` |
-| [`src/main.ts`](../../../src/main.ts) / `scripts/*.ts` | 改为 `await loadConfig()`，平台不再导出配置 |
-| [`config/default.toml`](../../../config/default.toml) | 入库默认值：`127.0.0.1:3000`、actor `local`、log `info` |
-| [`config/local.example.toml`](../../../config/local.example.toml) | 本机 3100 端口示例 |
-| [`config/spec.md`](../../design/components/config/spec.md) | 组件契约、优先级、错误与验证 |
-| [`architecture.md`](../../design/architecture.md) | 组件数 8 → 9，依赖与数据所有权更新 |
-| [`platform/spec.md`](../../design/components/platform/spec.md) | 移除配置职责与 `Config` 契约 |
-| [`README.md`](../../../README.md) | 运行方式、优先级、目录与配置入口 |
-| [`2026-10-25-config-component.md`](../../history/decisions/2026-10-25-config-component.md) | 结构决策与备选方案 |
+| [`src/core/config/config.ts`](../../../../src/core/config/config.ts) | TOML 读取、`default`/`local` 合并、环境覆盖、`CONFIG_FILE`、字段校验 |
+| [`src/core/config/errors.ts`](../../../../src/core/config/errors.ts) | `ConfigError` 与 `config_read_error` / `config_parse_error` / `config_validation_error` |
+| [`src/core/config/index.ts`](../../../../src/core/config/index.ts) | `Config`、`LoadConfigOptions`、`LogLevel`、`loadConfig`、`ConfigError` |
+| [`src/main.ts`](../../../../src/main.ts) / `scripts/*.ts` | 改为 `await loadConfig()`，平台不再导出配置 |
+| [`config/default.toml`](../../../../config/default.toml) | 入库默认值：`127.0.0.1:3000`、actor `local`、log `info` |
+| [`config/local.example.toml`](../../../../config/local.example.toml) | 本机 3100 端口示例 |
+| [`config/spec.md`](../../../design/components/config/spec.md) | 组件契约、优先级、错误与验证 |
+| [`architecture.md`](../../../design/architecture.md) | 组件数 8 → 9，依赖与数据所有权更新 |
+| [`platform/spec.md`](../../../design/components/platform/spec.md) | 移除配置职责与 `Config` 契约 |
+| [`README.md`](../../../../README.md) | 运行方式、优先级、目录与配置入口 |
+| [`2026-10-25-config-component.md`](../../decisions/2026-10-25-config-component.md) | 结构决策与备选方案 |
 
 ## 验证
 

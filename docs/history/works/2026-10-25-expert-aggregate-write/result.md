@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: global
-status: closed
-updated: 2026-10-25
+status: frozen
+updated: 2026-10-27
 ---
 
 # 结果：专家聚合写契约
@@ -21,19 +21,19 @@ updated: 2026-10-25
 
 | 落点 | 内容 |
 |---|---|
-| [`src/components/expert/types.ts`](../../../src/components/expert/types.ts) | `UpdateExpertAggregate`、创建可选装配字段 |
-| [`src/components/expert/service.ts`](../../../src/components/expert/service.ts) | `create` 同事务装配、`updateAggregate`、共用 `replaceSkills` / `replaceTools`、字段级外键错误 |
-| [`src/components/expert/index.ts`](../../../src/components/expert/index.ts) | 导出聚合更新类型 |
-| [`src/components/http-gateway/app.ts`](../../../src/components/http-gateway/app.ts) | POST 扩展、`PATCH /experts/{id}`、UUID 数组校验、`If-Match` |
-| [`src/components/http-gateway/openapi.yaml`](../../../src/components/http-gateway/openapi.yaml) | `API-30`、`ExpertAggregatePatch`、创建装配字段与说明 |
-| [`docs/design/components/expert/spec.md`](../../design/components/expert/spec.md) | 聚合写契约、领域类型、方法表、验证口径 |
-| [`docs/design/components/http-gateway/spec.md`](../../design/components/http-gateway/spec.md) | 30 个业务端点、`API-30`、专家请求字段、编排表 |
-| [`docs/design/architecture.md`](../../design/architecture.md) | 端点数 29 → 30，专家 8 → 9 |
-| [`README.md`](../../../README.md) | 端点数与测试数 |
-| [`docs/plan/roadmap.md`](../../plan/roadmap.md) | 工序收口记录 |
-| [`tests/components/expert/service.test.ts`](../../../tests/components/expert/service.test.ts) | 创建装配、聚合更新、回滚、空 patch、旧 revision |
-| [`tests/components/http-gateway/expert.test.ts`](../../../tests/components/http-gateway/expert.test.ts) | POST 装配、PATCH 正反例 |
-| [`tests/components/http-gateway/openapi.test.ts`](../../../tests/components/http-gateway/openapi.test.ts) | 31 operations / 49 schemas / 300 `$ref` 结构断言 |
+| [`src/components/expert/types.ts`](../../../../src/components/expert/types.ts) | `UpdateExpertAggregate`、创建可选装配字段 |
+| [`src/components/expert/service.ts`](../../../../src/components/expert/service.ts) | `create` 同事务装配、`updateAggregate`、共用 `replaceSkills` / `replaceTools`、字段级外键错误 |
+| [`src/components/expert/index.ts`](../../../../src/components/expert/index.ts) | 导出聚合更新类型 |
+| [`src/components/http-gateway/app.ts`](../../../../src/components/http-gateway/app.ts) | POST 扩展、`PATCH /experts/{id}`、UUID 数组校验、`If-Match` |
+| [`src/components/http-gateway/openapi.yaml`](../../../../src/components/http-gateway/openapi.yaml) | `API-30`、`ExpertAggregatePatch`、创建装配字段与说明 |
+| [`docs/design/components/expert/spec.md`](../../../design/components/expert/spec.md) | 聚合写契约、领域类型、方法表、验证口径 |
+| [`docs/design/components/http-gateway/spec.md`](../../../design/components/http-gateway/spec.md) | 30 个业务端点、`API-30`、专家请求字段、编排表 |
+| [`docs/design/architecture.md`](../../../design/architecture.md) | 端点数 29 → 30，专家 8 → 9 |
+| [`README.md`](../../../../README.md) | 端点数与测试数 |
+| [`docs/plan/roadmap.md`](../../../plan/roadmap.md) | 工序收口记录 |
+| [`tests/components/expert/service.test.ts`](../../../../tests/components/expert/service.test.ts) | 创建装配、聚合更新、回滚、空 patch、旧 revision |
+| [`tests/components/http-gateway/expert.test.ts`](../../../../tests/components/http-gateway/expert.test.ts) | POST 装配、PATCH 正反例 |
+| [`tests/components/http-gateway/openapi.test.ts`](../../../../tests/components/http-gateway/openapi.test.ts) | 31 operations / 49 schemas / 300 `$ref` 结构断言 |
 
 ## 验证
 

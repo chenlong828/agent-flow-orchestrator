@@ -8,7 +8,7 @@ updated: 2026-10-26
 # B1 架构与契约边界
 
 > 范围：仅 B1 资产注册中心（Harness、工具、Skill、专家）。后续批次不在本文。
-> 本文冻结组件边界、依赖方向、数据所有权与契约规则；列级数据库设计已落入 [`db/migrations/`](../../db/migrations/)。REST API 明细见 [`components/http-gateway/spec.md`](components/http-gateway/spec.md)，实施结果见 [`result.md`](../works/2026-10-24-db-backend-infra/result.md)。
+> 本文冻结组件边界、依赖方向、数据所有权与契约规则；列级数据库设计已落入 [`db/migrations/`](../../db/migrations/)。REST API 明细见 [`components/http-gateway/spec.md`](components/http-gateway/spec.md)，实施结果见 [`result.md`](../history/works/2026-10-24-db-backend-infra/result.md)（归档件，仅作追溯）。
 
 ## 1 结论
 
@@ -154,6 +154,6 @@ config
 
 - `T-B1-D04` 已完成：业务表落入 [`db/migrations/`](../../db/migrations/)，未改变本文与 REST DTO 的字段语义；`0005` 后为 15 张（`skill_trigger` 合并进 `skill.description`）。
 - `ReferenceGuard` 已按端口方案实现：端口在 `kernel`，由 `catalog` 实现，领域删除服务经组合根注入；未新增 L2 删除组件。
-- REST API 已按 [`http-gateway/spec.md`](components/http-gateway/spec.md) 实现；Swagger 文档已挂到 `/docs` 与 `/openapi.yaml`，结果见 [`api-swagger/result.md`](../works/2026-10-25-api-swagger/result.md) 与 [`runtime-openapi-export/result.md`](../works/2026-10-25-runtime-openapi-export/result.md)。UI 是独立项目，是否接入由该项目决定，契约反馈只改本仓库契约。
-- 组件状态均为 `current`；实现与验证结果见 [`result.md`](../works/2026-10-24-db-backend-infra/result.md)。
-- `CMP-config` 已从 `CMP-platform` 拆出；TOML + `process.env` 启动配置结果见 [`core-config/result.md`](../works/2026-10-25-core-config/result.md)。
+- REST API 已按 [`http-gateway/spec.md`](components/http-gateway/spec.md) 实现；Swagger 文档已挂到 `/docs` 与 `/openapi.yaml`，结果见 [`api-swagger/result.md`](../history/works/2026-10-25-api-swagger/result.md) 与 [`runtime-openapi-export/result.md`](../history/works/2026-10-25-runtime-openapi-export/result.md)。UI 是独立项目，是否接入由该项目决定，契约反馈只改本仓库契约。
+- 组件状态均为 `current`；实现与验证的历史记录见 [`result.md`](../history/works/2026-10-24-db-backend-infra/result.md)（归档件，仅作追溯）。
+- `CMP-config` 已从 `CMP-platform` 拆出；TOML + `process.env` 启动配置历史记录见 [`core-config/result.md`](../history/works/2026-10-25-core-config/result.md)（归档件，仅作追溯）。

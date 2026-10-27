@@ -18,7 +18,7 @@ AgentFlow 研发智能体工作流编排服务的编排侧工程：目标是把�
 - Skill 契约 v2：`summary` 与 `triggers` 合并为 `description`（1–400 字），新增 `GET /skills/{id}/document` 输出 markdown 全文；见 [`result.md`](docs/works/2026-10-26-skill-contract-v2/result.md)。
 - 开发者 API 文档：`/docs`（Swagger UI）与 `/openapi.yaml`，Swagger UI 资源已 vendor 到仓库，可离线使用。
 - 演示种子：5 Harness / 10 工具 / 12 Skill / 8 专家，Skill 与工具装配边各 23 条。
-- 实现结果与验证记录：[`result.md`](docs/works/2026-10-24-db-backend-infra/result.md)。
+- 实现结果与验证记录：[`result.md`](docs/history/works/2026-10-24-db-backend-infra/result.md)。
 
 B2 Key/工作区、B3 工作流、B4 实例/看板、ACP 执行模型未实现；后续运行形态按实际需求另立工序，见 [`docs/plan/roadmap.md`](docs/plan/roadmap.md)。早期开放问题已关闭，当前无开放问题，见 [`docs/plan/open-questions.md`](docs/plan/open-questions.md)。
 

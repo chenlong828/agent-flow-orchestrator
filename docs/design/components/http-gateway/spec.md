@@ -472,7 +472,7 @@ B1 不提供的页面动作：Harness 连接测试/心跳刷新、工具调试/�
 - 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 26 KB；OpenAPI 运行时资产约 73 KB、Swagger UI 静态资源约 2.14 MB，均单独计量，不计入组件预算。
 - 单独验证命令：`bun test tests/components/http-gateway`。
 - 文档入口：启动后访问 `/docs`；机器可读契约：`/openapi.yaml`。OpenAPI 资产随组件发布，包含 31 个 operation 的说明、51 个 schema 的说明与核心 DTO 的字段说明。
-- 当前状态：`current`；已实现并通过契约测试，验证入口见 [`result.md`](../../../works/2026-10-24-db-backend-infra/result.md)。
+- 当前状态：`current`；已实现并通过契约测试，实施与验证的历史记录见 [`result.md`](../../../history/works/2026-10-24-db-backend-infra/result.md)（归档件，仅作追溯）。
 
 ## 10 B1 实现口径与剩余问题
 

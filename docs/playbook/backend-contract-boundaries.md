@@ -166,8 +166,8 @@ BFF 的职责是**适配传输形状**：
 
 本 playbook 的首批证据来自两个工序：
 
-- [`专家聚合写`](../works/2026-10-25-expert-aggregate-write/result.md)：一个 UI 保存动作原本跨三个写端点；后端补了创建即装配与聚合 PATCH，一次事务、一次 `revision`。
-- [`列表读模型补齐`](../works/2026-10-25-list-read-model/result.md)：列表缺少 Skill 触发词、专家 Skill 预览和工具描述；后端直接补列表字段，拒绝 BFF N+1。
+- [`专家聚合写`](../history/works/2026-10-25-expert-aggregate-write/result.md)：一个 UI 保存动作原本跨三个写端点；后端补了创建即装配与聚合 PATCH，一次事务、一次 `revision`。
+- [`列表读模型补齐`](../history/works/2026-10-25-list-read-model/result.md)：列表缺少 Skill 触发词、专家 Skill 预览和工具描述；后端直接补列表字段，拒绝 BFF N+1。
 
 维护规则：
 
