@@ -49,7 +49,7 @@ export type ExpertDeps = {
   clock: Clock;
   ids: IdGenerator;
   actor: string;
-  guard?: ReferenceGuard;
+  guard: ReferenceGuard;
 };
 
 function toIso(value: Date | string): string {
@@ -425,11 +425,9 @@ export function createExpertService(deps: ExpertDeps): ExpertService {
     async delete(id, revision) {
       const current = await store.findRoot(db, id);
       if (current === null) throw new NotFoundError("专家", id);
-      if (guard !== undefined) {
-        const references = await guard.check("expert", id);
-        if (references.length > 0) {
-          throw new ReferencedError({ type: "expert", id, name: current.name }, references);
-        }
+      const references = await guard.check("expert", id);
+      if (references.length > 0) {
+        throw new ReferencedError({ type: "expert", id, name: current.name }, references);
       }
       try {
         await db.transaction(async (tx) => {
