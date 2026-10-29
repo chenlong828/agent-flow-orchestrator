@@ -153,18 +153,18 @@ config
 
 ## 9 验证
 
-- **架构测试**：无跨组件 store 导入；工作流只通过 `WorkflowService`/`WorkflowRead` 暴露契约；无领域组件互调；`Bun.sql` 只在 `platform/db` 与 store；Bun 文件 API 只出现在 `config`（读 TOML）、`http-gateway`（读文档静态资源）与 `platform`（存储适配器）；业务组件只用 `FileStore` 端口；`FileStore` 只由 `skill` 依赖、由 `platform` 实现；无循环依赖；`http-gateway` 不碰 store、不碰 `FileStore`；`catalog` 无写操作；`kernel` 不导入运行时组件；`config` 只被入口/脚本/测试引用。
+- **架构测试**：领域组件只依赖 `kernel`/`platform`，互调检查先把相对导入解析成绝对路径再判归属，并含“合成违规导入必须被抓到”的自测；无跨组件 store 导入；`Bun.sql` 只在 `platform/db`；Bun 文件 API 只出现在 `config`（读 TOML）、`http-gateway`（读文档静态资源）与 `platform`（存储适配器）；`FileStore` 只由 `skill` 依赖、由 `platform` 实现；无循环依赖；`http-gateway` 不碰 store、不碰 `FileStore`；`catalog` 无写操作；`kernel` 不导入运行时组件；`config` 只被入口/脚本/测试引用。
 - **组件测试**：每个组件能只加载自身源码 + 规格 + 测试运行验证命令。
 - **契约测试**：HTTP 端点按 `http-gateway/spec.md` 的 3 正 1 反验证；错误码、字段、分页、`If-Match`、引用列表、multipart、下载头；文档端点验证 HTML、静态资源与 OpenAPI 结构。
 - **项目边界检查**：仓库内不出现 `agent-flow-ui` 的源码导入；不出现跨项目相对路径依赖；外部 UI 只通过 HTTP 契约交互。
-- **预算**：单组件源码 + 规格 + 测试 ≤120k token；单任务装载 ≤250k。
+- **预算**：单组件源码 + 规格 + 测试 ≤120k token；单任务装载 ≤250k。vendor 的 Swagger UI 静态资源单独计量，不计入组件源码预算。
 
-## 10 实施状态与下一步
+## 10 实施状态
 
-- `T-B1-D04` 已完成历史 schema：旧 `skill` 五章/踩坑/引用结构落入 [`db/migrations/`](../../db/migrations/)；本次不沿用旧结构。
-- 2026-10-28：Skill 包形态契约 v1 冻结，规格/OpenAPI 由 T-SKP-06 同步；目标 schema 为重写 `0003`、删除 `0005`，重建后 13 张业务表、4 个迁移。实现待 T-SKP-08 起的拆分任务，当前代码尚未切换。
-- `ReferenceGuard` 已按端口方案实现：端口在 `kernel`，由 `catalog` 实现，领域删除服务经组合根注入；未新增 L2 删除组件。
-- 旧 REST API 已实现并通过历史契约测试；Skill 新契约（草稿/保存/下载/详情 `body`+`files`）待实现。Swagger 运行时仍按旧实现，由 T-SKP-17 一并更新运行时代码与测试。
+- 当前 10 个组件、16 张表、5 个只向前迁移（`0001`–`0005`）；REST 47 个业务端点 + `/healthz`。
+- B1 资产注册中心与 B3 工作流定义已实现并通过验证；B2 Key/工作区、B4 实例/看板、ACP 执行模型未实现。
+- Skill 包形态 v2 已落地：草稿/保存/下载与 `GET /skills/{id}/document`；不再提供 `POST /skills`、`PUT /skills/{id}`。
+- `ReferenceGuard` 按端口方案实现：端口在 `kernel`，由 `catalog` 实现，领域删除服务经组合根注入。
 - 组件状态均为 `current`；历史实现见 [`result.md`](../history/works/2026-10-24-db-backend-infra/result.md)（归档件，仅作追溯）。
-- 2026-10-29：`CMP-workflow` P1 冻结，10 个端点与三张表进入实现；B4 运行不在本批。
-- `CMP-config` 已从 `CMP-platform` 拆出；TOML + `process.env` 启动配置历史记录见 [`core-config/result.md`](../history/works/2026-10-25-core-config/result.md)（归档件，仅作追溯）。
+- 2026-10-29：`CMP-workflow` P1 冻结，10 个端点与三张表已实现；B4 运行不在本批。
+- `CMP-config` 已从 `CMP-platform` 拆出；启动配置历史见 [`core-config/result.md`](../history/works/2026-10-25-core-config/result.md)（归档件，仅作追溯）。

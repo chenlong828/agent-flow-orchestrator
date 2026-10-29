@@ -10,17 +10,17 @@ AgentFlow 研发智能体工作流编排服务的编排侧工程：目标是把�
 
 ## 当前状态
 
-控制面首批 **B1 资产注册中心**（Harness、工具、Skill、专家）已实现并通过验证：
+控制面 **B1 资产注册中心**（Harness、工具、Skill、专家）与 **B3 工作流定义**已实现并通过验证：
 
-- Bun 1.4.4 + PostgreSQL 18.4；模块化单体，9 个组件（新增 `CMP-config`）。
-- 15 张业务表；5 个只向前迁移。
-- 31 个 B1 业务端点 + `/healthz`，契约见 [`http-gateway/spec.md`](docs/design/components/http-gateway/spec.md)；运行时 `/openapi.yaml` 与 Swagger UI `/docs` 由 HTTP 组件直接提供。
+- Bun 1.4.4 + PostgreSQL 18.4；模块化单体，10 个组件。
+- 16 张表（含 `skill_category` 字典表）；5 个只向前迁移。
+- 47 个业务端点（B1 37 + B3 10）+ `/healthz`，契约见 [`http-gateway/spec.md`](docs/design/components/http-gateway/spec.md)；运行时 `/openapi.yaml` 与 Swagger UI `/docs` 由 HTTP 组件直接提供。
 - Skill 契约 v2：`summary` 与 `triggers` 合并为 `description`（1–400 字），新增 `GET /skills/{id}/document` 输出 markdown 全文；见 [`result.md`](docs/works/2026-10-26-skill-contract-v2/result.md)。
 - 开发者 API 文档：`/docs`（Swagger UI）与 `/openapi.yaml`，Swagger UI 资源已 vendor 到仓库，可离线使用。
 - 演示种子：5 Harness / 10 工具 / 12 Skill / 8 专家，Skill 与工具装配边各 23 条。
 - 实现结果与验证记录：[`result.md`](docs/history/works/2026-10-24-db-backend-infra/result.md)。
 
-B2 Key/工作区、B3 工作流、B4 实例/看板、ACP 执行模型未实现；后续运行形态按实际需求另立工序，见 [`docs/plan/roadmap.md`](docs/plan/roadmap.md)。早期开放问题已关闭，当前无开放问题，见 [`docs/plan/open-questions.md`](docs/plan/open-questions.md)。
+B2 Key/工作区、B4 实例/看板、ACP 执行模型未实现；B3 工作流已实现（2026-10-29）。后续运行形态按实际需求另立工序，见 [`docs/plan/roadmap.md`](docs/plan/roadmap.md)。早期开放问题已关闭，当前无开放问题，见 [`docs/plan/open-questions.md`](docs/plan/open-questions.md)。
 
 ## 运行
 
@@ -38,11 +38,11 @@ bun run db:migrate
 bun run db:seed
 ```
 
-启动 API（默认 `127.0.0.1:3000`；`dev` 监听文件改动自动重启，`start` 不监听）：
+启动 API（默认 `127.0.0.1:3100`；`dev` 监听文件改动自动重启，`start` 不监听）：
 
 ```bash
 bun run dev
-curl http://127.0.0.1:3000/healthz
+curl http://127.0.0.1:3100/healthz
 ```
 
 本机端口被占用时，复制示例配置并修改端口：
@@ -60,7 +60,7 @@ curl http://127.0.0.1:3100/healthz
 
 启动服务后打开：
 
-- Swagger UI：`http://127.0.0.1:<port>/docs`（默认 3000；由 `config/local.toml` 或 `PORT` 决定）
+- Swagger UI：`http://127.0.0.1:<port>/docs`（默认 3100；由 `config/local.toml` 或 `PORT` 决定）
 - OpenAPI 文件：`http://127.0.0.1:<port>/openapi.yaml`
 
 这是开发者 API 文档，不是产品 UI；不改变本仓库只提供 HTTP API 的边界。`Try it out` 会真实调用本地 API，更新/删除/装配操作会修改数据库数据。
@@ -68,7 +68,7 @@ curl http://127.0.0.1:3100/healthz
 验证：
 
 ```bash
-bun test --max-concurrency=1   # 199 个测试
+bun test --max-concurrency=1   # 全量测试
 bun run typecheck              # tsc --noEmit
 ```
 
