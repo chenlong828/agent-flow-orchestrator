@@ -65,7 +65,7 @@ function service(
     ids: uuidv7Ids,
     draftTtlHours: ttlHours,
     actor: "tester",
-    guard,
+    guard: guard ?? { check: async () => [] },
   });
 }
 

@@ -59,7 +59,7 @@ export type SkillDraftDeps = {
   ids: IdGenerator;
   draftTtlHours: number;
   actor: string;
-  guard?: ReferenceGuard;
+  guard: ReferenceGuard;
 };
 
 function toIso(value: Date | string): string {
@@ -551,7 +551,6 @@ export function createSkillDraftService(deps: SkillDraftDeps): SkillDraftService
       );
       if (current === null) throw new NotFoundError("Skill", id);
       if (current.revision !== revision) throw new RevisionConflictError(current.revision);
-      if (guard === undefined) throw new Error("删除 Skill 需要 ReferenceGuard");
       const references = await guard.check("skill", id);
       if (references.length > 0) {
         throw new ReferencedError({ type: "skill", id, name: current.name }, references);
