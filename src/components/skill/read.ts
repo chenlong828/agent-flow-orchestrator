@@ -8,7 +8,6 @@ import type { Db } from "../../core/platform/index.ts";
 import {
   parseSkillMarkdown,
   readSkillPackage,
-  SKILL_MD,
   type SkillPackageEntry,
 } from "./package.ts";
 import type {
@@ -153,9 +152,6 @@ export function createSkillRead(db: Db, store: FileStore): SkillRead {
     try {
       const data = await readAll(await store.get(`packages/${row.package_key}`));
       const entries = readSkillPackage(data);
-      if (entries[0]?.path !== SKILL_MD) {
-        throw new Error("包内缺少 SKILL.md");
-      }
       return { row, data, entries };
     } catch (error) {
       throw new PackageUnavailableError(row.id, error);
