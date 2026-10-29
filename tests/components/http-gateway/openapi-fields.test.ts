@@ -36,6 +36,7 @@ const CASES: [string, readonly string[]][] = [
   ["HarnessCreate", HARNESS_CREATE_FIELDS],
   ["HarnessUpdate", HARNESS_WRITE_FIELDS],
   ["ToolCreate", TOOL_WRITE_FIELDS],
+  ["ToolUpdate", TOOL_WRITE_FIELDS],
   ["SkillDraftSave", SKILL_SAVE_FIELDS],
   ["ExpertCreate", EXPERT_CREATE_FIELDS],
   ["ExpertUpdate", EXPERT_WRITE_FIELDS],
