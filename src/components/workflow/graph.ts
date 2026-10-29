@@ -57,8 +57,6 @@ export type ValidationReport = {
   warnings: ValidationIssue[];
 };
 
-export const EMPTY_GRAPH: WorkflowGraph = { stages: [], nodes: [], edges: [] };
-
 const NODE_TYPES: readonly NodeType[] = [
   "start",
   "end",
