@@ -6,6 +6,7 @@ import {
   NotFoundError,
   PackageUnavailableError,
   PayloadTooLargeError,
+  PreconditionRequiredError,
   ReferencedError,
   RevisionConflictError,
   ValidationError,
@@ -378,9 +379,10 @@ export function createSkillDraftService(deps: SkillDraftDeps): SkillDraftService
       let version = "v1.0";
       if (draft.skill_id === null) {
         if (baseRevision !== null) {
-          throw new ValidationError("baseRevision", "新建草稿不能带 baseRevision");
+          throw new ValidationError("If-Match", "新建草稿不能带 If-Match");
         }
       } else {
+        if (baseRevision === null) throw new PreconditionRequiredError();
         current = await db.one<CurrentSkill>(
           "select id, name, package_key, version, revision from skill where id = $1",
           [draft.skill_id],
@@ -443,10 +445,12 @@ export function createSkillDraftService(deps: SkillDraftDeps): SkillDraftService
           let skillId: string;
           let revision: number;
           let oldPackageKey: string | null = null;
-          if (lockedDraft.skill_id === null) {
+          const draftSkillId = lockedDraft.skill_id;
+          const created = draftSkillId === null;
+          const now = clock.now();
+          if (draftSkillId === null) {
             skillId = ids.next();
             revision = 1;
-            const now = clock.now();
             await tx.query(
               `insert into skill
                 (id, name, category_code, description, package_key, version,
@@ -466,16 +470,15 @@ export function createSkillDraftService(deps: SkillDraftDeps): SkillDraftService
           } else {
             const latest = await tx.one<CurrentSkill>(
               "select id, name, package_key, version, revision from skill where id = $1 for update",
-              [lockedDraft.skill_id],
+              [draftSkillId],
             );
-            if (latest === null) throw new NotFoundError("Skill", lockedDraft.skill_id);
+            if (latest === null) throw new NotFoundError("Skill", draftSkillId);
             if (baseRevision !== latest.revision) {
               throw new RevisionConflictError(latest.revision);
             }
             skillId = latest.id;
             revision = latest.revision + 1;
             oldPackageKey = latest.package_key;
-            const now = clock.now();
             const changed = await tx.query<{ id: string }>(
               `update skill set
                  name = $1, category_code = $2, description = $3,
@@ -507,14 +510,27 @@ export function createSkillDraftService(deps: SkillDraftDeps): SkillDraftService
           }
           await tx.query("delete from skill_draft where id = $1", [id]);
 
-          return { id: skillId, revision, version, oldPackageKey };
+          return {
+            id: skillId,
+            revision,
+            version,
+            updatedAt: toIso(now),
+            created,
+            oldPackageKey,
+          };
         });
 
         await removeDraftTree(store, id).catch(() => undefined);
         if (result.oldPackageKey !== null) {
           await store.delete(`packages/${result.oldPackageKey}`).catch(() => undefined);
         }
-        return { id: result.id, revision: result.revision, version: result.version };
+        return {
+          id: result.id,
+          revision: result.revision,
+          version: result.version,
+          updatedAt: result.updatedAt,
+          created: result.created,
+        };
       } catch (error) {
         await store.delete(`packages/${packageKey}`).catch(() => undefined);
         if (isUniqueViolation(error)) throw new NameConflictError(proposed.name);

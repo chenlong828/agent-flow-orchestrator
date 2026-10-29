@@ -87,7 +87,7 @@ type SkillRead = {
 ```
 
 - 输入/输出使用领域字段；不出现 HTTP DTO、SQL 列名、multipart 字段名。
-- `saveDraft` 的新建草稿传 `baseRevision=null`；已有草稿传草稿的 `baseRevision`，服务端同时校验当前 `skill.revision`。
+- `saveDraft` 的新建草稿传 `baseRevision=null`；已有草稿必须传草稿的 `baseRevision`，缺省抛 `PreconditionRequiredError`；新建草稿传非 null 抛 `ValidationError`；服务端同时校验当前 `skill.revision`。
 - `setEnabled` / `delete` 以 `revision` 做乐观锁；`saveDraft` 以草稿 `baseRevision` + 当前 `revision` 做闸门。
 - `delete` 先 `ReferenceGuard.check("skill", id)`；有引用不删除。
 - `getDocument` / `getPackage` 读取当前包；包缺失或损坏抛 `PackageUnavailableError`，不回落 brief。
@@ -161,6 +161,7 @@ type SaveSkillResult = {
   revision: number;
   version: string;
   updatedAt: string;
+  created: boolean;              // 仅供传输层选择 201/200；不进入 REST 响应
 };
 
 type CreateDraft = {
@@ -197,7 +198,7 @@ type SkillQuery = {
 | `renameDraftFile` | 附件改名/跨目录 | `id`、`path`、`newPath` | `DraftFileResult` | `NotFoundError`、`DraftExpiredError`、`FileConflictError`、`ValidationError` | 目标必须不存在；`SKILL.md` 保留 |
 | `deleteDraftFile` | 删除附件 | `id`、`path` | `void` | `NotFoundError`、`DraftExpiredError`、`ValidationError` | 只删附件；不推进 revision |
 | `cancelDraft` | 取消草稿 | `id` | `void` | `NotFoundError` | 删记录/目录；过期按 204 清理 |
-| `saveDraft` | 生成包并保存 | `id`、`baseRevision`、`SaveSkill` | `SaveSkillResult` | `ValidationError`、`NotFoundError`、`DraftExpiredError`、`RevisionConflictError`、`NameConflictError`、`PayloadTooLargeError`、`SkillMdTooLargeError`、`PackageUnavailableError`、`DatabaseUnavailableError` | 生成包 → fsync → 单事务切指针 → 删草稿；失败保留草稿 |
+| `saveDraft` | 生成包并保存 | `id`、`baseRevision`、`SaveSkill` | `SaveSkillResult` | `ValidationError`、`PreconditionRequiredError`、`NotFoundError`、`DraftExpiredError`、`RevisionConflictError`、`NameConflictError`、`PayloadTooLargeError`、`SkillMdTooLargeError`、`PackageUnavailableError`、`DatabaseUnavailableError` | 生成包 → fsync → 单事务切指针 → 删草稿；失败保留草稿 |
 | `setEnabled` | 启停 | `id`、`revision`、`enabled` | `{ id, revision }` | `NotFoundError`、`RevisionConflictError` | 单行更新；不重建包 |
 | `delete` | 删除 Skill | `id`、`revision` | `void` | `NotFoundError`、`RevisionConflictError`、`ReferencedError` | 先引用检查；删 brief/包/草稿 |
 | `list` | 列表查询 | `SkillQuery` | `Page<SkillSummary>` | `ValidationError` | 读 brief，不读 zip |

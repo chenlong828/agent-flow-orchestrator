@@ -13,6 +13,7 @@ import {
   FileConflictError,
   NameConflictError,
   PackageUnavailableError,
+  PreconditionRequiredError,
   ReferencedError,
   RevisionConflictError,
   SkillMdTooLargeError,
@@ -203,7 +204,8 @@ describe("Skill 保存、启停与 GC", () => {
       tags: ["新", "新", "保存"],
       body: "## 适用场景\n\n内容",
     });
-    expect(saved).toMatchObject({ revision: 1, version: "v1.0" });
+    expect(saved).toMatchObject({ revision: 1, version: "v1.0", created: true });
+    expect(saved.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 
     const row = await db.one<{ package_key: string; tags: number; revision: number }>(
       `select s.package_key, s.revision,
@@ -239,7 +241,7 @@ describe("Skill 保存、启停与 GC", () => {
       tags: ["CRES"],
       body: "## 更新",
     });
-    expect(saved).toMatchObject({ revision: 2, version: "v1.5" });
+    expect(saved).toMatchObject({ revision: 2, version: "v1.5", created: false });
     expect(await store.head(`packages/${before!.package_key}`)).toBeNull();
 
     await db.query("update skill set version = 'v1.9' where id = $1", [skillId]);
@@ -252,6 +254,34 @@ describe("Skill 保存、启停与 GC", () => {
       body: "## 再更新",
     });
     expect(saved2).toMatchObject({ revision: 3, version: "v2.0" });
+  });
+
+  test("保存规则：更新草稿缺 baseRevision 返回 428，新建草稿带 baseRevision 返回 400", async () => {
+    const drafts = service();
+    const updateDraft = await drafts.createDraft(skillId);
+    const missing = await drafts
+      .saveDraft(updateDraft.id, null, {
+        name: "CRES 技能",
+        categoryCode: "coding",
+        description: "缺 If-Match",
+        body: "",
+      })
+      .catch((caught) => caught);
+    expect(missing).toBeInstanceOf(PreconditionRequiredError);
+    expect((await drafts.getDraft(updateDraft.id)).id).toBe(updateDraft.id);
+
+    const newDraft = await drafts.createDraft(null);
+    const extra = await drafts
+      .saveDraft(newDraft.id, 1, {
+        name: "新建 Skill 带 If-Match",
+        categoryCode: "coding",
+        description: "多带 If-Match",
+        body: "",
+      })
+      .catch((caught) => caught);
+    expect(extra).toBeInstanceOf(ValidationError);
+    expect(extra.details).toMatchObject({ field: "If-Match" });
+    expect((await drafts.getDraft(newDraft.id)).id).toBe(newDraft.id);
   });
 
   test("名称冲突、revision 冲突与 SKILL.md 超限保留草稿", async () => {

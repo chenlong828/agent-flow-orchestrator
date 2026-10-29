@@ -87,6 +87,9 @@ export type SaveSkillResult = {
   id: string;
   revision: number;
   version: string;
+  updatedAt: string;
+  /** 仅供传输层选择 201/200，不进入 REST 响应。 */
+  created: boolean;
 };
 
 export type SkillDraftService = {
