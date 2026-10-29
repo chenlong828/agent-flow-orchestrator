@@ -128,10 +128,9 @@ export function parsePageQuery(url: URL): PageQuery {
 export function parseSortQuery<T extends string>(
   url: URL,
   allowed: Record<string, T>,
-  defaultSort?: T,
 ): T | undefined {
   const raw = queryValue(url, "sort");
-  if (raw === undefined) return defaultSort;
+  if (raw === undefined) return undefined;
   const value = allowed[raw];
   if (value === undefined) {
     throw new ValidationError("sort", `必须是 ${Object.keys(allowed).join(" / ")} 之一`);
