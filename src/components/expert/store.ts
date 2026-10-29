@@ -246,16 +246,6 @@ export function createExpertStore(db: Db) {
       );
     },
 
-    async replaceSkillLinks(tx: Db, expertId: string, skillIds: string[]): Promise<void> {
-      await tx.query("delete from expert_skill where expert_id = $1", [expertId]);
-      for (const [position, skillId] of skillIds.entries()) {
-        await tx.query(
-          "insert into expert_skill (expert_id, position, skill_id) values ($1, $2, $3)",
-          [expertId, position, skillId],
-        );
-      }
-    },
-
     async clearSkillLinks(tx: Db, expertId: string): Promise<void> {
       await tx.query("delete from expert_skill where expert_id = $1", [expertId]);
     },
@@ -286,16 +276,6 @@ export function createExpertStore(db: Db) {
         "insert into expert_tool (expert_id, position, tool_id) values ($1, $2, $3)",
         [expertId, position, toolId],
       );
-    },
-
-    async replaceToolLinks(tx: Db, expertId: string, toolIds: string[]): Promise<void> {
-      await tx.query("delete from expert_tool where expert_id = $1", [expertId]);
-      for (const [position, toolId] of toolIds.entries()) {
-        await tx.query(
-          "insert into expert_tool (expert_id, position, tool_id) values ($1, $2, $3)",
-          [expertId, position, toolId],
-        );
-      }
     },
 
     async skillIdsFor(tx: Db, expertId: string): Promise<string[]> {
