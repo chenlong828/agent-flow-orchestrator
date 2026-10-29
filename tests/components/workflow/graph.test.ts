@@ -54,6 +54,30 @@ describe("工作流图形状校验", () => {
     expect(result.warnings.some((item) => item.code === "expert_forbidden")).toBe(true);
   });
 
+  test("可选视口随图保留；非法视口被拒绝", () => {
+    const viewport = { x: 120, y: 80, zoom: 0.75 };
+    const valid = collectGraph({ ...validGraph(), viewport });
+    expect(valid.errors).toEqual([]);
+    expect(valid.graph?.viewport).toEqual(viewport);
+
+    const unknown = collectGraph({ ...validGraph(), viewport: { ...viewport, extra: true } });
+    expect(unknown.errors.some((item) => item.code === "graph_shape")).toBe(true);
+    expect(unknown.graph).toBeNull();
+
+    for (const bad of [
+      { x: 120, y: 80 },
+      { x: Number.NaN, y: 80, zoom: 0.75 },
+      { x: 120, y: 80, zoom: 0 },
+      { x: 120, y: 80, zoom: -0.5 },
+    ]) {
+      const result = collectGraph({ ...validGraph(), viewport: bad });
+      expect(result.errors.some((item) => item.code === "invalid_layout")).toBe(true);
+      expect(result.graph).toBeNull();
+    }
+
+    expect(parseGraph({ ...validGraph(), viewport }).viewport).toEqual(viewport);
+  });
+
   test("parseGraph 把形状错误聚合为 validation_error", () => {
     expect(() => parseGraph({ stages: [] })).toThrow();
     try {

@@ -9,6 +9,7 @@ export type {
   UpdateWorkflow,
   ValidationIssue,
   ValidationReport,
+  Viewport,
   WorkflowDetail,
   WorkflowDsl,
   WorkflowEdge,

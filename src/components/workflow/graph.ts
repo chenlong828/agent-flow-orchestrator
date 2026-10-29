@@ -10,6 +10,12 @@ export type Layout = {
   height?: number;
 };
 
+export type Viewport = {
+  x: number;
+  y: number;
+  zoom: number;
+};
+
 export type Stage = {
   id: string;
   name: string;
@@ -37,6 +43,7 @@ export type WorkflowGraph = {
   stages: Stage[];
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
+  viewport?: Viewport;
 };
 
 export type ValidationIssue = {
@@ -152,6 +159,53 @@ function parseLayout(
   return result as Layout;
 }
 
+function parseViewport(
+  value: unknown,
+  path: string,
+  errors: ValidationIssue[],
+): Viewport | undefined {
+  if (value === undefined) return undefined;
+  if (!isObject(value)) {
+    errors.push({ code: "invalid_layout", path, message: "必须是对象" });
+    return undefined;
+  }
+  unknownFields(value, ["x", "y", "zoom"], path, errors);
+  const x = value.x;
+  const y = value.y;
+  const zoom = value.zoom;
+  let valid = true;
+  for (const [field, raw] of [
+    ["x", x],
+    ["y", y],
+  ] as const) {
+    if (typeof raw !== "number" || !Number.isFinite(raw)) {
+      errors.push({
+        code: "invalid_layout",
+        path: `${path}.${field}`,
+        message: "必须是有限数字",
+      });
+      valid = false;
+    }
+  }
+  if (typeof zoom !== "number" || !Number.isFinite(zoom)) {
+    errors.push({
+      code: "invalid_layout",
+      path: `${path}.zoom`,
+      message: "必须是有限数字",
+    });
+    valid = false;
+  } else if (zoom <= 0) {
+    errors.push({
+      code: "invalid_layout",
+      path: `${path}.zoom`,
+      message: "必须大于 0",
+    });
+    valid = false;
+  }
+  if (!valid) return undefined;
+  return { x: x as number, y: y as number, zoom: zoom as number };
+}
+
 function parseId(
   value: unknown,
   path: string,
@@ -183,7 +237,8 @@ export function collectGraph(input: unknown): {
       errors: [{ code: "graph_shape", path: "graph", message: "必须是对象" }],
     };
   }
-  unknownFields(input, ["stages", "nodes", "edges"], "graph", errors);
+  unknownFields(input, ["stages", "nodes", "edges", "viewport"], "graph", errors);
+  const viewport = parseViewport(input.viewport, "graph.viewport", errors);
 
   const rawStages = input.stages;
   const rawNodes = input.nodes;
@@ -332,7 +387,10 @@ export function collectGraph(input: unknown): {
   });
 
   if (errors.length > 0) return { graph: null, errors };
-  return { graph: { stages, nodes, edges }, errors };
+  return {
+    graph: { stages, nodes, edges, ...(viewport === undefined ? {} : { viewport }) },
+    errors,
+  };
 }
 
 export function parseGraph(input: unknown): WorkflowGraph {

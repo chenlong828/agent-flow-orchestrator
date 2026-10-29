@@ -1620,7 +1620,7 @@ paths:
       operationId: saveWorkflowDefinition
       x-api-id: API-37
       x-component-method: workflow.saveDefinition + catalog.getWorkflow
-      description: 形状错误 400 且不保存；语义问题 200 并返回 warnings；专家不存在 400 且回滚。
+      description: 整图替换，`graph.viewport` 随图保存或清空；形状错误 400 且不保存；语义问题 200 并返回 warnings；专家不存在 400 且回滚。
       parameters:
       - "$ref": "#/components/parameters/IfMatch"
       requestBody:
@@ -3223,13 +3223,14 @@ components:
       properties:
         x:
           type: number
-          description: 画布水平偏移。
+          description: 画布水平滚动偏移，CSS 像素。
         y:
           type: number
-          description: 画布垂直偏移。
+          description: 画布垂直滚动偏移，CSS 像素。
         zoom:
           type: number
-          description: 缩放比例。
+          exclusiveMinimum: 0
+          description: 画布缩放倍数，必须大于 0。
       description: 可选画布视口，仅用于展示，不参与执行语义。
     WorkflowLayout:
       type: object
@@ -3260,7 +3261,10 @@ components:
           items:
             "$ref": "#/components/schemas/WorkflowEdge"
           description: 边列表。
-      description: 工作流当前图；只含 stages/nodes/edges，禁止 behavior 与未知字段。
+        viewport:
+          "$ref": "#/components/schemas/WorkflowLayoutViewport"
+          description: 可选画布视口，仅用于展示；保存定义时随整图提交。
+      description: 工作流当前图；含 stages/nodes/edges 与可选展示视口，禁止 behavior 与未知字段。
     WorkflowSummary:
       type: object
       required:
@@ -3318,7 +3322,7 @@ components:
           graph:
             "$ref": "#/components/schemas/WorkflowGraph"
             description: 唯一当前图。
-      description: 工作流详情；包含完整 graph。
+      description: 工作流详情；包含完整 graph（含可选展示视口）。
     WorkflowCreate:
       type: object
       required:

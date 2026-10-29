@@ -73,6 +73,31 @@ describe("工作流定义写入", () => {
     expect(await ctx.workflowRead.countByExperts([expert.id])).toEqual({ [expert.id]: 1 });
   });
 
+  test("视口随定义保存/回读；DSL 往返与复制保留", async () => {
+    const expert = await makeExpert();
+    const workflow = await ctx.workflowService.create({ name: "视口流程", type: "研发" });
+    const viewport = { x: 140, y: 90, zoom: 0.8 };
+    await ctx.workflowService.saveDefinition(workflow.id, 1, {
+      graph: { ...graphFor(expert.id), viewport },
+    });
+    const detail = await ctx.workflowRead.get(workflow.id);
+    expect(detail.graph.viewport).toEqual(viewport);
+
+    const dsl = await ctx.workflowService.exportDsl(workflow.id);
+    expect(dsl.layout).toEqual({ viewport });
+    const imported = await ctx.workflowService.importDsl({
+      ...dsl,
+      metadata: { name: "视口导入", type: "外部", description: "" },
+    });
+    expect((await ctx.workflowRead.get(imported.id)).graph.viewport).toEqual(viewport);
+
+    const copied = await ctx.workflowService.copy(workflow.id, {});
+    expect((await ctx.workflowRead.get(copied.id)).graph.viewport).toEqual(viewport);
+
+    await ctx.workflowService.saveDefinition(workflow.id, 2, { graph: graphFor(expert.id) });
+    expect((await ctx.workflowRead.get(workflow.id)).graph.viewport).toBeUndefined();
+  });
+
   test("形状错误阻断保存；语义问题保存为 warning", async () => {
     const expert = await makeExpert();
     const workflow = await ctx.workflowService.create({ name: "校验流程", type: "研发" });
@@ -181,6 +206,13 @@ describe("复制、导入与读模型", () => {
       metadata: { name: "重复导入", type: "外部", description: "" },
       ...graphFor(expert.id),
     };
+    await expect(
+      ctx.workflowService.importDsl({
+        ...valid,
+        metadata: { name: "非法视口", type: "外部", description: "" },
+        layout: { viewport: { x: 0, y: 0, zoom: 0 } },
+      }),
+    ).rejects.toMatchObject({ code: "validation_error" });
     await ctx.workflowService.importDsl(valid);
     await expect(ctx.workflowService.importDsl(valid)).rejects.toMatchObject({
       code: "name_conflict",

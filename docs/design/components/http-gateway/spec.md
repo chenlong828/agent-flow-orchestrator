@@ -503,12 +503,12 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 
 **详情 `WorkflowDetail`**：共享字段 + `graph`。
 
-**`WorkflowGraph`**：`{stages: Stage[], nodes: WorkflowNode[], edges: WorkflowEdge[]}`；节点/阶段/边 ID 是工作流内稳定字符串，不是 UUID。
+**`WorkflowGraph`**：`{stages: Stage[], nodes: WorkflowNode[], edges: WorkflowEdge[], viewport?: {x,y,zoom}}`；节点/阶段/边 ID 是工作流内稳定字符串，不是 UUID。`viewport` 是可选画布展示状态：`x/y` 为画布滚动偏移（CSS 像素），`zoom` 为缩放倍数且必须大于 0；随整图保存，不参与执行语义。
 
 - `Stage`：`{id,name}`。
 - `WorkflowNode`：`{id,type,name,stageId:string|null,expertId:string|null}`；`type` 为 `start|end|agent|review|confirm|fanout|fanin`。
 - `WorkflowEdge`：`{id,from,to,kind}`；`kind` 为 `seq|rollback`。
-- 可选 `layout.viewport={x,y,zoom}` 只用于展示，不参与执行语义。
+- DSL 顶层 `layout.viewport={x,y,zoom}` 与 `WorkflowGraph.viewport` 双向映射；只用于展示，不参与执行语义。
 
 **查询参数**：`q`、`type`、`limit`、`offset`、`sort`（`name`、`updatedAt`）。
 
@@ -516,7 +516,7 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 
 **`CopyWorkflow`**：`{name?: string}`；省略时默认 `"{源名称} 副本"`，冲突自动追加 ` (2)`…` (99)`；节点/阶段/边 ID 原样保留。
 
-**`SaveDefinitionInput`**：`{graph: WorkflowGraph}`；形状错误 400，语义问题 200 + `warnings`，专家不存在 400 并回滚。
+**`SaveDefinitionInput`**：`{graph: WorkflowGraph}`；整图替换，`graph.viewport` 随图保存或清空；形状错误 400，语义问题 200 + `warnings`，专家不存在 400 并回滚。
 
 **`ValidationReport`**：`{errors:[{code,path,message}],warnings:[{code,path,message}]}`；`validate` 只读专家状态，不写库。
 

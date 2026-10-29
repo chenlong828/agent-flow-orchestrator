@@ -6,7 +6,16 @@ describe("工作流 DSL JSON Schema 资产", () => {
       $schema: string;
       required: string[];
       properties: Record<string, { const?: unknown; maxItems?: number }>;
-      $defs: Record<string, { required?: string[]; properties?: Record<string, { enum?: string[] }> }>;
+      $defs: Record<
+        string,
+        {
+          required?: string[];
+          properties?: Record<
+            string,
+            { enum?: string[]; properties?: Record<string, { exclusiveMinimum?: number }> }
+          >;
+        }
+      >;
     };
     expect(schema.$schema).toContain("2020-12");
     expect(schema.required).toEqual(["dslVersion", "metadata", "stages", "nodes", "edges"]);
@@ -28,5 +37,8 @@ describe("工作流 DSL JSON Schema 资产", () => {
     expect(schema.$defs.edge?.required).toEqual(["id", "from", "to", "kind"]);
     expect(schema.$defs.edge?.properties?.kind?.enum).toEqual(["seq", "rollback"]);
     expect(schema.$defs.layout?.required).toEqual(["x", "y"]);
+    expect(
+      schema.$defs.viewportLayout?.properties?.viewport?.properties?.zoom?.exclusiveMinimum,
+    ).toBe(0);
   });
 });

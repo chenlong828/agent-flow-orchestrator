@@ -131,10 +131,10 @@ describe("SCN-0101 工作流组合管理", () => {
 });
 
 describe("SCN-0102 工作流编辑与校验", () => {
-  test("TC-WFE-001 保存有效图递增 revision 并回读阶段/节点/边与布局", async () => {
+  test("TC-WFE-001 保存有效图递增 revision 并回读阶段/节点/边/布局/视口", async () => {
     const expert = await makeExpert();
     const created = await createWorkflow("编辑流程");
-    const graph = graphFor(expert.id);
+    const graph = { ...graphFor(expert.id), viewport: { x: 120, y: 80, zoom: 0.75 } };
     const saved = await call(ctx.app, "PUT", `/api/v1/workflows/${created.id}/definition`, {
       body: { graph },
       headers: withRevision(1),
@@ -147,9 +147,10 @@ describe("SCN-0102 工作流编辑与校验", () => {
     expect(detail.body.graph).toEqual(graph);
     expect(detail.body.graph.stages[0].layout).toEqual({ x: 10, y: 20 });
     expect(detail.body.graph.nodes[0].layout).toEqual({ x: 10, y: 20 });
+    expect(detail.body.graph.viewport).toEqual({ x: 120, y: 80, zoom: 0.75 });
   });
 
-  test("TC-WFE-002 形状错误返回 400 且不保存", async () => {
+  test("TC-WFE-002 形状错误（含非法视口）返回 400 且不保存", async () => {
     const created = await createWorkflow("形状错误");
     const bad = await call(ctx.app, "PUT", `/api/v1/workflows/${created.id}/definition`, {
       body: {
@@ -164,6 +165,20 @@ describe("SCN-0102 工作流编辑与校验", () => {
     expect(bad.status).toBe(400);
     expect(bad.body.error.code).toBe("validation_error");
     expect(bad.body.error.details.fieldErrors.length).toBeGreaterThan(0);
+
+    const badViewport = await call(ctx.app, "PUT", `/api/v1/workflows/${created.id}/definition`, {
+      body: {
+        graph: {
+          stages: [],
+          nodes: [],
+          edges: [],
+          viewport: { x: 0, y: 0, zoom: 0 },
+        },
+      },
+      headers: withRevision(1),
+    });
+    expect(badViewport.status).toBe(400);
+    expect(badViewport.body.error.code).toBe("validation_error");
 
     const detail = await call(ctx.app, "GET", `/api/v1/workflows/${created.id}`);
     expect(detail.body.revision).toBe(1);
@@ -201,6 +216,20 @@ describe("SCN-0102 工作流编辑与校验", () => {
     });
     expect(saved.status).toBe(400);
     expect(saved.body.error.code).toBe("validation_error");
+
+    const badViewport = await call(ctx.app, "PUT", `/api/v1/workflows/${created.id}/definition`, {
+      body: {
+        graph: {
+          stages: [],
+          nodes: [],
+          edges: [],
+          viewport: { x: 0, y: 0, zoom: 0 },
+        },
+      },
+      headers: withRevision(1),
+    });
+    expect(badViewport.status).toBe(400);
+    expect(badViewport.body.error.code).toBe("validation_error");
 
     const detail = await call(ctx.app, "GET", `/api/v1/workflows/${created.id}`);
     expect(detail.body.revision).toBe(1);

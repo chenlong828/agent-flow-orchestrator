@@ -124,7 +124,7 @@ describe("OpenAPI 契约结构", () => {
     const refs = [...text.matchAll(/\$ref['"]?\s*:\s*['"]?#\/components\/([^'"]+)['"]?/g)].map(
       (match) => match[1]!,
     );
-    expect(refs.length).toBe(467);
+    expect(refs.length).toBe(468);
     const missing: string[] = [];
     for (const ref of new Set(refs)) {
       let current: any = spec.components;

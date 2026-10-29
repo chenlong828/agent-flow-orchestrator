@@ -176,9 +176,10 @@ function normalizeDsl(input: unknown): { dsl: WorkflowDsl; graph: WorkflowGraph 
         typeof vp.y !== "number" ||
         !Number.isFinite(vp.y) ||
         typeof vp.zoom !== "number" ||
-        !Number.isFinite(vp.zoom)
+        !Number.isFinite(vp.zoom) ||
+        vp.zoom <= 0
       ) {
-        throw new ValidationError("layout.viewport", "x/y/zoom 必须是有限数字");
+        throw new ValidationError("layout.viewport", "x/y/zoom 必须是有限数字，且 zoom 必须大于 0");
       }
       layout = { viewport: { x: vp.x, y: vp.y, zoom: vp.zoom } };
     }
@@ -193,7 +194,7 @@ function normalizeDsl(input: unknown): { dsl: WorkflowDsl; graph: WorkflowGraph 
       edges: graph.edges,
       ...(layout === undefined ? {} : { layout }),
     },
-    graph,
+    graph: layout?.viewport === undefined ? graph : { ...graph, viewport: layout.viewport },
   };
 }
 
@@ -401,6 +402,9 @@ export function createWorkflowService(deps: WorkflowDeps): WorkflowService {
         stages: graph.stages,
         nodes: graph.nodes,
         edges: graph.edges,
+        ...(graph.viewport === undefined
+          ? {}
+          : { layout: { viewport: graph.viewport } }),
       };
     },
 

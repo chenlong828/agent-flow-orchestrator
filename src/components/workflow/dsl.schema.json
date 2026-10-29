@@ -69,9 +69,9 @@
           "additionalProperties": false,
           "required": ["x", "y", "zoom"],
           "properties": {
-            "x": { "type": "number" },
-            "y": { "type": "number" },
-            "zoom": { "type": "number" }
+            "x": { "type": "number", "description": "画布水平滚动偏移，CSS 像素。" },
+            "y": { "type": "number", "description": "画布垂直滚动偏移，CSS 像素。" },
+            "zoom": { "type": "number", "exclusiveMinimum": 0, "description": "画布缩放倍数。" }
           }
         }
       }

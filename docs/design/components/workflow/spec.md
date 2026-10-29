@@ -21,7 +21,7 @@ updated: 2026-10-29
 | 表 | 说明 |
 |---|---|
 | `workflow` | 聚合根：名称、类型标签、描述、`revision`、审计 |
-| `workflow_definition` | 1:1 当前定义，只含 `graph` JSONB |
+| `workflow_definition` | 1:1 当前定义，`graph` JSONB 含结构、节点/阶段布局与可选画布视口 |
 | `workflow_expert_ref` | 专家引用投影；可从 `graph` 重建 |
 
 - 不建版本、发布、behavior、实例、运行表。
@@ -87,12 +87,13 @@ type WorkflowRead = {
 
 - 一个工作流一份当前定义；`revision` 从 1 开始，写操作 +1。
 - 节点/阶段/边 ID 为工作流内稳定字符串，分别唯一；边端点必须存在。
-- `graph` 只含 `stages`、`nodes`、`edges`；未知字段拒绝。
+- `graph` 含 `stages`、`nodes`、`edges` 和可选 `viewport`；未知字段拒绝。`viewport={x,y,zoom}` 仅用于展示，`x/y` 是画布滚动偏移、`zoom` 是缩放倍数；不参与执行语义。
 - 形状错误阻断保存；语义问题保存成功并给 warning；B4 运行前严格拦截。
 - 专家矩阵：`start`/`end`/`agent`/`review`/`fanout`/`fanin` 必填，`confirm` 禁止。
 - 导入比保存更严：形状/语义错误 400；缺失专家清空并 warning；停用专家保留绑定。
 - 校验只读专家状态，不写工作流或专家表。
-- 复制图，节点 ID 保留；名称冲突自动追加 ` (2)`…` (99)`。
+- 复制图，节点 ID 与 `viewport` 保留；名称冲突自动追加 ` (2)`…` (99)`。
+- DSL 导入/导出在 `layout.viewport` 与 `graph.viewport` 之间双向映射。
 
 ## 6 验证
 

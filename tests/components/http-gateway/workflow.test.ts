@@ -127,6 +127,49 @@ describe("工作流 HTTP 契约", () => {
     expect(missing.status).toBe(404);
   });
 
+  test("视口随定义保存/回读；非法视口 400；DSL 往返与复制保留", async () => {
+    const expert = await makeExpert();
+    const created = await call(ctx.app, "POST", "/api/v1/workflows", {
+      body: { name: "视口流程", type: "研发" },
+    });
+    const id = created.body.id as string;
+    const viewport = { x: 140, y: 90, zoom: 0.8 };
+
+    const invalid = await call(ctx.app, "PUT", `/api/v1/workflows/${id}/definition`, {
+      body: { graph: { ...graphFor(expert.id), viewport: { ...viewport, zoom: 0 } } },
+      headers: withRevision(1),
+    });
+    expect(invalid.status).toBe(400);
+    expect(invalid.body.error.code).toBe("validation_error");
+
+    const saved = await call(ctx.app, "PUT", `/api/v1/workflows/${id}/definition`, {
+      body: { graph: { ...graphFor(expert.id), viewport } },
+      headers: withRevision(1),
+    });
+    expect(saved.status).toBe(200);
+    expect(saved.body.workflow.graph.viewport).toEqual(viewport);
+    expect(saved.body.workflow.revision).toBe(2);
+
+    const detail = await call(ctx.app, "GET", `/api/v1/workflows/${id}`);
+    expect(detail.body.graph.viewport).toEqual(viewport);
+
+    const dsl = await call(ctx.app, "GET", `/api/v1/workflows/${id}/dsl`);
+    expect(dsl.body.layout).toEqual({ viewport });
+
+    const imported = await call(ctx.app, "POST", "/api/v1/workflows/import", {
+      body: {
+        ...dsl.body,
+        metadata: { name: "视口导入", type: "外部", description: "" },
+      },
+    });
+    expect(imported.status).toBe(201);
+    expect(imported.body.workflow.graph.viewport).toEqual(viewport);
+
+    const copied = await call(ctx.app, "POST", `/api/v1/workflows/${id}/copy`, { body: {} });
+    expect(copied.status).toBe(201);
+    expect(copied.body.graph.viewport).toEqual(viewport);
+  });
+
   test("复制自动后缀；DSL JSON 与 YAML 导出；导入缺失专家清空", async () => {
     const expert = await makeExpert();
     const created = await call(ctx.app, "POST", "/api/v1/workflows", {
