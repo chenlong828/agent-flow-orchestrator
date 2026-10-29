@@ -8,6 +8,7 @@ import type { ToolService } from "../tool/index.ts";
 import type { WorkflowService } from "../workflow/index.ts";
 import type { ApiDocs } from "./docs.ts";
 import { errorResponse, json } from "./respond.ts";
+import { assertUuid } from "./validation.ts";
 import { handleExpert } from "./routes/expert.ts";
 import { handleHarness } from "./routes/harness.ts";
 import { handleSkill } from "./routes/skill.ts";
@@ -76,6 +77,13 @@ export function createHttpApp(deps: HttpDeps): (request: Request) => Promise<Res
     if (segments.length === 1 && segments[0] === "skill-categories") {
       if (request.method !== "GET") throw new NotFoundError("路径", path);
       return json({ items: await catalog.listSkillCategories() });
+    }
+
+    if (
+      segments[1] !== undefined &&
+      !(segments[0] === "workflows" && segments[1] === "import")
+    ) {
+      assertUuid(segments[1], "id");
     }
 
     const ctx: RouteContext = { request, url, path, segments, deps: routeDeps };
