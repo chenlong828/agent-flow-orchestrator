@@ -86,6 +86,8 @@ describe("Skill HTTP 契约", () => {
     expect(response.status).toBe(201);
     expect(response.headers.get("location")).toBe(`/api/v1/skills/${response.body.id}`);
     expect(response.body).toMatchObject({ revision: 1, version: "v1.0" });
+    expect(response.body.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(Object.hasOwn(response.body, "created")).toBe(false);
 
     const detail = await call(ctx.app, "GET", `/api/v1/skills/${response.body.id}`);
     expect(detail.status).toBe(200);
@@ -142,6 +144,9 @@ describe("Skill HTTP 契约", () => {
     const missing = await saveDraft(draft.id, { name: "CRES 技能 v2" });
     expect(missing.status).toBe(428);
 
+    const extra = await saveDraft((await createDraft()).id, { name: "新建带 If-Match" }, 1);
+    expect(extra.status).toBe(400);
+
     const stale = await saveDraft(draft.id, { name: "CRES 技能 v2" }, 9);
     expect(stale.status).toBe(409);
     expect(stale.body.error.details.currentRevision).toBe(1);
@@ -149,6 +154,8 @@ describe("Skill HTTP 契约", () => {
     const updated = await saveDraft(draft.id, { name: "CRES 技能 v2" }, 1);
     expect(updated.status).toBe(200);
     expect(updated.body).toMatchObject({ revision: 2, version: "v1.1" });
+    expect(updated.body.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(Object.hasOwn(updated.body, "created")).toBe(false);
     const detail = await call(ctx.app, "GET", `/api/v1/skills/${created.id}`);
     expect(detail.body.name).toBe("CRES 技能 v2");
   });

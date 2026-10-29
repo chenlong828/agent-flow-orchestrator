@@ -1,7 +1,6 @@
 import {
   AppError,
   NotFoundError,
-  PreconditionRequiredError,
   UnsupportedMediaTypeError,
   ValidationError,
   type Page,
@@ -724,24 +723,17 @@ export function createHttpApp(deps: HttpDeps): (request: Request) => Promise<Res
       }
 
       if (resource === "skill-drafts" && subresource === "save" && request.method === "POST") {
-        const draft = await skillDraftService.getDraft(id);
         const rawIfMatch = request.headers.get("if-match");
-        let baseRevision: number | null = null;
-        if (draft.skillId !== null) {
-          if (rawIfMatch === null || rawIfMatch === "") throw new PreconditionRequiredError();
-          baseRevision = parseIfMatch(request);
-        } else if (rawIfMatch !== null && rawIfMatch !== "") {
-          throw new ValidationError("If-Match", "新建草稿不能带 If-Match");
-        }
+        const baseRevision =
+          rawIfMatch === null || rawIfMatch === "" ? null : parseIfMatch(request);
         const body = await readJsonObject(request, SKILL_SAVE_FIELDS);
-        const saved = await skillDraftService.saveDraft(
+        const { created, ...saved } = await skillDraftService.saveDraft(
           id,
           baseRevision,
           body as unknown as SaveSkill,
           actorFrom(request, actor),
         );
-        const status = draft.skillId === null ? 201 : 200;
-        return json(saved, status, {
+        return json(saved, created ? 201 : 200, {
           Location: `/api/v1/skills/${saved.id}`,
         });
       }
