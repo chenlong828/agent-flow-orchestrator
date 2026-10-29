@@ -68,8 +68,9 @@ curl http://127.0.0.1:3100/healthz
 验证：
 
 ```bash
-bun test --max-concurrency=1   # 全量测试
-bun run typecheck              # tsc --noEmit
+bun run check                  # 交付前：typecheck + 全量测试 + 文档检查
+bun test --max-concurrency=1   # 只跑全量测试
+bun run typecheck              # 只跑 tsc --noEmit
 ```
 
 配置优先级：代码默认值 < `config/default.toml` < `config/local.toml` < `process.env`（Bun 会自动把 `.env` 加载到 `process.env`）。`DATABASE_URL` 只从 `.env`/环境读取，不写入 TOML。`HOST`、`PORT`、`DEV_ACTOR`、`LOG_LEVEL` 与 `CONFIG_FILE` 见 [`config/spec.md`](docs/design/components/config/spec.md)。数据库连接默认 `postgres://postgres@127.0.0.1:54329/agentflow`。服务无登录/鉴权，只监听本机。

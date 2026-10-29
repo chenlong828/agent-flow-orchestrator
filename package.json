@@ -7,6 +7,7 @@
     "start": "bun run src/main.ts",
     "test": "bun test --max-concurrency=1",
     "typecheck": "tsc --noEmit",
+    "check": "bun run typecheck && bun test --max-concurrency=1 && bun run docs:check",
     "docs:index": "bun run scripts/scenario-index.ts",
     "docs:check": "bun run scripts/scenario-index.ts --check",
     "db:start": "bash scripts/pg.sh start",
