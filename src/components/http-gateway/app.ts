@@ -45,6 +45,25 @@ import {
   readOptionalJsonObject,
 } from "./validation.ts";
 import { errorResponse, json, markdown, noContent, notModified } from "./respond.ts";
+import {
+  EXPERT_CREATE_FIELDS,
+  EXPERT_PATCH_FIELDS,
+  EXPERT_WRITE_FIELDS,
+  EXPERT_SORT,
+  HARNESS_CREATE_FIELDS,
+  HARNESS_SORT,
+  HARNESS_WRITE_FIELDS,
+  SKILL_SAVE_FIELDS,
+  SKILL_SORT,
+  TOOL_SORT,
+  TOOL_WRITE_FIELDS,
+  WORKFLOW_COPY_FIELDS,
+  WORKFLOW_CREATE_FIELDS,
+  WORKFLOW_GRAPH_FIELDS,
+  WORKFLOW_IMPORT_FIELDS,
+  WORKFLOW_SORT,
+  WORKFLOW_WRITE_FIELDS,
+} from "./fields.ts";
 
 export type HttpDeps = {
   catalog: CatalogRead;
@@ -57,78 +76,6 @@ export type HttpDeps = {
   actor: string;
   docs?: ApiDocs;
 };
-
-const HARNESS_WRITE_FIELDS = [
-  "name",
-  "kind",
-  "address",
-  "accessMode",
-  "description",
-  "concurrencyMax",
-  "queuePolicy",
-  "tags",
-] as const;
-const HARNESS_CREATE_FIELDS = [...HARNESS_WRITE_FIELDS, "enabled"] as const;
-const TOOL_WRITE_FIELDS = [
-  "name",
-  "kind",
-  "invocation",
-  "description",
-  "harnessId",
-  "timeoutMs",
-  "params",
-] as const;
-const SKILL_SAVE_FIELDS = [
-  "name",
-  "categoryCode",
-  "description",
-  "tags",
-  "body",
-] as const;
-const EXPERT_WRITE_FIELDS = [
-  "name",
-  "color",
-  "role",
-  "persona",
-  "duty",
-  "skillOrder",
-  "verifyOrder",
-  "notes",
-  "refs",
-] as const;
-const EXPERT_CREATE_FIELDS = [
-  ...EXPERT_WRITE_FIELDS,
-  "enabled",
-  "skillIds",
-  "toolIds",
-] as const;
-const EXPERT_PATCH_FIELDS = [...EXPERT_WRITE_FIELDS, "skillIds", "toolIds"] as const;
-const HARNESS_SORT = {
-  "name:asc": "name",
-  "name:desc": "-name",
-  "updatedAt:asc": "updatedAt",
-  "updatedAt:desc": "-updatedAt",
-} as const;
-const TOOL_SORT = HARNESS_SORT;
-const SKILL_SORT = {
-  ...HARNESS_SORT,
-  "version:asc": "version",
-  "version:desc": "-version",
-} as const;
-const EXPERT_SORT = HARNESS_SORT;
-const WORKFLOW_WRITE_FIELDS = ["name", "type", "description"] as const;
-const WORKFLOW_CREATE_FIELDS = WORKFLOW_WRITE_FIELDS;
-const WORKFLOW_COPY_FIELDS = ["name"] as const;
-const WORKFLOW_GRAPH_FIELDS = ["graph"] as const;
-const WORKFLOW_IMPORT_FIELDS = [
-  "dslVersion",
-  "metadata",
-  "stages",
-  "nodes",
-  "edges",
-  "layout",
-] as const;
-const WORKFLOW_SORT = HARNESS_SORT;
 
 function requireObject(value: unknown, field: string): Record<string, unknown> {
   if (!isPlainObject(value)) throw new ValidationError(field, "必须是对象");
