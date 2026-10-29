@@ -465,21 +465,7 @@ export function createHttpApp(deps: HttpDeps): (request: Request) => Promise<Res
         }
         case "skill-drafts": {
           if (request.method === "POST") {
-            const rawBody = await request.text();
-            let body: Record<string, unknown> = {};
-            if (rawBody.trim() !== "") {
-              let parsed: unknown;
-              try {
-                parsed = JSON.parse(rawBody);
-              } catch {
-                throw new ValidationError("body", "必须是合法 JSON");
-              }
-              if (!isPlainObject(parsed)) {
-                throw new ValidationError("body", "必须是 JSON 对象");
-              }
-              assertAllowedFields(parsed, ["skillId"]);
-              body = parsed;
-            }
+            const body = await readOptionalJsonObject(request, ["skillId"]);
             const skillId = body.skillId;
             if (skillId !== undefined && skillId !== null) {
               if (typeof skillId !== "string") {

@@ -220,4 +220,19 @@ describe("Skill HTTP 契约", () => {
     const skillMd = await upload(draft.id, "SKILL.md", "x");
     expect(skillMd.status).toBe(400);
   });
+
+  test("草稿创建：空 body 201、未知字段与非 UUID 400", async () => {
+    const empty = await call(ctx.app, "POST", "/api/v1/skill-drafts");
+    expect(empty.status).toBe(201);
+
+    const unknown = await call(ctx.app, "POST", "/api/v1/skill-drafts", {
+      body: { skillId: null, extra: 1 },
+    });
+    expect(unknown.status).toBe(400);
+
+    const badId = await call(ctx.app, "POST", "/api/v1/skill-drafts", {
+      body: { skillId: "not-a-uuid" },
+    });
+    expect(badId.status).toBe(400);
+  });
 });
