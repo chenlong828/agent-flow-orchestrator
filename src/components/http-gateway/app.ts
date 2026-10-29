@@ -2,7 +2,6 @@ import {
   NotFoundError,
   UnsupportedMediaTypeError,
   ValidationError,
-  type Page,
 } from "../../core/kernel/index.ts";
 import type { Health } from "../../core/platform/index.ts";
 import type { CatalogRead } from "../catalog/index.ts";
@@ -35,11 +34,7 @@ import {
   assertAllowedFields,
   assertUuid,
   isPlainObject,
-  parseBooleanQuery,
-  parseEnumQuery,
   parseIfMatch,
-  parsePageQuery,
-  parseSortQuery,
   queryValue,
   readJsonObject,
   readOptionalJsonObject,
@@ -49,21 +44,24 @@ import {
   EXPERT_CREATE_FIELDS,
   EXPERT_PATCH_FIELDS,
   EXPERT_WRITE_FIELDS,
-  EXPERT_SORT,
   HARNESS_CREATE_FIELDS,
-  HARNESS_SORT,
   HARNESS_WRITE_FIELDS,
   SKILL_SAVE_FIELDS,
-  SKILL_SORT,
-  TOOL_SORT,
   TOOL_WRITE_FIELDS,
   WORKFLOW_COPY_FIELDS,
   WORKFLOW_CREATE_FIELDS,
   WORKFLOW_GRAPH_FIELDS,
   WORKFLOW_IMPORT_FIELDS,
-  WORKFLOW_SORT,
   WORKFLOW_WRITE_FIELDS,
 } from "./fields.ts";
+import {
+  pagePayload,
+  parseExpertListQuery,
+  parseHarnessListQuery,
+  parseSkillListQuery,
+  parseToolListQuery,
+  parseWorkflowListQuery,
+} from "./queries.ts";
 
 export type HttpDeps = {
   catalog: CatalogRead;
@@ -133,64 +131,6 @@ function validateOptionalIdArray(body: Record<string, unknown>, field: string): 
   });
 }
 
-function parseHarnessListQuery(url: URL) {
-  return {
-    q: queryValue(url, "q"),
-    kind: parseEnumQuery(url, "kind", ["container", "server", "desktop", "laptop"] as const),
-    enabled: parseBooleanQuery(url, "enabled"),
-    health: parseEnumQuery(url, "health", [
-      "unknown",
-      "online",
-      "offline",
-      "overloaded",
-    ] as const),
-    page: parsePageQuery(url),
-    sort: parseSortQuery(url, HARNESS_SORT),
-  };
-}
-
-function parseToolListQuery(url: URL) {
-  const harnessId = queryValue(url, "harnessId");
-  if (harnessId !== undefined) assertUuid(harnessId, "harnessId");
-  return {
-    q: queryValue(url, "q"),
-    kind: parseEnumQuery(url, "kind", ["mcp", "cli", "script"] as const),
-    status: parseEnumQuery(url, "status", ["unverified", "available", "unavailable"] as const),
-    harnessId,
-    page: parsePageQuery(url),
-    sort: parseSortQuery(url, TOOL_SORT),
-  };
-}
-
-function parseSkillListQuery(url: URL) {
-  return {
-    q: queryValue(url, "q"),
-    categoryCode: queryValue(url, "category"),
-    enabled: parseBooleanQuery(url, "enabled"),
-    tag: queryValue(url, "tag"),
-    page: parsePageQuery(url),
-    sort: parseSortQuery(url, SKILL_SORT),
-  };
-}
-
-function parseExpertListQuery(url: URL) {
-  return {
-    q: queryValue(url, "q"),
-    enabled: parseBooleanQuery(url, "enabled"),
-    page: parsePageQuery(url),
-    sort: parseSortQuery(url, EXPERT_SORT),
-  };
-}
-
-function parseWorkflowListQuery(url: URL) {
-  return {
-    q: queryValue(url, "q"),
-    type: queryValue(url, "type"),
-    page: parsePageQuery(url),
-    sort: parseSortQuery(url, WORKFLOW_SORT),
-  };
-}
-
 function yamlScalar(value: unknown): string {
   if (value === null) return "null";
   if (typeof value === "string") return JSON.stringify(value);
@@ -241,15 +181,6 @@ function toYaml(value: unknown, indent = 0): string {
       .join("\n");
   }
   return `${pad}${yamlScalar(value)}`;
-}
-
-function pagePayload<T>(page: Page<T>): Record<string, unknown> {
-  return {
-    items: page.items,
-    total: page.total,
-    limit: page.limit,
-    offset: page.offset,
-  };
 }
 
 export function createHttpApp(deps: HttpDeps): (request: Request) => Promise<Response> {
