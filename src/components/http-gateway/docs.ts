@@ -28,7 +28,7 @@ function docsHtml(): string {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
-  <title>AgentFlow B1 API 文档</title>
+  <title>AgentFlow B1+B3 API 文档</title>
   <link rel="icon" type="image/png" href="/docs/favicon-32x32.png">
   <link rel="stylesheet" href="/docs/swagger-ui.css">
 </head>

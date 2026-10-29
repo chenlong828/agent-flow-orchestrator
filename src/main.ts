@@ -122,7 +122,7 @@ const server = Bun.serve({
   fetch: app,
 });
 
-console.log(`AgentFlow B1 编排服务已启动：http://${config.host}:${server.port}`);
+console.log(`AgentFlow B1+B3 编排服务已启动：http://${config.host}:${server.port}`);
 console.log(`API 文档：http://${config.host}:${server.port}/docs`);
 
 async function shutdown(): Promise<void> {
