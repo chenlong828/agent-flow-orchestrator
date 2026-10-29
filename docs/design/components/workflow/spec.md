@@ -3,7 +3,7 @@ layer: design
 module: workflow
 status: current
 component: CMP-workflow
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # `CMP-workflow` 组件规格
@@ -32,10 +32,17 @@ updated: 2026-10-29
 
 ```ts
 type WorkflowService = {
-  create(input: CreateWorkflow, actor?: string): Promise<{ id: string; revision: number }>;
+  create(
+    input: CreateWorkflow,
+    actor?: string,
+  ): Promise<{ id: string; revision: number; warnings: ValidationIssue[] }>;
   update(id: string, revision: number, input: UpdateWorkflow, actor?: string): Promise<{ id: string; revision: number }>;
   delete(id: string, revision: number): Promise<void>;
-  copy(id: string, input: CopyWorkflow, actor?: string): Promise<{ id: string; revision: number }>;
+  copy(
+    id: string,
+    input: CopyWorkflow,
+    actor?: string,
+  ): Promise<{ id: string; revision: number; warnings: ValidationIssue[] }>;
   saveDefinition(
     id: string,
     revision: number,
@@ -87,13 +94,16 @@ type WorkflowRead = {
 
 - 一个工作流一份当前定义；`revision` 从 1 开始，写操作 +1。
 - 节点/阶段/边 ID 为工作流内稳定字符串，分别唯一；边端点必须存在。
-- `graph` 含 `stages`、`nodes`、`edges` 和可选 `viewport`；未知字段拒绝。`viewport={x,y,zoom}` 仅用于展示，`x/y` 是画布滚动偏移、`zoom` 是缩放倍数；不参与执行语义。
-- 形状错误阻断保存；语义问题保存成功并给 warning；B4 运行前严格拦截。
+- `graph` 含 `stages`、`nodes`、`edges` 和可选 `viewport`；图顶层、阶段/节点/边顶层未知字段拒绝。`layout` / `viewport` 是前端画布对象，后端只要求 JSON 对象并原样存取，不解释 `x/y/width/height/zoom`。
+- 结构、引用、拓扑与专家绑定错误阻断创建/保存/复制/导入；只有专家停用给 warning。B4 运行前仍需重新校验。
 - 专家矩阵：`start`/`end`/`agent`/`review`/`fanout`/`fanin` 必填，`confirm` 禁止。
-- 导入比保存更严：形状/语义错误 400；缺失专家清空并 warning；停用专家保留绑定。
-- 校验只读专家状态，不写工作流或专家表。
-- 复制图，节点 ID 与 `viewport` 保留；名称冲突自动追加 ` (2)`…` (99)`。
-- DSL 导入/导出在 `layout.viewport` 与 `graph.viewport` 之间双向映射。
+- 空图拒绝：创建必须提交合法图；保存/复制/导出/导入同样拒绝空图。旧空图/非法图可读，但写入和复制/导出会被拒绝。
+- 导入是专家绑定例外：允许 `expertId` 为空；不存在的专家清空并 warning；禁止绑定仍 400。导入后再次保存时按严格绑定校验。
+- 导出允许未绑定专家（保证导入结果可往返），拒绝不存在的专家 ID 和禁止绑定。
+- 校验只读专家状态，不写工作流或专家表；`errors` 含拓扑/缺失专家/未绑定/禁止绑定，`warnings` 只含停用专家。
+- 复制图，节点 ID 与 `viewport` 保留；源图不合法或为空时 400；名称冲突自动追加 ` (2)`…` (99)`。
+- DSL 导入/导出在 `layout.viewport` 与 `graph.viewport` 之间双向映射；`layout` 字段不解释。
+- 多字段图错误抛 `MultiFieldValidationError`，`details.issues` 为 `{code,path,message}`；`details.fieldErrors` 保留兼容。路径统一用数组下标，如 `graph.nodes[1].expertId`。
 
 ## 6 验证
 
@@ -102,10 +112,10 @@ bun test tests/components/workflow
 bunx tsc --noEmit
 ```
 
-- 图形状/语义用例；
-- 保存事务与 revision 冲突；
-- 专家引用重建、复制、导入；
-- DSL 导出/导入与 schema 一致。
+- 图形状/拓扑/绑定用例，`layout`/`viewport` 透明透传；
+- 创建必须带图、空图拒绝、保存事务与 revision 冲突；
+- 专家引用重建、复制、导入/导出；
+- DSL 导出/导入与 schema 一致，缺失专家清空后保存 400。
 
 ## 7 预算
 

@@ -40,8 +40,7 @@ export async function handleWorkflow(ctx: RouteContext): Promise<Response> {
         body as unknown as CreateWorkflow,
         actorFrom(request, actor),
       );
-      const detail = await catalog.getWorkflow(created.id);
-      return json(detail, 201, { Location: `/api/v1/workflows/${created.id}` });
+      return json(created, 201, { Location: `/api/v1/workflows/${created.id}` });
     }
     throw new NotFoundError("路径", path);
   }
@@ -93,8 +92,7 @@ export async function handleWorkflow(ctx: RouteContext): Promise<Response> {
         body as unknown as CopyWorkflow,
         actorFrom(request, actor),
       );
-      const detail = await catalog.getWorkflow(copied.id);
-      return json(detail, 201, { Location: `/api/v1/workflows/${copied.id}` });
+      return json(copied, 201, { Location: `/api/v1/workflows/${copied.id}` });
     }
 
     if (subresource === "definition" && request.method === "PUT") {

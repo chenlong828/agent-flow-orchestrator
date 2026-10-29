@@ -36,19 +36,30 @@ afterAll(async () => {
 });
 
 describe("工作流 HTTP 契约", () => {
-  test("创建、列表、详情、更新、删除与 If-Match", async () => {
+  test("创建必须带合法图；列表、详情、更新、删除与 If-Match", async () => {
+    await expect(
+      call(ctx.app, "POST", "/api/v1/workflows", {
+        body: { name: "缺图", type: "研发" },
+      }),
+    ).resolves.toMatchObject({ status: 400 });
+    const empty = await call(ctx.app, "POST", "/api/v1/workflows", {
+      body: { name: "空图", type: "研发", graph: { stages: [], nodes: [], edges: [] } },
+    });
+    expect(empty.status).toBe(400);
+    expect(empty.body.error.details.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "missing_start", path: "graph.nodes" }),
+        expect.objectContaining({ code: "missing_end", path: "graph.nodes" }),
+      ]),
+    );
+
+    const expert = await makeExpert();
     const created = await call(ctx.app, "POST", "/api/v1/workflows", {
-      body: { name: "需求流程", type: "研发", description: "说明" },
+      body: { name: "需求流程", type: "研发", description: "说明", graph: graphFor(expert.id) },
     });
     expect(created.status).toBe(201);
+    expect(created.body).toEqual({ id: expect.any(String), revision: 1, warnings: [] });
     expect(created.headers.get("location")).toBe(`/api/v1/workflows/${created.body.id}`);
-    expect(created.body).toMatchObject({
-      name: "需求流程",
-      type: "研发",
-      revision: 1,
-      nodeCount: 0,
-      stageCount: 0,
-    });
 
     const list = await call(ctx.app, "GET", "/api/v1/workflows?q=需求&type=研发");
     expect(list.status).toBe(200);
@@ -56,7 +67,15 @@ describe("工作流 HTTP 契约", () => {
 
     const detail = await call(ctx.app, "GET", `/api/v1/workflows/${created.body.id}`);
     expect(detail.status).toBe(200);
-    expect(detail.body.graph).toEqual({ stages: [], nodes: [], edges: [] });
+    expect(detail.body).toMatchObject({
+      name: "需求流程",
+      type: "研发",
+      revision: 1,
+      nodeCount: 3,
+      stageCount: 1,
+      updatedBy: "tester",
+    });
+    expect(detail.body.graph).toEqual(graphFor(expert.id));
 
     const missingPrecondition = await call(ctx.app, "PUT", `/api/v1/workflows/${created.body.id}`, {
       body: { name: "改名", type: "研发", description: "" },
@@ -69,6 +88,7 @@ describe("工作流 HTTP 契约", () => {
     });
     expect(updated.status).toBe(200);
     expect(updated.body.revision).toBe(2);
+    expect(updated.body.updatedBy).toBe("tester");
 
     const old = await call(ctx.app, "PUT", `/api/v1/workflows/${created.body.id}`, {
       body: { name: "旧", type: "研发", description: "" },
@@ -85,10 +105,10 @@ describe("工作流 HTTP 契约", () => {
     expect(gone.status).toBe(404);
   });
 
-  test("保存定义、形状错误、语义 warning 与校验报告", async () => {
+  test("保存定义：形状/拓扑错误 400，校验报告区分 errors 与 warnings", async () => {
     const expert = await makeExpert();
     const created = await call(ctx.app, "POST", "/api/v1/workflows", {
-      body: { name: "保存流程", type: "研发" },
+      body: { name: "保存流程", type: "研发", graph: graphFor(expert.id) },
     });
     const id = created.body.id as string;
 
@@ -98,18 +118,25 @@ describe("工作流 HTTP 契约", () => {
     });
     expect(bad.status).toBe(400);
     expect(bad.body.error.code).toBe("validation_error");
+    expect(Array.isArray(bad.body.error.details.issues)).toBe(true);
     expect(Array.isArray(bad.body.error.details.fieldErrors)).toBe(true);
 
-    const semanticGraph = graphFor(expert.id);
-    semanticGraph.nodes.splice(2, 1);
-    semanticGraph.edges.splice(1, 1);
-    const saved = await call(ctx.app, "PUT", `/api/v1/workflows/${id}/definition`, {
-      body: { graph: semanticGraph },
+    const broken = graphFor(expert.id);
+    broken.nodes.splice(2, 1);
+    broken.edges.splice(1, 1);
+    const rejected = await call(ctx.app, "PUT", `/api/v1/workflows/${id}/definition`, {
+      body: { graph: broken },
       headers: withRevision(1),
     });
-    expect(saved.status).toBe(200);
-    expect(saved.body.workflow.revision).toBe(2);
-    expect(saved.body.warnings.map((item: { code: string }) => item.code)).toContain("missing_end");
+    expect(rejected.status).toBe(400);
+    expect(rejected.body.error.details.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "missing_end", path: "graph.nodes" }),
+      ]),
+    );
+    const unchanged = await call(ctx.app, "GET", `/api/v1/workflows/${id}`);
+    expect(unchanged.body.revision).toBe(1);
+    expect(unchanged.body.graph).toEqual(graphFor(expert.id));
 
     const report = await call(ctx.app, "POST", `/api/v1/workflows/${id}/validate`, {
       body: { graph: graphFor(expert.id) },
@@ -117,6 +144,15 @@ describe("工作流 HTTP 契约", () => {
     expect(report.status).toBe(200);
     expect(report.body.errors).toEqual([]);
     expect(report.body.warnings).toEqual([]);
+
+    const empty = await call(ctx.app, "POST", `/api/v1/workflows/${id}/validate`, {
+      body: { graph: { stages: [], nodes: [], edges: [] } },
+    });
+    expect(empty.status).toBe(200);
+    expect(empty.body.errors.map((item: { code: string }) => item.code)).toEqual(
+      expect.arrayContaining(["missing_start", "missing_end"]),
+    );
+    expect(empty.body.warnings).toEqual([]);
 
     const missing = await call(
       ctx.app,
@@ -127,20 +163,19 @@ describe("工作流 HTTP 契约", () => {
     expect(missing.status).toBe(404);
   });
 
-  test("视口随定义保存/回读；非法视口 400；DSL 往返与复制保留", async () => {
+  test("layout/viewport 透明：zoom=0 与任意字段保存/回读；DSL 往返与复制保留", async () => {
     const expert = await makeExpert();
     const created = await call(ctx.app, "POST", "/api/v1/workflows", {
-      body: { name: "视口流程", type: "研发" },
+      body: { name: "视口流程", type: "研发", graph: graphFor(expert.id) },
     });
     const id = created.body.id as string;
-    const viewport = { x: 140, y: 90, zoom: 0.8 };
+    const viewport = { x: 140, y: 90, zoom: 0, extra: { minimap: true } };
 
-    const invalid = await call(ctx.app, "PUT", `/api/v1/workflows/${id}/definition`, {
-      body: { graph: { ...graphFor(expert.id), viewport: { ...viewport, zoom: 0 } } },
+    const bad = await call(ctx.app, "PUT", `/api/v1/workflows/${id}/definition`, {
+      body: { graph: { ...graphFor(expert.id), viewport: "not-an-object" } },
       headers: withRevision(1),
     });
-    expect(invalid.status).toBe(400);
-    expect(invalid.body.error.code).toBe("validation_error");
+    expect(bad.status).toBe(400);
 
     const saved = await call(ctx.app, "PUT", `/api/v1/workflows/${id}/definition`, {
       body: { graph: { ...graphFor(expert.id), viewport } },
@@ -167,29 +202,28 @@ describe("工作流 HTTP 契约", () => {
 
     const copied = await call(ctx.app, "POST", `/api/v1/workflows/${id}/copy`, { body: {} });
     expect(copied.status).toBe(201);
-    expect(copied.body.graph.viewport).toEqual(viewport);
+    const copiedDetail = await call(ctx.app, "GET", `/api/v1/workflows/${copied.body.id}`);
+    expect(copiedDetail.body.graph.viewport).toEqual(viewport);
   });
 
   test("复制自动后缀；DSL JSON 与 YAML 导出；导入缺失专家清空", async () => {
     const expert = await makeExpert();
     const created = await call(ctx.app, "POST", "/api/v1/workflows", {
-      body: { name: "Alpha", type: "研发" },
+      body: { name: "Alpha", type: "研发", graph: graphFor(expert.id) },
     });
     const id = created.body.id as string;
-    await call(ctx.app, "PUT", `/api/v1/workflows/${id}/definition`, {
-      body: { graph: graphFor(expert.id) },
-      headers: withRevision(1),
-    });
 
     const first = await call(ctx.app, "POST", `/api/v1/workflows/${id}/copy`, {
       body: {},
     });
     expect(first.status).toBe(201);
-    expect(first.body.name).toBe("Alpha 副本");
+    const firstDetail = await call(ctx.app, "GET", `/api/v1/workflows/${first.body.id}`);
+    expect(firstDetail.body.name).toBe("Alpha 副本");
     const second = await call(ctx.app, "POST", `/api/v1/workflows/${id}/copy`, {
       body: {},
     });
-    expect(second.body.name).toBe("Alpha 副本 (2)");
+    const secondDetail = await call(ctx.app, "GET", `/api/v1/workflows/${second.body.id}`);
+    expect(secondDetail.body.name).toBe("Alpha 副本 (2)");
 
     const dsl = await call(ctx.app, "GET", `/api/v1/workflows/${id}/dsl`);
     expect(dsl.status).toBe(200);
@@ -202,7 +236,7 @@ describe("工作流 HTTP 契约", () => {
     expect(yamlResponse.status).toBe(200);
     expect(yamlResponse.headers.get("content-type")).toContain("application/yaml");
     const yaml = await yamlResponse.text();
-    expect(yaml).toContain('dslVersion: 1');
+    expect(yaml).toContain("dslVersion: 1");
     expect(yaml).toContain('name: "Alpha"');
     const parsed = Bun.YAML.parse(yaml) as { dslVersion: number; metadata: { name: string } };
     expect(parsed.dslVersion).toBe(1);
@@ -227,14 +261,18 @@ describe("工作流 HTTP 契约", () => {
     ).toBeNull();
   });
 
+  test("列表排序使用冒号语法，旧的 -updatedAt 返回 400", async () => {
+    const ok = await call(ctx.app, "GET", "/api/v1/workflows?sort=updatedAt:desc");
+    expect(ok.status).toBe(200);
+    const bad = await call(ctx.app, "GET", "/api/v1/workflows?sort=-updatedAt");
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.details.field).toBe("sort");
+  });
+
   test("专家删除被工作流引用时返回 409", async () => {
     const expert = await makeExpert();
     const created = await call(ctx.app, "POST", "/api/v1/workflows", {
-      body: { name: "引用流程", type: "研发" },
-    });
-    await call(ctx.app, "PUT", `/api/v1/workflows/${created.body.id}/definition`, {
-      body: { graph: graphFor(expert.id) },
-      headers: withRevision(1),
+      body: { name: "引用流程", type: "研发", graph: graphFor(expert.id) },
     });
     const detail = await call(ctx.app, "GET", `/api/v1/experts/${expert.id}`);
     expect(detail.body.refCount).toBe(1);

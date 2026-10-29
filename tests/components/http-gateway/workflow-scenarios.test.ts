@@ -23,12 +23,12 @@ async function makeExpert(name = "场景专家") {
   return ctx.expertService.create({ name, color: "#123456", role: "执行" });
 }
 
-async function createWorkflow(name: string, type = "研发") {
+async function createWorkflow(name: string, graph: unknown, type = "研发") {
   const created = await call(ctx.app, "POST", "/api/v1/workflows", {
-    body: { name, type, description: `${name} 说明` },
+    body: { name, type, description: `${name} 说明`, graph },
   });
   expect(created.status).toBe(201);
-  return created.body as { id: string; revision: number };
+  return created.body as { id: string; revision: number; warnings: unknown[] };
 }
 
 beforeAll(async () => {
@@ -46,11 +46,7 @@ afterAll(async () => {
 describe("SCN-0101 工作流组合管理", () => {
   test("TC-WFP-001 列表筛选与详情返回当前定义和节点/阶段计数", async () => {
     const expert = await makeExpert();
-    const created = await createWorkflow("需求流程");
-    await call(ctx.app, "PUT", `/api/v1/workflows/${created.id}/definition`, {
-      body: { graph: graphFor(expert.id) },
-      headers: withRevision(1),
-    });
+    const created = await createWorkflow("需求流程", graphFor(expert.id));
 
     const list = await call(ctx.app, "GET", "/api/v1/workflows?q=需求&type=研发");
     expect(list.status).toBe(200);
@@ -73,32 +69,29 @@ describe("SCN-0101 工作流组合管理", () => {
 
   test("TC-WFP-002 复制只复制图，节点/阶段/边 ID 保留且源不变", async () => {
     const expert = await makeExpert();
-    const source = await createWorkflow("Alpha");
-    await call(ctx.app, "PUT", `/api/v1/workflows/${source.id}/definition`, {
-      body: { graph: graphFor(expert.id) },
-      headers: withRevision(1),
-    });
+    const source = await createWorkflow("Alpha", graphFor(expert.id));
 
     const copied = await call(ctx.app, "POST", `/api/v1/workflows/${source.id}/copy`, {
       body: {},
     });
     expect(copied.status).toBe(201);
-    expect(copied.body.name).toBe("Alpha 副本");
-    expect(copied.body.revision).toBe(1);
+    expect(copied.body).toMatchObject({ revision: 1, warnings: [] });
 
     const sourceDetail = await call(ctx.app, "GET", `/api/v1/workflows/${source.id}`);
     const copiedDetail = await call(ctx.app, "GET", `/api/v1/workflows/${copied.body.id}`);
+    expect(copiedDetail.body.name).toBe("Alpha 副本");
     expect(copiedDetail.body.graph).toEqual(sourceDetail.body.graph);
     expect(copiedDetail.body.graph.nodes.map((node: { id: string }) => node.id)).toEqual([
       "n1",
       "n2",
       "n3",
     ]);
-    expect(sourceDetail.body.revision).toBe(2);
+    expect(sourceDetail.body.revision).toBe(1);
   });
 
   test("TC-WFP-003 更新元数据与删除按 revision 生效", async () => {
-    const created = await createWorkflow("待整理");
+    const expert = await makeExpert();
+    const created = await createWorkflow("待整理", graphFor(expert.id));
     const updated = await call(ctx.app, "PUT", `/api/v1/workflows/${created.id}`, {
       body: { name: "已整理", type: "平台", description: "新说明" },
       headers: withRevision(1),
@@ -115,9 +108,10 @@ describe("SCN-0101 工作流组合管理", () => {
   });
 
   test("TC-WFP-004 重名创建与缺失 If-Match 被拒绝", async () => {
-    const first = await createWorkflow("Unique");
+    const expert = await makeExpert();
+    const first = await createWorkflow("Unique", graphFor(expert.id));
     const conflict = await call(ctx.app, "POST", "/api/v1/workflows", {
-      body: { name: "unique", type: "研发" },
+      body: { name: "unique", type: "研发", graph: graphFor(expert.id) },
     });
     expect(conflict.status).toBe(409);
     expect(conflict.body.error.code).toBe("name_conflict");
@@ -133,8 +127,8 @@ describe("SCN-0101 工作流组合管理", () => {
 describe("SCN-0102 工作流编辑与校验", () => {
   test("TC-WFE-001 保存有效图递增 revision 并回读阶段/节点/边/布局/视口", async () => {
     const expert = await makeExpert();
-    const created = await createWorkflow("编辑流程");
-    const graph = { ...graphFor(expert.id), viewport: { x: 120, y: 80, zoom: 0.75 } };
+    const created = await createWorkflow("编辑流程", graphFor(expert.id));
+    const graph = { ...graphFor(expert.id), viewport: { x: 120, y: 80, zoom: 0.75, extra: true } };
     const saved = await call(ctx.app, "PUT", `/api/v1/workflows/${created.id}/definition`, {
       body: { graph },
       headers: withRevision(1),
@@ -147,11 +141,12 @@ describe("SCN-0102 工作流编辑与校验", () => {
     expect(detail.body.graph).toEqual(graph);
     expect(detail.body.graph.stages[0].layout).toEqual({ x: 10, y: 20 });
     expect(detail.body.graph.nodes[0].layout).toEqual({ x: 10, y: 20 });
-    expect(detail.body.graph.viewport).toEqual({ x: 120, y: 80, zoom: 0.75 });
+    expect(detail.body.graph.viewport).toEqual({ x: 120, y: 80, zoom: 0.75, extra: true });
   });
 
-  test("TC-WFE-002 形状错误（含非法视口）返回 400 且不保存", async () => {
-    const created = await createWorkflow("形状错误");
+  test("TC-WFE-002 形状错误（含非对象视口）返回 400 且不保存", async () => {
+    const expert = await makeExpert();
+    const created = await createWorkflow("形状错误", graphFor(expert.id));
     const bad = await call(ctx.app, "PUT", `/api/v1/workflows/${created.id}/definition`, {
       body: {
         graph: {
@@ -164,16 +159,12 @@ describe("SCN-0102 工作流编辑与校验", () => {
     });
     expect(bad.status).toBe(400);
     expect(bad.body.error.code).toBe("validation_error");
-    expect(bad.body.error.details.fieldErrors.length).toBeGreaterThan(0);
+    expect(bad.body.error.details.issues.length).toBeGreaterThan(0);
+    expect(bad.body.error.details.fieldErrors.length).toBe(bad.body.error.details.issues.length);
 
     const badViewport = await call(ctx.app, "PUT", `/api/v1/workflows/${created.id}/definition`, {
       body: {
-        graph: {
-          stages: [],
-          nodes: [],
-          edges: [],
-          viewport: { x: 0, y: 0, zoom: 0 },
-        },
+        graph: { ...graphFor(expert.id), viewport: "not-an-object" },
       },
       headers: withRevision(1),
     });
@@ -182,12 +173,12 @@ describe("SCN-0102 工作流编辑与校验", () => {
 
     const detail = await call(ctx.app, "GET", `/api/v1/workflows/${created.id}`);
     expect(detail.body.revision).toBe(1);
-    expect(detail.body.graph).toEqual({ stages: [], nodes: [], edges: [] });
+    expect(detail.body.graph).toEqual(graphFor(expert.id));
   });
 
-  test("TC-WFE-003 语义问题保存成功并返回 warning，validate 统一 200", async () => {
+  test("TC-WFE-003 拓扑问题阻断保存，validate 统一返回 errors", async () => {
     const expert = await makeExpert();
-    const created = await createWorkflow("语义问题");
+    const created = await createWorkflow("拓扑问题", graphFor(expert.id));
     const graph = graphFor(expert.id);
     graph.nodes.splice(2, 1);
     graph.edges.splice(1, 1);
@@ -196,19 +187,32 @@ describe("SCN-0102 工作流编辑与校验", () => {
       body: { graph },
       headers: withRevision(1),
     });
-    expect(saved.status).toBe(200);
-    expect(saved.body.warnings.map((item: { code: string }) => item.code)).toContain("missing_end");
+    expect(saved.status).toBe(400);
+    expect(saved.body.error.details.issues.map((item: { code: string }) => item.code)).toContain(
+      "missing_end",
+    );
 
     const report = await call(ctx.app, "POST", `/api/v1/workflows/${created.id}/validate`, {
       body: { graph },
     });
     expect(report.status).toBe(200);
-    expect(report.body.errors).toEqual([]);
-    expect(report.body.warnings.map((item: { code: string }) => item.code)).toContain("missing_end");
+    expect(report.body.errors.map((item: { code: string }) => item.code)).toContain("missing_end");
+    expect(report.body.warnings).toEqual([]);
+
+    await ctx.expertService.setEnabled(expert.id, 1, false);
+    const disabled = await call(ctx.app, "PUT", `/api/v1/workflows/${created.id}/definition`, {
+      body: { graph: graphFor(expert.id) },
+      headers: withRevision(1),
+    });
+    expect(disabled.status).toBe(200);
+    expect(disabled.body.warnings.map((item: { code: string }) => item.code)).toContain(
+      "expert_disabled",
+    );
   });
 
   test("TC-WFE-004 保存缺失专家返回 400 且整事务回滚", async () => {
-    const created = await createWorkflow("缺失专家");
+    const expert = await makeExpert();
+    const created = await createWorkflow("缺失专家", graphFor(expert.id));
     const missingExpert = "0192f0c4-7a1e-7d3b-9c2a-1f5e6d7c8b9a";
     const saved = await call(ctx.app, "PUT", `/api/v1/workflows/${created.id}/definition`, {
       body: { graph: graphFor(missingExpert) },
@@ -216,35 +220,23 @@ describe("SCN-0102 工作流编辑与校验", () => {
     });
     expect(saved.status).toBe(400);
     expect(saved.body.error.code).toBe("validation_error");
-
-    const badViewport = await call(ctx.app, "PUT", `/api/v1/workflows/${created.id}/definition`, {
-      body: {
-        graph: {
-          stages: [],
-          nodes: [],
-          edges: [],
-          viewport: { x: 0, y: 0, zoom: 0 },
-        },
-      },
-      headers: withRevision(1),
-    });
-    expect(badViewport.status).toBe(400);
-    expect(badViewport.body.error.code).toBe("validation_error");
+    expect(
+      saved.body.error.details.issues.some(
+        (item: { code: string; path: string }) =>
+          item.code === "expert_missing" && item.path === "graph.nodes[0].expertId",
+      ),
+    ).toBe(true);
 
     const detail = await call(ctx.app, "GET", `/api/v1/workflows/${created.id}`);
     expect(detail.body.revision).toBe(1);
-    expect(detail.body.graph).toEqual({ stages: [], nodes: [], edges: [] });
+    expect(detail.body.graph).toEqual(graphFor(expert.id));
   });
 });
 
 describe("SCN-0103 工作流定义交换", () => {
   test("TC-WFX-001 导出 JSON 含 DSL 结构且不含内部字段", async () => {
     const expert = await makeExpert();
-    const created = await createWorkflow("导出流程");
-    await call(ctx.app, "PUT", `/api/v1/workflows/${created.id}/definition`, {
-      body: { graph: graphFor(expert.id) },
-      headers: withRevision(1),
-    });
+    const created = await createWorkflow("导出流程", graphFor(expert.id));
 
     const exported = await call(ctx.app, "GET", `/api/v1/workflows/${created.id}/dsl?format=json`);
     expect(exported.status).toBe(200);
@@ -265,11 +257,7 @@ describe("SCN-0103 工作流定义交换", () => {
 
   test("TC-WFX-002 YAML 与 JSON 结构等价且保持数组顺序", async () => {
     const expert = await makeExpert();
-    const created = await createWorkflow("YAML 流程");
-    await call(ctx.app, "PUT", `/api/v1/workflows/${created.id}/definition`, {
-      body: { graph: graphFor(expert.id) },
-      headers: withRevision(1),
-    });
+    const created = await createWorkflow("YAML 流程", graphFor(expert.id));
 
     const json = await call(ctx.app, "GET", `/api/v1/workflows/${created.id}/dsl`);
     const yamlResponse = await ctx.app(
@@ -313,7 +301,7 @@ describe("SCN-0103 工作流定义交换", () => {
     expect(list.body.total).toBe(1);
   });
 
-  test("TC-WFX-004 导入未知字段与语义错误被拒绝且不落库", async () => {
+  test("TC-WFX-004 导入未知字段与空图被拒绝且不落库", async () => {
     const dsl = {
       dslVersion: 1,
       metadata: { name: "非法导入", type: "外部", description: "" },
@@ -331,9 +319,7 @@ describe("SCN-0103 工作流定义交换", () => {
     expect(semantic.status).toBe(400);
     expect(semantic.body.error.code).toBe("validation_error");
     expect(
-      semantic.body.error.details.fieldErrors.some((item: { reason: string }) =>
-        item.reason.includes("missing_start"),
-      ),
+      semantic.body.error.details.issues.some((item: { code: string }) => item.code === "missing_start"),
     ).toBe(true);
 
     const list = await call(ctx.app, "GET", "/api/v1/workflows");

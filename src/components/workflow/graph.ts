@@ -3,18 +3,13 @@ import { MultiFieldValidationError } from "../../core/kernel/index.ts";
 export type NodeType = "start" | "end" | "agent" | "review" | "confirm" | "fanout" | "fanin";
 export type EdgeKind = "seq" | "rollback";
 
-export type Layout = {
-  x: number;
-  y: number;
-  width?: number;
-  height?: number;
-};
+export type JsonObject = Record<string, unknown>;
 
-export type Viewport = {
-  x: number;
-  y: number;
-  zoom: number;
-};
+/** 画布布局由前端 DSL 定义；后端只按 JSON 对象透传。 */
+export type Layout = JsonObject;
+
+/** 画布视口由前端 DSL 定义；后端只按 JSON 对象透传。 */
+export type Viewport = JsonObject;
 
 export type Stage = {
   id: string;
@@ -126,82 +121,17 @@ function optionalString(
   return value;
 }
 
-function parseLayout(
+function parseObjectField(
   value: unknown,
   path: string,
   errors: ValidationIssue[],
-): Layout | undefined {
+): JsonObject | undefined {
   if (value === undefined) return undefined;
   if (!isObject(value)) {
     errors.push({ code: "invalid_layout", path, message: "必须是对象" });
     return undefined;
   }
-  unknownFields(value, ["x", "y", "width", "height"], path, errors);
-  const numberFields: (keyof Layout)[] = ["x", "y", "width", "height"];
-  const result: Partial<Layout> = {};
-  for (const field of numberFields) {
-    const raw = value[field];
-    if (raw === undefined) {
-      if (field === "x" || field === "y") {
-        errors.push({ code: "invalid_layout", path: `${path}.${field}`, message: "必须是有限数字" });
-      }
-      continue;
-    }
-    if (typeof raw !== "number" || !Number.isFinite(raw)) {
-      errors.push({ code: "invalid_layout", path: `${path}.${field}`, message: "必须是有限数字" });
-      continue;
-    }
-    result[field] = raw;
-  }
-  if (result.x === undefined || result.y === undefined) return undefined;
-  return result as Layout;
-}
-
-function parseViewport(
-  value: unknown,
-  path: string,
-  errors: ValidationIssue[],
-): Viewport | undefined {
-  if (value === undefined) return undefined;
-  if (!isObject(value)) {
-    errors.push({ code: "invalid_layout", path, message: "必须是对象" });
-    return undefined;
-  }
-  unknownFields(value, ["x", "y", "zoom"], path, errors);
-  const x = value.x;
-  const y = value.y;
-  const zoom = value.zoom;
-  let valid = true;
-  for (const [field, raw] of [
-    ["x", x],
-    ["y", y],
-  ] as const) {
-    if (typeof raw !== "number" || !Number.isFinite(raw)) {
-      errors.push({
-        code: "invalid_layout",
-        path: `${path}.${field}`,
-        message: "必须是有限数字",
-      });
-      valid = false;
-    }
-  }
-  if (typeof zoom !== "number" || !Number.isFinite(zoom)) {
-    errors.push({
-      code: "invalid_layout",
-      path: `${path}.zoom`,
-      message: "必须是有限数字",
-    });
-    valid = false;
-  } else if (zoom <= 0) {
-    errors.push({
-      code: "invalid_layout",
-      path: `${path}.zoom`,
-      message: "必须大于 0",
-    });
-    valid = false;
-  }
-  if (!valid) return undefined;
-  return { x: x as number, y: y as number, zoom: zoom as number };
+  return value;
 }
 
 function parseId(
@@ -236,7 +166,7 @@ export function collectGraph(input: unknown): {
     };
   }
   unknownFields(input, ["stages", "nodes", "edges", "viewport"], "graph", errors);
-  const viewport = parseViewport(input.viewport, "graph.viewport", errors);
+  const viewport = parseObjectField(input.viewport, "graph.viewport", errors);
 
   const rawStages = input.stages;
   const rawNodes = input.nodes;
@@ -281,7 +211,7 @@ export function collectGraph(input: unknown): {
     }
     const name = nonEmptyString(raw.name, `${path}.name`, errors);
     const description = optionalString(raw.description, `${path}.description`, errors, 500);
-    const layout = parseLayout(raw.layout, `${path}.layout`, errors);
+    const layout = parseObjectField(raw.layout, `${path}.layout`, errors);
     if (id !== null && name !== null) {
       stages.push({ id, name, ...(description === undefined ? {} : { description }), ...(layout === undefined ? {} : { layout }) });
     }
@@ -330,7 +260,7 @@ export function collectGraph(input: unknown): {
         expertId = raw.expertId;
       }
     }
-    const layout = parseLayout(raw.layout, `${path}.layout`, errors);
+    const layout = parseObjectField(raw.layout, `${path}.layout`, errors);
     if (
       id !== null &&
       name !== null &&
@@ -394,34 +324,40 @@ export function collectGraph(input: unknown): {
 export function parseGraph(input: unknown): WorkflowGraph {
   const { graph, errors } = collectGraph(input);
   if (errors.length > 0 || graph === null) {
-    throw new MultiFieldValidationError(
-      errors.map((issue) => ({ field: issue.path, reason: `${issue.code}: ${issue.message}` })),
-    );
+    throw new MultiFieldValidationError(errors);
   }
   return graph;
 }
 
-function addWarning(
-  warnings: ValidationIssue[],
+function addIssue(
+  issues: ValidationIssue[],
   code: string,
   path: string,
   message: string,
 ): void {
-  warnings.push({ code, path, message });
+  issues.push({ code, path, message });
 }
 
-/**
- * 语义检查：保存时返回 warnings；导入时由调用方把非专家 warning 当成错误。
- */
-export function analyzeGraph(graph: WorkflowGraph): ValidationReport {
-  const warnings: ValidationIssue[] = [];
+/** 拓扑检查：start/end、seq 链、可达、环、fanout/fanin 与回退。 */
+export function analyzeTopology(graph: WorkflowGraph): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
   const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
+  const nodeIndex = new Map(graph.nodes.map((node, index) => [node.id, index]));
+  const edgeIndex = new Map(graph.edges.map((edge, index) => [edge.id, index]));
+  const nodePath = (id: string): string => {
+    const index = nodeIndex.get(id);
+    return index === undefined ? "graph.nodes" : `graph.nodes[${index}]`;
+  };
+  const edgePath = (id: string): string => {
+    const index = edgeIndex.get(id);
+    return index === undefined ? "graph.edges" : `graph.edges[${index}]`;
+  };
   const starts = graph.nodes.filter((node) => node.type === "start");
   const ends = graph.nodes.filter((node) => node.type === "end");
-  if (starts.length === 0) addWarning(warnings, "missing_start", "graph.nodes", "缺少开始节点");
-  if (starts.length > 1) addWarning(warnings, "multiple_start", "graph.nodes", "开始节点必须恰好一个");
-  if (ends.length === 0) addWarning(warnings, "missing_end", "graph.nodes", "缺少结束节点");
-  if (ends.length > 1) addWarning(warnings, "multiple_end", "graph.nodes", "结束节点必须恰好一个");
+  if (starts.length === 0) addIssue(issues, "missing_start", "graph.nodes", "缺少开始节点");
+  if (starts.length > 1) addIssue(issues, "multiple_start", "graph.nodes", "开始节点必须恰好一个");
+  if (ends.length === 0) addIssue(issues, "missing_end", "graph.nodes", "缺少结束节点");
+  if (ends.length > 1) addIssue(issues, "multiple_end", "graph.nodes", "结束节点必须恰好一个");
 
   const seqIn = new Map<string, WorkflowEdge[]>();
   const seqOut = new Map<string, WorkflowEdge[]>();
@@ -443,24 +379,24 @@ export function analyzeGraph(graph: WorkflowGraph): ValidationReport {
   const start = starts.length === 1 ? starts[0] : undefined;
   const end = ends.length === 1 ? ends[0] : undefined;
   if (start !== undefined && (seqIn.get(start.id)?.length ?? 0) > 0) {
-    addWarning(warnings, "start_has_incoming", `graph.nodes.${start.id}`, "开始节点不能有入边");
+    addIssue(issues, "start_has_incoming", nodePath(start.id), "开始节点不能有入边");
   }
   if (end !== undefined && (seqOut.get(end.id)?.length ?? 0) > 0) {
-    addWarning(warnings, "end_has_outgoing", `graph.nodes.${end.id}`, "结束节点不能有出边");
+    addIssue(issues, "end_has_outgoing", nodePath(end.id), "结束节点不能有出边");
   }
 
   for (const node of graph.nodes) {
     if ((seqIn.get(node.id)?.length ?? 0) > 1) {
-      addWarning(warnings, "broken_chain", `graph.nodes.${node.id}`, "节点最多一条 seq 入边");
+      addIssue(issues, "broken_chain", nodePath(node.id), "节点最多一条 seq 入边");
     }
     if ((seqOut.get(node.id)?.length ?? 0) > 1) {
-      addWarning(warnings, "broken_chain", `graph.nodes.${node.id}`, "节点最多一条 seq 出边");
+      addIssue(issues, "broken_chain", nodePath(node.id), "节点最多一条 seq 出边");
     }
     if (start !== undefined && node.id !== start.id && (seqIn.get(node.id)?.length ?? 0) === 0) {
-      addWarning(warnings, "broken_chain", `graph.nodes.${node.id}`, "非开始节点必须有一条 seq 入边");
+      addIssue(issues, "broken_chain", nodePath(node.id), "非开始节点必须有一条 seq 入边");
     }
     if (end !== undefined && node.id !== end.id && (seqOut.get(node.id)?.length ?? 0) === 0) {
-      addWarning(warnings, "broken_chain", `graph.nodes.${node.id}`, "非结束节点必须有一条 seq 出边");
+      addIssue(issues, "broken_chain", nodePath(node.id), "非结束节点必须有一条 seq 出边");
     }
   }
 
@@ -477,7 +413,7 @@ export function analyzeGraph(graph: WorkflowGraph): ValidationReport {
     }
     for (const node of graph.nodes) {
       if (!reachable.has(node.id)) {
-        addWarning(warnings, "broken_chain", `graph.nodes.${node.id}`, "节点从开始节点不可达");
+        addIssue(issues, "broken_chain", nodePath(node.id), "节点从开始节点不可达");
       }
     }
   }
@@ -496,17 +432,17 @@ export function analyzeGraph(graph: WorkflowGraph): ValidationReport {
     return false;
   }
   if (graph.nodes.some((node) => hasCycle(node.id))) {
-    addWarning(warnings, "seq_cycle", "graph.edges", "seq 子图存在环");
+    addIssue(issues, "seq_cycle", "graph.edges", "seq 子图存在环");
   }
 
   for (const node of graph.nodes) {
     const rollbacks = rollbackOut.get(node.id) ?? [];
     if (rollbacks.length === 0) continue;
     if (node.type !== "review" && node.type !== "confirm") {
-      addWarning(warnings, "invalid_rollback", `graph.nodes.${node.id}`, "只有 review/confirm 可以发起回退");
+      addIssue(issues, "invalid_rollback", nodePath(node.id), "只有 review/confirm 可以发起回退");
     }
     if (rollbacks.length > 1) {
-      addWarning(warnings, "invalid_rollback", `graph.nodes.${node.id}`, "每个节点最多一条回退边");
+      addIssue(issues, "invalid_rollback", nodePath(node.id), "每个节点最多一条回退边");
     }
     const ancestors = new Set<string>();
     const queue = [node.id];
@@ -523,11 +459,16 @@ export function analyzeGraph(graph: WorkflowGraph): ValidationReport {
     for (const edge of rollbacks) {
       const target = nodes.get(edge.to);
       if (target === undefined) {
-        addWarning(warnings, "invalid_rollback", `graph.edges.${edge.id}.to`, "回退目标不存在");
+        addIssue(issues, "invalid_rollback", `${edgePath(edge.id)}.to`, "回退目标不存在");
       } else if (target.type === "end") {
-        addWarning(warnings, "invalid_rollback", `graph.edges.${edge.id}.to`, "不能回退到结束节点");
+        addIssue(issues, "invalid_rollback", `${edgePath(edge.id)}.to`, "不能回退到结束节点");
       } else if (!ancestors.has(target.id)) {
-        addWarning(warnings, "rollback_target_not_ancestor", `graph.edges.${edge.id}.to`, "回退目标不是 seq 路径上的祖先");
+        addIssue(
+          issues,
+          "rollback_target_not_ancestor",
+          `${edgePath(edge.id)}.to`,
+          "回退目标不是 seq 路径上的祖先",
+        );
       }
     }
   }
@@ -536,18 +477,25 @@ export function analyzeGraph(graph: WorkflowGraph): ValidationReport {
     if (node.type === "fanout") {
       const out = seqOut.get(node.id) ?? [];
       if (out.length !== 1 || nodes.get(out[0]?.to ?? "")?.type !== "fanin") {
-        addWarning(warnings, "fanout_fanin_unpaired", `graph.nodes.${node.id}`, "fanout 必须唯一指向一个 fanin");
+        addIssue(issues, "fanout_fanin_unpaired", nodePath(node.id), "fanout 必须唯一指向一个 fanin");
       }
     }
     if (node.type === "fanin") {
       const incoming = seqIn.get(node.id) ?? [];
       if (incoming.length !== 1 || nodes.get(incoming[0]?.from ?? "")?.type !== "fanout") {
-        addWarning(warnings, "fanout_fanin_unpaired", `graph.nodes.${node.id}`, "fanin 必须唯一来自一个 fanout");
+        addIssue(issues, "fanout_fanin_unpaired", nodePath(node.id), "fanin 必须唯一来自一个 fanout");
       }
     }
   }
 
-  for (const node of graph.nodes) {
+  return issues;
+}
+
+/** 专家绑定检查：必填/禁止；专家存在性由服务层读库校验。 */
+export function analyzeBindings(graph: WorkflowGraph): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  graph.nodes.forEach((node, index) => {
+    const path = `graph.nodes[${index}].expertId`;
     const requiresExpert =
       node.type === "start" ||
       node.type === "end" ||
@@ -556,16 +504,11 @@ export function analyzeGraph(graph: WorkflowGraph): ValidationReport {
       node.type === "fanout" ||
       node.type === "fanin";
     if (requiresExpert && node.expertId === null) {
-      addWarning(warnings, "expert_required", `graph.nodes.${node.id}.expertId`, `${node.type} 节点必须绑定专家`);
+      addIssue(issues, "expert_required", path, `${node.type} 节点必须绑定专家`);
     }
     if (node.type === "confirm" && node.expertId !== null) {
-      addWarning(warnings, "expert_forbidden", `graph.nodes.${node.id}.expertId`, "confirm 节点不能绑定专家");
+      addIssue(issues, "expert_forbidden", path, "confirm 节点不能绑定专家");
     }
-  }
-
-  return { errors: [], warnings };
-}
-
-export function emptyGraph(): WorkflowGraph {
-  return { stages: [], nodes: [], edges: [] };
+  });
+  return issues;
 }

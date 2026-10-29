@@ -44,11 +44,17 @@ export class ValidationError extends AppError {
   }
 }
 
-/** 携带多个字段错误的校验错误；details.fieldErrors 为数组。 */
+/** 携带多个图校验错误的校验错误；details.issues 为新结构，fieldErrors 保留兼容。 */
 export class MultiFieldValidationError extends AppError {
-  constructor(errors: { field: string; reason: string }[]) {
+  constructor(issues: { code: string; path: string; message: string }[]) {
     super("validation_error", "请求字段不合法", {
-      details: { fieldErrors: errors },
+      details: {
+        issues,
+        fieldErrors: issues.map((issue) => ({
+          field: issue.path,
+          reason: `${issue.code}: ${issue.message}`,
+        })),
+      },
     });
   }
 }

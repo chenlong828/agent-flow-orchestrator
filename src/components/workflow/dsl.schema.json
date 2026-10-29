@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agentflow.local/schemas/workflow-dsl.v1.json",
   "title": "WorkflowDsl",
-  "description": "工作流定义 DSL v1，供外部编辑器与导入工具消费；服务端运行时校验以 graph.ts 为准。",
+  "description": "工作流定义 DSL v1，供外部编辑器与导入工具消费；layout/viewport 是前端画布结构，服务端只按对象透传，运行时结构/拓扑校验以 graph.ts 为准。",
   "type": "object",
   "additionalProperties": false,
   "required": ["dslVersion", "metadata", "stages", "nodes", "edges"],

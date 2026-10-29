@@ -116,15 +116,46 @@ describe("OpenAPI 契约结构", () => {
     }
   });
 
+  test("工作流契约：排序、透明布局、创建必填图与 updatedBy", () => {
+    const sort = spec.components.schemas.WorkflowSort;
+    expect(sort.enum).toEqual(["name:asc", "name:desc", "updatedAt:asc", "updatedAt:desc"]);
+    expect(sort.default).toBe("updatedAt:desc");
+
+    const stage = spec.components.schemas.WorkflowStage;
+    expect(stage.properties.description.maxLength).toBe(500);
+    expect(stage.properties.layout.type).toBe("object");
+    expect(stage.properties.layout.additionalProperties).toBe(true);
+    const node = spec.components.schemas.WorkflowNode;
+    expect(node.properties.layout.type).toBe("object");
+    expect(node.properties.layout.additionalProperties).toBe(true);
+    const graph = spec.components.schemas.WorkflowGraph;
+    expect(graph.properties.viewport.type).toBe("object");
+    expect(graph.properties.viewport.additionalProperties).toBe(true);
+    expect(spec.components.schemas.WorkflowLayout).toBeUndefined();
+    expect(spec.components.schemas.WorkflowLayoutViewport).toBeUndefined();
+
+    expect(spec.components.schemas.WorkflowCreate.required).toContain("graph");
+    expect(spec.components.schemas.WorkflowMutationResult.required).toEqual([
+      "id",
+      "revision",
+      "warnings",
+    ]);
+    expect(spec.components.schemas.WorkflowSummary.required).toContain("updatedBy");
+    expect(spec.paths["/api/v1/workflows"].post.responses["201"].content["application/json"].schema.$ref)
+      .toBe("#/components/schemas/WorkflowMutationResult");
+    expect(spec.paths["/api/v1/workflows/{id}/copy"].post.responses["201"].content["application/json"].schema.$ref)
+      .toBe("#/components/schemas/WorkflowMutationResult");
+  });
+
   test("components 完整，所有 $ref 都可解析", () => {
     expect(Object.keys(spec.components.parameters)).toHaveLength(8);
-    expect(Object.keys(spec.components.schemas)).toHaveLength(76);
+    expect(Object.keys(spec.components.schemas)).toHaveLength(75);
     expect(Object.keys(spec.components.responses)).toHaveLength(10);
 
     const refs = [...text.matchAll(/\$ref['"]?\s*:\s*['"]?#\/components\/([^'"]+)['"]?/g)].map(
       (match) => match[1]!,
     );
-    expect(refs.length).toBe(468);
+    expect(refs.length).toBe(467);
     const missing: string[] = [];
     for (const ref of new Set(refs)) {
       let current: any = spec.components;

@@ -57,7 +57,7 @@ export const SKILL_SORT = {
 } as const;
 export const EXPERT_SORT = HARNESS_SORT;
 export const WORKFLOW_WRITE_FIELDS = ["name", "type", "description"] as const;
-export const WORKFLOW_CREATE_FIELDS = WORKFLOW_WRITE_FIELDS;
+export const WORKFLOW_CREATE_FIELDS = [...WORKFLOW_WRITE_FIELDS, "graph"] as const;
 export const WORKFLOW_COPY_FIELDS = ["name"] as const;
 export const WORKFLOW_GRAPH_FIELDS = ["graph"] as const;
 export const WORKFLOW_IMPORT_FIELDS = [

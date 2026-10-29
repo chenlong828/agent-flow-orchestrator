@@ -30,16 +30,20 @@ describe("kernel 错误分类", () => {
     expect(error.message).toBe("字段 name 不合法：不能为空");
   });
 
-  test("多字段校验错误使用 details.fieldErrors 数组", () => {
+  test("多字段校验错误同时使用 details.issues 与兼容 fieldErrors", () => {
     const error = new MultiFieldValidationError([
-      { field: "name", reason: "不能为空" },
-      { field: "color", reason: "格式不合法" },
+      { code: "graph_shape", path: "graph.nodes[0].id", message: "不能为空" },
+      { code: "broken_chain", path: "graph.nodes", message: "链断开" },
     ]);
     expect(error.code).toBe("validation_error");
     expect(error.details).toEqual({
+      issues: [
+        { code: "graph_shape", path: "graph.nodes[0].id", message: "不能为空" },
+        { code: "broken_chain", path: "graph.nodes", message: "链断开" },
+      ],
       fieldErrors: [
-        { field: "name", reason: "不能为空" },
-        { field: "color", reason: "格式不合法" },
+        { field: "graph.nodes[0].id", reason: "graph_shape: 不能为空" },
+        { field: "graph.nodes", reason: "broken_chain: 链断开" },
       ],
     });
   });

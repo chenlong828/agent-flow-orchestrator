@@ -3,7 +3,7 @@ layer: design
 module: http-gateway
 status: current
 component: CMP-http-gateway
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # `CMP-http-gateway` 组件规格与 REST API 契约
@@ -159,15 +159,15 @@ updated: 2026-10-29
 | `API-29` | PUT | `/experts/{id}/tools` | `UC-B1-05` | 整体替换有序工具 | 200 专家详情 |
 | `API-30` | PATCH | `/experts/{id}` | `UC-B1-04` / `UC-B1-05` | 聚合部分更新五区、引用与装配；一次事务 | 200 专家详情 |
 | `API-31` | GET | `/workflows` | `UC-B3-01` | 工作流列表/检索 | 200 列表 |
-| `API-32` | POST | `/workflows` | `UC-B3-01` | 创建工作流；初始为空图 | 201 + Location |
+| `API-32` | POST | `/workflows` | `UC-B3-01` | 创建工作流并同时写入合法图 | 201 `{id,revision,warnings}` + Location |
 | `API-33` | GET | `/workflows/{id}` | `UC-B3-01` | 工作流详情（含 graph） | 200 详情 |
 | `API-34` | PUT | `/workflows/{id}` | `UC-B3-01` | 更新名称/类型/描述 | 200 详情 |
 | `API-35` | DELETE | `/workflows/{id}` | `UC-B3-01` | 删除工作流及定义/引用 | 204 |
-| `API-36` | POST | `/workflows/{id}/copy` | `UC-B3-01` | 复制图，自动处理名称后缀 | 201 + Location |
-| `API-37` | PUT | `/workflows/{id}/definition` | `UC-B3-02` | 保存当前图；语义问题返回 warning | 200 `{workflow,warnings}` |
+| `API-36` | POST | `/workflows/{id}/copy` | `UC-B3-01` | 校验并复制图，自动处理名称后缀 | 201 `{id,revision,warnings}` + Location |
+| `API-37` | PUT | `/workflows/{id}/definition` | `UC-B3-02` | 保存当前图；结构/拓扑/绑定错误 400，停用专家 warning | 200 `{workflow,warnings}` |
 | `API-38` | POST | `/workflows/{id}/validate` | `UC-B3-02` | 只校验图，不写入 | 200 `ValidationReport` |
 | `API-39` | GET | `/workflows/{id}/dsl` | `UC-B3-03` | 导出 JSON/YAML DSL | 200 文件 |
-| `API-40` | POST | `/workflows/import` | `UC-B3-03` | 从严导入 DSL，新建工作流 | 201 `{workflow,idMap,warnings}` |
+| `API-40` | POST | `/workflows/import` | `UC-B3-03` | 从严导入 DSL；允许空专家绑定，新建工作流 | 201 `{workflow,idMap,warnings}` |
 
 ### 4.2 健康检查
 
@@ -500,27 +500,32 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 | `revision` | number | 乐观锁，从 1 开始 |
 | `createdAt` | string | ISO-8601 |
 | `updatedAt` | string | ISO-8601 |
+| `updatedBy` | string \| null | 最后更新操作者；展示/审计，不参与授权 |
 
 **详情 `WorkflowDetail`**：共享字段 + `graph`。
 
-**`WorkflowGraph`**：`{stages: Stage[], nodes: WorkflowNode[], edges: WorkflowEdge[], viewport?: {x,y,zoom}}`；节点/阶段/边 ID 是工作流内稳定字符串，不是 UUID。`viewport` 是可选画布展示状态：`x/y` 为画布滚动偏移（CSS 像素），`zoom` 为缩放倍数且必须大于 0；随整图保存，不参与执行语义。
+**`WorkflowGraph`**：`{stages: Stage[], nodes: WorkflowNode[], edges: WorkflowEdge[], viewport?: object}`；节点/阶段/边 ID 是工作流内稳定字符串，不是 UUID。`viewport` / `layout` 是前端画布对象，后端只要求 JSON 对象并原样存取，不解释 `x/y/width/height/zoom`；详细结构由 `dsl.schema.json` 定义。
 
-- `Stage`：`{id,name}`。
-- `WorkflowNode`：`{id,type,name,stageId:string|null,expertId:string|null}`；`type` 为 `start|end|agent|review|confirm|fanout|fanin`。
+- `Stage`：`{id,name,description?,layout?:object}`。
+- `WorkflowNode`：`{id,type,name,stageId:string|null,expertId:string|null,layout?:object}`；`type` 为 `start|end|agent|review|confirm|fanout|fanin`。
 - `WorkflowEdge`：`{id,from,to,kind}`；`kind` 为 `seq|rollback`。
-- DSL 顶层 `layout.viewport={x,y,zoom}` 与 `WorkflowGraph.viewport` 双向映射；只用于展示，不参与执行语义。
+- DSL 顶层 `layout.viewport` 与 `WorkflowGraph.viewport` 双向映射；只用于展示，不参与执行语义。
 
-**查询参数**：`q`、`type`、`limit`、`offset`、`sort`（`name`、`updatedAt`）。
+**查询参数**：`q`、`type`、`limit`、`offset`、`sort`（`name:asc|desc`、`updatedAt:asc|desc`，默认 `updatedAt:desc`）。
 
-**创建/更新请求**：`{name,type,description?}`；`PUT` 的 `description` 也必填（可为空串）。
+**创建/更新请求**：`POST` 为 `{name,type,description?,graph}`，`graph` 必填且必须通过结构/拓扑/绑定校验；`PUT` 为 `{name,type,description}`，`description` 必填（可为空串）。
+
+**创建/复制响应**：`{id,revision,warnings}`；详情需再 `GET`。
 
 **`CopyWorkflow`**：`{name?: string}`；省略时默认 `"{源名称} 副本"`，冲突自动追加 ` (2)`…` (99)`；节点/阶段/边 ID 原样保留。
 
-**`SaveDefinitionInput`**：`{graph: WorkflowGraph}`；整图替换，`graph.viewport` 随图保存或清空；形状错误 400，语义问题 200 + `warnings`，专家不存在 400 并回滚。
+**`SaveDefinitionInput`**：`{graph: WorkflowGraph}`；整图替换，`graph.viewport` 随图保存或清空；结构/拓扑/专家绑定错误 400 且不保存，停用专家 200 + `warnings`，专家不存在 400 并回滚。
 
-**`ValidationReport`**：`{errors:[{code,path,message}],warnings:[{code,path,message}]}`；`validate` 只读专家状态，不写库。
+**`ValidationReport`**：`{errors:[{code,path,message}],warnings:[{code,path,message}]}`；`validate` 只读专家状态，不写库。拓扑、缺失/未绑定/禁止绑定专家进 `errors`，停用专家进 `warnings`。
 
-**`WorkflowDsl`**：`{dslVersion:1,metadata:{name,type,description},stages,nodes,edges,layout?}`；导入只接受 JSON，导出支持 `?format=json|yaml`。
+**`WorkflowDsl`**：`{dslVersion:1,metadata:{name,type,description},stages,nodes,edges,layout?}`；导入只接受 JSON，导出支持 `?format=json|yaml`。导入允许空专家绑定，缺失专家清空并 warning；导出允许空绑定，拒绝缺失/禁止绑定。
+
+多字段图校验 400 使用 `error.details.issues:[{code,path,message}]`，并保留 `error.details.fieldErrors:[{field,reason}]` 兼容；路径统一数组下标。
 
 ### 5.7 端点 → 组件方法
 
@@ -616,7 +621,7 @@ B1/B3 不提供的页面动作：Harness 连接测试/心跳刷新、工具调�
 5. 用 Skill 保存验证 `version` 递增与 `SKILL.md` 16 KiB；客户端不传 `version`/`enabled`。
 6. 用整包下载验证 zip、`Content-Disposition`、`ETag`/304；不提供单文件下载。
 7. 用专家装配验证顺序与 `revision`；Skill/工具列表整体替换；一次保存五区与两类装配时使用 `PATCH /experts/{id}`，确认只递增一次 `revision`。
-8. 工作流验证：`If-Match` 缺失 428、旧版本 409；保存语义问题 200 + warnings，形状错误 400；DSL 导入缺失专家清空并 warning；专家删除被工作流引用 409。
+8. 工作流验证：创建必须带合法图；保存结构/拓扑/绑定错误 400，停用专家 warning；DSL 导入允许空专家并清空缺失专家后 warning；复制/导出拒绝空图或非法图；专家删除被工作流引用 409。
 9. 忽略未知字段；遇到契约缺口先改本文，不跨项目改代码。
 
 ## 7 契约测试

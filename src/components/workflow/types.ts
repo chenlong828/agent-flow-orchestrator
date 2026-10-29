@@ -26,6 +26,7 @@ export type CreateWorkflow = {
   name: string;
   type: string;
   description?: string;
+  graph: unknown;
 };
 
 export type UpdateWorkflow = {
@@ -52,6 +53,7 @@ export type WorkflowSummary = {
   revision: number;
   createdAt: string;
   updatedAt: string;
+  updatedBy: string | null;
 };
 
 export type WorkflowDetail = WorkflowSummary & {
@@ -79,11 +81,14 @@ export type WorkflowDsl = {
   stages: Stage[];
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
-  layout?: { viewport?: { x: number; y: number; zoom: number } };
+  layout?: { viewport?: Record<string, unknown> };
 };
 
 export type WorkflowService = {
-  create(input: CreateWorkflow, actor?: string): Promise<{ id: string; revision: number }>;
+  create(
+    input: CreateWorkflow,
+    actor?: string,
+  ): Promise<{ id: string; revision: number; warnings: ValidationIssue[] }>;
   update(
     id: string,
     revision: number,
@@ -95,7 +100,7 @@ export type WorkflowService = {
     id: string,
     input: CopyWorkflow,
     actor?: string,
-  ): Promise<{ id: string; revision: number }>;
+  ): Promise<{ id: string; revision: number; warnings: ValidationIssue[] }>;
   saveDefinition(
     id: string,
     revision: number,

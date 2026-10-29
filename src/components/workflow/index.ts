@@ -26,8 +26,8 @@ export type { WorkflowDeps } from "./service.ts";
 export { createWorkflowStore } from "./store.ts";
 export type { WorkflowRootRow } from "./store.ts";
 export {
-  analyzeGraph,
+  analyzeBindings,
+  analyzeTopology,
   collectGraph,
-  emptyGraph,
   parseGraph,
 } from "./graph.ts";
