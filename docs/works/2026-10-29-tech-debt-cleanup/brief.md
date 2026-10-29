@@ -1,7 +1,7 @@
 ---
 layer: works
 module: global
-status: active
+status: closed
 updated: 2026-10-29
 ---
 
@@ -46,22 +46,22 @@ updated: 2026-10-29
 | ID | 类型 | 组件 | 内容 | 状态 | 装载清单 |
 |---|---|---|---|---|---|
 | T-DEBT-00 | docs | global | 建立工序 brief | done | 本文件 |
-| T-DEBT-01 | test | tests/global | 修正架构测试相对导入盲区；加 workflow；补循环依赖、Bun 文件 API、FileStore、kernel 检查；加自测 | pending | `tests/architecture.test.ts` |
-| T-DEBT-02 | chore | skill | 删 `store.ts`/`service.ts`/`types.ts` 占位壳；删 `read.ts` 不可达分支 | pending | `src/components/skill/{store,service,types,read}.ts` |
-| T-DEBT-03 | chore | expert | 删未引用的 `replaceSkillLinks`/`replaceToolLinks` | pending | `src/components/expert/store.ts` |
-| T-DEBT-04 | chore | workflow | 删未使用的 `EMPTY_GRAPH` | pending | `src/components/workflow/graph.ts` |
-| T-DEBT-05 | chore | gateway | 删 `parseSortQuery` 未使用的 `defaultSort` 参数 | pending | `src/components/http-gateway/validation.ts` |
-| T-DEBT-06 | docs | docs | README 组件/端点/B3 状态与表数口径；架构 §9 验证映射、§10 当前数、vendor 预算口径 | pending | `README.md`、`docs/design/architecture.md` |
-| T-DEBT-07 | chore | global | 加 `bun run check`（typecheck + test + docs:check），README 开发段写明 | pending | `package.json`、`README.md` |
-| T-DEBT-08 | refactor | skill | `SkillDraftDeps.guard` 必填，删裸抛分支；测试默认注入替身 | pending | `src/components/skill/draft.ts`、`tests/components/skill/*` |
-| T-DEBT-09 | refactor | expert | `ExpertDeps.guard` 必填，删静默跳过分支 | pending | `src/components/expert/service.ts`、`tests/components/expert/*` |
-| T-DEBT-10 | refactor | skill | `saveDraft` 校验 If-Match 规则并返回 `created`；更新 skill 规格；补服务测试 | pending | `src/components/skill/{draft,contract}.ts`、`docs/design/components/skill/spec.md`、`tests/components/skill/*` |
-| T-DEBT-11 | refactor | gateway | 保存端点改为解析 `baseRevision` + 委托 `saveDraft` + 按 `created` 映射 201/200 | pending | `src/components/http-gateway/app.ts`、`tests/components/http-gateway/skill.test.ts` |
-| T-DEBT-12 | refactor | gateway | 草稿创建复用 `readOptionalJsonObject`，保留 UUID 校验 | pending | `src/components/http-gateway/app.ts` |
-| T-DEBT-14 | refactor | gateway | 抽 `respond.ts`（json/noContent/markdown/notModified/errorResponse/statusFor/restCode） | pending | `src/components/http-gateway/{app,respond}.ts` |
-| T-DEBT-15 | refactor | gateway | 抽 `fields.ts`；加字段白名单 ↔ OpenAPI 一致性测试 | pending | `src/components/http-gateway/{app,fields}.ts`、`tests/components/http-gateway/*` |
-| T-DEBT-16 | refactor | gateway | 抽 `queries.ts`（5 个列表查询 + pagePayload） | pending | `src/components/http-gateway/{app,queries}.ts` |
-| T-DEBT-17 | refactor | gateway | 按资源拆 `routes/`（misc/harness/tool/skill/expert/workflow，6 个 commit）；`app.ts` ≤250 行 | pending | `src/components/http-gateway/app.ts`、`src/components/http-gateway/routes/*` |
+| T-DEBT-01 | test | tests/global | 修正架构测试相对导入盲区；加 workflow；补循环依赖、Bun 文件 API、FileStore、kernel 检查；加自测 | done | `tests/architecture.test.ts` |
+| T-DEBT-02 | chore | skill | 删 `store.ts`/`service.ts`/`types.ts` 占位壳；删 `read.ts` 不可达分支 | done | `src/components/skill/{store,service,types,read}.ts` |
+| T-DEBT-03 | chore | expert | 删未引用的 `replaceSkillLinks`/`replaceToolLinks` | done | `src/components/expert/store.ts` |
+| T-DEBT-04 | chore | workflow | 删未使用的 `EMPTY_GRAPH` | done | `src/components/workflow/graph.ts` |
+| T-DEBT-05 | chore | gateway | 删 `parseSortQuery` 未使用的 `defaultSort` 参数 | done | `src/components/http-gateway/validation.ts` |
+| T-DEBT-06 | docs | docs | README 组件/端点/B3 状态与表数口径；架构 §9 验证映射、§10 当前数、vendor 预算口径 | done | `README.md`、`docs/design/architecture.md` |
+| T-DEBT-07 | chore | global | 加 `bun run check`（typecheck + test + docs:check），README 开发段写明 | done | `package.json`、`README.md` |
+| T-DEBT-08 | refactor | skill | `SkillDraftDeps.guard` 必填，删裸抛分支；测试默认注入替身 | done | `src/components/skill/draft.ts`、`tests/components/skill/*` |
+| T-DEBT-09 | refactor | expert | `ExpertDeps.guard` 必填，删静默跳过分支 | done | `src/components/expert/service.ts`、`tests/components/expert/*` |
+| T-DEBT-10 | refactor | skill | `saveDraft` 校验 If-Match 规则并返回 `created`；更新 skill 规格；补服务测试 | done | `src/components/skill/{draft,contract}.ts`、`docs/design/components/skill/spec.md`、`tests/components/skill/*` |
+| T-DEBT-11 | refactor | gateway | 保存端点改为解析 `baseRevision` + 委托 `saveDraft` + 按 `created` 映射 201/200 | done | `src/components/http-gateway/app.ts`、`tests/components/http-gateway/skill.test.ts` |
+| T-DEBT-12 | refactor | gateway | 草稿创建复用 `readOptionalJsonObject`，保留 UUID 校验 | done | `src/components/http-gateway/app.ts` |
+| T-DEBT-14 | refactor | gateway | 抽 `respond.ts`（json/noContent/markdown/notModified/errorResponse/statusFor/restCode） | done | `src/components/http-gateway/{app,respond}.ts` |
+| T-DEBT-15 | refactor | gateway | 抽 `fields.ts`；加字段白名单 ↔ OpenAPI 一致性测试 | done | `src/components/http-gateway/{app,fields}.ts`、`tests/components/http-gateway/*` |
+| T-DEBT-16 | refactor | gateway | 抽 `queries.ts`（5 个列表查询 + pagePayload） | done | `src/components/http-gateway/{app,queries}.ts` |
+| T-DEBT-17 | refactor | gateway | 按资源拆 `routes/`（harness/tool/skill/expert/workflow；misc 保留 app）；`app.ts` 122 行、分派 ≤100 行 | done | `src/components/http-gateway/app.ts`、`src/components/http-gateway/routes/*` |
 
 **未纳入本轮**：T-DEBT-13（JSON 请求体上限）、T-DEBT-18～23（见非目标）。
 
