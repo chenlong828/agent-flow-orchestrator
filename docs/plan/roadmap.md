@@ -34,6 +34,7 @@ updated: 2026-10-27
 - `2026-10-25-expert-aggregate-write`：专家创建即装配、`PATCH /experts/{id}` 聚合部分更新；一次事务、一次 `revision`，保留原 `PUT` 与装配端点。结论见 [`result.md`](../history/works/2026-10-25-expert-aggregate-write/result.md)。
 - `2026-10-25-list-read-model`：列表直接补 `SkillListItem.triggers`、`ExpertListItem.skills`（前 3 个 `{id,name}`）、`ToolListItem.description`；不引入 BFF 富化或前端 N+1。结论见 [`result.md`](../history/works/2026-10-25-list-read-model/result.md)。
 - `2026-10-26-skill-contract-v2`：Skill 契约拆成管理面与编排面——`description`（1–400）合并原 `summary` + `triggers`，新增 `GET /skills/{id}/document` 输出 markdown 全文（ETag/304）；迁移删除 `skill_trigger`，业务端点 30 → 31。展示端重构不在本仓库。结论见 [`result.md`](../works/2026-10-26-skill-contract-v2/result.md)。
+- `2026-10-28-workflow-definition`：B3 工作流定义已实现——三张表、`CMP-workflow`、catalog/expert/kernel 增量、10 个 HTTP 端点、OpenAPI 与契约测试；B4 运行/实例与 UI 未做。结论见 [`result.md`](../history/works/2026-10-28-workflow-definition/result.md)。
 - `2026-10-25-scenario-index-pilot`：建立首个场景「智能体能力资产 / 专家能力定义与装配 / 专家定义与装配管理」，分配 `TC-EXP-001`～`TC-EXP-004`，新增场景索引生成器与 `docs:index` / `docs:check`。场景保持 `designed`，未宣称完整 CRUD 验收。结论见 [`result.md`](../works/2026-10-25-scenario-index-pilot/result.md)。
 - 2026-10-27：除 `2026-10-25-scenario-index-pilot`（生成器仍在改）与 `2026-10-26-skill-contract-v2`（收口未完）外，以上工序已收口并整目录归档到 `history/works/`，frontmatter 改为 `frozen`；归档件只作历史证据，不作设计依据。
-- 后续不预置 M2/M4 的答案；实际运行需求出现时再启动对应工序。B1 只覆盖控制面资产注册，不包含工作流与运行实例。早期开放问题已关闭，见 [`open-questions.md`](open-questions.md)。
+- 后续不预置 M2/M4 的答案；实际运行需求出现时再启动对应工序。B1+B3 覆盖控制面资产注册与工作流定义，B4 运行实例仍未开始。早期开放问题已关闭，见 [`open-questions.md`](open-questions.md)。

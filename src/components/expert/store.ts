@@ -314,6 +314,15 @@ export function createExpertStore(db: Db) {
       return rows.map((row) => row.tool_id);
     },
 
+    async statuses(tx: Db, expertIds: string[]): Promise<Record<string, boolean>> {
+      if (expertIds.length === 0) return {};
+      const rows = await tx.query<{ id: string; enabled: boolean }>(
+        "select id, enabled from expert where id = any($1::uuid[])",
+        [expertIds],
+      );
+      return Object.fromEntries(rows.map((row) => [row.id, row.enabled]));
+    },
+
     async listUsingSkill(tx: Db, skillId: string): Promise<{ id: string; name: string }[]> {
       return tx.query(
         `select e.id, e.name from expert_skill es

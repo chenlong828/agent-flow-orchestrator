@@ -4,6 +4,9 @@ import { closeTestDb, getTestDb } from "../helpers/test-db.ts";
 let db: Awaited<ReturnType<typeof getTestDb>>;
 
 const BUSINESS_TABLES = [
+  "workflow",
+  "workflow_definition",
+  "workflow_expert_ref",
   "expert",
   "expert_persona",
   "expert_ref",
@@ -28,7 +31,7 @@ afterAll(async () => {
 });
 
 describe("数据库结构", () => {
-  test("业务表恰好 13 张，另有 schema_migrations", async () => {
+  test("业务表恰好 16 张，另有 schema_migrations", async () => {
     const rows = await db.query<{ table_name: string }>(
       `select table_name from information_schema.tables
        where table_schema = 'public' and table_type = 'BASE TABLE'
@@ -38,7 +41,7 @@ describe("数据库结构", () => {
     expect(names).toEqual([...BUSINESS_TABLES, "schema_migrations"].sort());
   });
 
-  test("4 个迁移按顺序记录，分类参考数据为 4 条", async () => {
+  test("5 个迁移按顺序记录，分类参考数据为 4 条", async () => {
     const migrations = await db.query<{ version: string }>(
       "select version from schema_migrations order by version",
     );
@@ -47,6 +50,7 @@ describe("数据库结构", () => {
       "0002_tool.sql",
       "0003_skill.sql",
       "0004_expert.sql",
+      "0005_workflow.sql",
     ]);
 
     const categories = await db.query<{ code: string; position: number }>(
@@ -90,6 +94,34 @@ describe("数据库结构", () => {
          and t.relname = 'skill_draft' and r.relname = 'skill'`,
     );
     expect(draftCascade).toEqual([{ delete_rule: "c" }]);
+  });
+
+  test("工作流三表按冻结 schema 落库", async () => {
+    const columns = await db.query<{ table_name: string; column_name: string }>(
+      `select table_name, column_name
+       from information_schema.columns
+       where table_schema = 'public'
+         and table_name in ('workflow', 'workflow_definition', 'workflow_expert_ref')
+       order by table_name, ordinal_position`,
+    );
+    expect(columns).toEqual([
+      { table_name: "workflow", column_name: "id" },
+      { table_name: "workflow", column_name: "name" },
+      { table_name: "workflow", column_name: "type" },
+      { table_name: "workflow", column_name: "description" },
+      { table_name: "workflow", column_name: "revision" },
+      { table_name: "workflow", column_name: "created_at" },
+      { table_name: "workflow", column_name: "updated_at" },
+      { table_name: "workflow", column_name: "created_by" },
+      { table_name: "workflow", column_name: "updated_by" },
+      { table_name: "workflow_definition", column_name: "workflow_id" },
+      { table_name: "workflow_definition", column_name: "graph" },
+      { table_name: "workflow_definition", column_name: "updated_at" },
+      { table_name: "workflow_definition", column_name: "updated_by" },
+      { table_name: "workflow_expert_ref", column_name: "workflow_id" },
+      { table_name: "workflow_expert_ref", column_name: "node_id" },
+      { table_name: "workflow_expert_ref", column_name: "expert_id" },
+    ]);
   });
 
   test("Skill brief、包指针与草稿字段按契约落库", async () => {

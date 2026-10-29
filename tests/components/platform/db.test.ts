@@ -118,6 +118,7 @@ describe("platform 迁移执行", () => {
       "0002_tool.sql",
       "0003_skill.sql",
       "0004_expert.sql",
+      "0005_workflow.sql",
     ]);
     const after = await db.query("select version, checksum from schema_migrations order by version");
     expect(after).toEqual(before);

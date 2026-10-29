@@ -24,6 +24,13 @@ import type {
   UpdateExpert,
   UpdateExpertAggregate,
 } from "../expert/index.ts";
+import type {
+  CopyWorkflow,
+  CreateWorkflow,
+  UpdateWorkflow,
+  WorkflowDsl,
+  WorkflowService,
+} from "../workflow/index.ts";
 import type { ApiDocs } from "./docs.ts";
 import {
   actorFrom,
@@ -37,6 +44,7 @@ import {
   parseSortQuery,
   queryValue,
   readJsonObject,
+  readOptionalJsonObject,
 } from "./validation.ts";
 
 export type HttpDeps = {
@@ -45,6 +53,7 @@ export type HttpDeps = {
   toolService: ToolService;
   skillDraftService: SkillDraftService;
   expertService: ExpertService;
+  workflowService: WorkflowService;
   health: Health;
   actor: string;
   docs?: ApiDocs;
@@ -110,6 +119,19 @@ const SKILL_SORT = {
   "version:desc": "-version",
 } as const;
 const EXPERT_SORT = HARNESS_SORT;
+const WORKFLOW_WRITE_FIELDS = ["name", "type", "description"] as const;
+const WORKFLOW_CREATE_FIELDS = WORKFLOW_WRITE_FIELDS;
+const WORKFLOW_COPY_FIELDS = ["name"] as const;
+const WORKFLOW_GRAPH_FIELDS = ["graph"] as const;
+const WORKFLOW_IMPORT_FIELDS = [
+  "dslVersion",
+  "metadata",
+  "stages",
+  "nodes",
+  "edges",
+  "layout",
+] as const;
+const WORKFLOW_SORT = HARNESS_SORT;
 
 function json(data: JsonValue | string, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(data), {
@@ -295,6 +317,67 @@ function parseExpertListQuery(url: URL) {
   };
 }
 
+function parseWorkflowListQuery(url: URL) {
+  return {
+    q: queryValue(url, "q"),
+    type: queryValue(url, "type"),
+    page: parsePageQuery(url),
+    sort: parseSortQuery(url, WORKFLOW_SORT),
+  };
+}
+
+function yamlScalar(value: unknown): string {
+  if (value === null) return "null";
+  if (typeof value === "string") return JSON.stringify(value);
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  throw new ValidationError("dsl", "DSL 包含无法序列化的值");
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function toYaml(value: unknown, indent = 0): string {
+  const pad = " ".repeat(indent);
+  if (Array.isArray(value)) {
+    if (value.length === 0) return `${pad}[]`;
+    return value
+      .map((item) => {
+        if (!isPlainRecord(item)) return `${pad}- ${yamlScalar(item)}`;
+        const entries = Object.entries(item);
+        if (entries.length === 0) return `${pad}- {}`;
+        const [first, ...rest] = entries;
+        if (first === undefined) return `${pad}- {}`;
+        const firstValue = isPlainRecord(first[1])
+          ? `\n${toYaml(first[1], indent + 4)}`
+          : yamlScalar(first[1]);
+        const lines = [`${pad}- ${first[0]}: ${firstValue}`];
+        for (const [key, entry] of rest) {
+          if (isPlainRecord(entry)) {
+            lines.push(`${" ".repeat(indent + 2)}${key}:\n${toYaml(entry, indent + 4)}`);
+          } else {
+            lines.push(`${" ".repeat(indent + 2)}${key}: ${yamlScalar(entry)}`);
+          }
+        }
+        return lines.join("\n");
+      })
+      .join("\n");
+  }
+  if (isPlainRecord(value)) {
+    const entries = Object.entries(value);
+    if (entries.length === 0) return `${pad}{}`;
+    return entries
+      .map(([key, entry]) => {
+        if (isPlainRecord(entry) || Array.isArray(entry)) {
+          return `${pad}${key}:\n${toYaml(entry, indent + 2)}`;
+        }
+        return `${pad}${key}: ${yamlScalar(entry)}`;
+      })
+      .join("\n");
+  }
+  return `${pad}${yamlScalar(value)}`;
+}
+
 function pagePayload<T>(page: Page<T>): Record<string, unknown> {
   return {
     items: page.items,
@@ -311,6 +394,7 @@ export function createHttpApp(deps: HttpDeps): (request: Request) => Promise<Res
     toolService,
     skillDraftService,
     expertService,
+    workflowService,
     health,
     actor,
     docs,
@@ -412,6 +496,22 @@ export function createHttpApp(deps: HttpDeps): (request: Request) => Promise<Res
           }
           throw new NotFoundError("路径", path);
         }
+        case "workflows": {
+          if (request.method === "GET") {
+            const page = await catalog.listWorkflows(parseWorkflowListQuery(url));
+            return json(pagePayload(page));
+          }
+          if (request.method === "POST") {
+            const body = await readJsonObject(request, WORKFLOW_CREATE_FIELDS);
+            const created = await workflowService.create(
+              body as unknown as CreateWorkflow,
+              actorFrom(request, actor),
+            );
+            const detail = await catalog.getWorkflow(created.id);
+            return json(detail, 201, { Location: `/api/v1/workflows/${created.id}` });
+          }
+          throw new NotFoundError("路径", path);
+        }
         case "experts": {
           if (request.method === "GET") {
             const page = await catalog.listExperts(parseExpertListQuery(url));
@@ -431,6 +531,21 @@ export function createHttpApp(deps: HttpDeps): (request: Request) => Promise<Res
         default:
           throw new NotFoundError("路径", path);
       }
+    }
+
+    if (segments.length === 2 && segments[0] === "workflows" && segments[1] === "import") {
+      if (request.method !== "POST") throw new NotFoundError("路径", path);
+      const body = await readJsonObject(request, WORKFLOW_IMPORT_FIELDS);
+      const imported = await workflowService.importDsl(
+        body as unknown as WorkflowDsl,
+        actorFrom(request, actor),
+      );
+      const detail = await catalog.getWorkflow(imported.id);
+      return json(
+        { workflow: detail, idMap: imported.idMap, warnings: imported.warnings },
+        201,
+        { Location: `/api/v1/workflows/${imported.id}` },
+      );
     }
 
     const [resource, rawId, subresource] = segments;
@@ -482,6 +597,25 @@ export function createHttpApp(deps: HttpDeps): (request: Request) => Promise<Res
           }
           if (request.method === "DELETE") {
             await skillDraftService.cancelDraft(id);
+            return noContent();
+          }
+          throw new NotFoundError("路径", path);
+        }
+        case "workflows": {
+          if (request.method === "GET") return json(await catalog.getWorkflow(id));
+          if (request.method === "PUT") {
+            const revision = parseIfMatch(request);
+            const body = await readJsonObject(request, WORKFLOW_WRITE_FIELDS);
+            await workflowService.update(
+              id,
+              revision,
+              body as unknown as UpdateWorkflow,
+              actorFrom(request, actor),
+            );
+            return json(await catalog.getWorkflow(id));
+          }
+          if (request.method === "DELETE") {
+            await workflowService.delete(id, parseIfMatch(request));
             return noContent();
           }
           throw new NotFoundError("路径", path);
@@ -610,6 +744,56 @@ export function createHttpApp(deps: HttpDeps): (request: Request) => Promise<Res
         return json(saved, status, {
           Location: `/api/v1/skills/${saved.id}`,
         });
+      }
+
+      if (resource === "workflows") {
+        if (subresource === "copy" && request.method === "POST") {
+          const body = await readOptionalJsonObject(request, WORKFLOW_COPY_FIELDS);
+          const copied = await workflowService.copy(
+            id,
+            body as unknown as CopyWorkflow,
+            actorFrom(request, actor),
+          );
+          const detail = await catalog.getWorkflow(copied.id);
+          return json(detail, 201, { Location: `/api/v1/workflows/${copied.id}` });
+        }
+        if (subresource === "definition" && request.method === "PUT") {
+          const revision = parseIfMatch(request);
+          const body = await readJsonObject(request, WORKFLOW_GRAPH_FIELDS);
+          const saved = await workflowService.saveDefinition(
+            id,
+            revision,
+            { graph: body.graph },
+            actorFrom(request, actor),
+          );
+          const detail = await catalog.getWorkflow(id);
+          return json({ workflow: detail, warnings: saved.warnings });
+        }
+        if (subresource === "validate" && request.method === "POST") {
+          await catalog.getWorkflow(id);
+          const body = await readJsonObject(request, WORKFLOW_GRAPH_FIELDS);
+          return json(await workflowService.validate(body.graph));
+        }
+        if (subresource === "dsl" && request.method === "GET") {
+          const format = queryValue(url, "format") ?? "json";
+          if (format !== "json" && format !== "yaml") {
+            throw new ValidationError("format", "必须是 json 或 yaml");
+          }
+          const dsl = await workflowService.exportDsl(id);
+          if (format === "json") {
+            return json(dsl as unknown as Record<string, unknown>, 200, {
+              "content-disposition": `attachment; filename="workflow-${id}.json"`,
+            });
+          }
+          return new Response(toYaml(dsl) + "\n", {
+            status: 200,
+            headers: {
+              "content-type": "application/yaml; charset=utf-8",
+              "content-disposition": `attachment; filename="workflow-${id}.yaml"`,
+            },
+          });
+        }
+        throw new NotFoundError("路径", path);
       }
 
       if (subresource === "references" && request.method === "GET") {

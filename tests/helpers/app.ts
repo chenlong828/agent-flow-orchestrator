@@ -16,6 +16,10 @@ import { createToolRead, createToolService } from "../../src/components/tool/ind
 import { createSkillRead } from "../../src/components/skill/read.ts";
 import { createSkillDraftService } from "../../src/components/skill/draft.ts";
 import { createExpertRead, createExpertService } from "../../src/components/expert/index.ts";
+import {
+  createWorkflowRead,
+  createWorkflowService,
+} from "../../src/components/workflow/index.ts";
 import { createCatalog } from "../../src/components/catalog/index.ts";
 import { createHttpApp } from "../../src/components/http-gateway/index.ts";
 import { getTestDb } from "./test-db.ts";
@@ -32,6 +36,8 @@ export type TestContext = {
   toolService: ReturnType<typeof createToolService>;
   skillService: { create(input: { name: string; categoryCode: string; description: string; tags?: string[]; sections?: Record<string, string> }): Promise<{ id: string }> };
   expertService: ReturnType<typeof createExpertService>;
+  workflowRead: ReturnType<typeof createWorkflowRead>;
+  workflowService: ReturnType<typeof createWorkflowService>;
 };
 
 export async function createTestContext(): Promise<TestContext> {
@@ -43,11 +49,13 @@ export async function createTestContext(): Promise<TestContext> {
   );
   const catalogSkillRead = createSkillRead(db, skillStore);
   const expertRead = createExpertRead({ db });
+  const workflowRead = createWorkflowRead({ db });
   const catalog = createCatalog({
     harnessRead,
     toolRead,
     skillRead: catalogSkillRead,
     expertRead,
+    workflowRead,
   });
 
   const harnessService = createHarnessService({
@@ -100,6 +108,14 @@ export async function createTestContext(): Promise<TestContext> {
     clock: systemClock,
     ids: uuidv7Ids,
     actor: "tester",
+    guard: catalog,
+  });
+  const workflowService = createWorkflowService({
+    db,
+    clock: systemClock,
+    ids: uuidv7Ids,
+    actor: "tester",
+    expertStatus: expertRead,
   });
 
   const app = createHttpApp({
@@ -108,6 +124,7 @@ export async function createTestContext(): Promise<TestContext> {
     toolService,
     skillDraftService,
     expertService,
+    workflowService,
     health: createHealth(db),
     actor: "tester",
   });
@@ -124,6 +141,8 @@ export async function createTestContext(): Promise<TestContext> {
     skillService,
     skillDraftService,
     expertService,
+    workflowRead,
+    workflowService,
   };
 }
 

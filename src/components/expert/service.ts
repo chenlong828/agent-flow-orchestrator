@@ -1,11 +1,13 @@
 import {
   NameConflictError,
   NotFoundError,
+  ReferencedError,
   RevisionConflictError,
   ValidationError,
   type Clock,
   type IdGenerator,
   type Page,
+  type ReferenceGuard,
 } from "../../core/kernel/index.ts";
 import {
   isForeignKeyViolation,
@@ -47,6 +49,7 @@ export type ExpertDeps = {
   clock: Clock;
   ids: IdGenerator;
   actor: string;
+  guard?: ReferenceGuard;
 };
 
 function toIso(value: Date | string): string {
@@ -234,7 +237,7 @@ function normalizeIds(value: unknown, field: string): string[] {
 }
 
 export function createExpertService(deps: ExpertDeps): ExpertService {
-  const { db, clock, ids, actor } = deps;
+  const { db, clock, ids, actor, guard } = deps;
   const store = createExpertStore(db);
 
   async function replaceSkills(
@@ -420,14 +423,29 @@ export function createExpertService(deps: ExpertDeps): ExpertService {
     },
 
     async delete(id, revision) {
-      return db.transaction(async (tx) => {
-        const current = await store.findRoot(tx, id, true);
-        if (current === null) throw new NotFoundError("专家", id);
-        if (current.revision !== revision) {
-          throw new RevisionConflictError(current.revision);
+      const current = await store.findRoot(db, id);
+      if (current === null) throw new NotFoundError("专家", id);
+      if (guard !== undefined) {
+        const references = await guard.check("expert", id);
+        if (references.length > 0) {
+          throw new ReferencedError({ type: "expert", id, name: current.name }, references);
         }
-        await store.deleteRoot(tx, id, revision);
-      });
+      }
+      try {
+        await db.transaction(async (tx) => {
+          const locked = await store.findRoot(tx, id, true);
+          if (locked === null) throw new NotFoundError("专家", id);
+          if (locked.revision !== revision) {
+            throw new RevisionConflictError(locked.revision);
+          }
+          await store.deleteRoot(tx, id, revision);
+        });
+      } catch (error) {
+        if (isForeignKeyViolation(error)) {
+          throw new ReferencedError({ type: "expert", id, name: current.name }, []);
+        }
+        throw error;
+      }
     },
 
     async setSkills(id, revision, skillIds, requestActor) {
@@ -512,6 +530,10 @@ export function createExpertRead(deps: { db: Db }): ExpertRead {
 
     async listExpertsUsingTool(toolId): Promise<ExpertReference[]> {
       return store.listUsingTool(db, toolId);
+    },
+
+    async statuses(expertIds): Promise<Record<string, boolean>> {
+      return store.statuses(db, expertIds);
     },
   };
 }

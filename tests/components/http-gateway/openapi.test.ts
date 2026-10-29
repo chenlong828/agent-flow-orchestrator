@@ -32,9 +32,9 @@ for (const [path, item] of Object.entries<any>(spec.paths)) {
 describe("OpenAPI 契约结构", () => {
   test("版本、路径与 operation 数量稳定", () => {
     expect(spec.openapi).toBe("3.0.3");
-    expect(Object.keys(spec.paths)).toHaveLength(24);
-    expect(operations).toHaveLength(38);
-    expect(spec.info["x-api-count"]).toBe(37);
+    expect(Object.keys(spec.paths)).toHaveLength(31);
+    expect(operations).toHaveLength(48);
+    expect(spec.info["x-api-count"]).toBe(47);
   });
 
   test("operation 介绍、schema 说明与 tag 齐全", () => {
@@ -118,13 +118,13 @@ describe("OpenAPI 契约结构", () => {
 
   test("components 完整，所有 $ref 都可解析", () => {
     expect(Object.keys(spec.components.parameters)).toHaveLength(8);
-    expect(Object.keys(spec.components.schemas)).toHaveLength(54);
+    expect(Object.keys(spec.components.schemas)).toHaveLength(76);
     expect(Object.keys(spec.components.responses)).toHaveLength(10);
 
     const refs = [...text.matchAll(/\$ref['"]?\s*:\s*['"]?#\/components\/([^'"]+)['"]?/g)].map(
       (match) => match[1]!,
     );
-    expect(refs.length).toBe(361);
+    expect(refs.length).toBe(467);
     const missing: string[] = [];
     for (const ref of new Set(refs)) {
       let current: any = spec.components;

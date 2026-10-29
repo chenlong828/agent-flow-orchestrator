@@ -111,4 +111,5 @@ export type ExpertRead = {
   get(id: string): Promise<ExpertDetail>;
   listExpertsUsingSkill(skillId: string): Promise<ExpertReference[]>;
   listExpertsUsingTool(toolId: string): Promise<ExpertReference[]>;
+  statuses(expertIds: string[]): Promise<Record<string, boolean>>;
 };

@@ -3,7 +3,7 @@ layer: design
 module: kernel
 status: current
 component: CMP-kernel
-updated: 2026-10-28
+updated: 2026-10-29
 ---
 
 # `CMP-kernel` 共享契约组件规格
@@ -98,12 +98,17 @@ const MAX_PAGE_LIMIT = 200;
 ### 3.3 引用检查端口
 
 ```ts
-type ReferenceOwner = "harness" | "tool" | "skill";
+type ReferenceOwner = "harness" | "tool" | "skill" | "expert";
 
 type Reference = {
-  type: "tool" | "expert";
+  type: "tool" | "expert" | "workflow";
   id: string;
   name: string;
+};
+
+/** 只读专家状态端口；由 CMP-expert 实现，组合根注入工作流服务。 */
+type ExpertStatusReader = {
+  statuses(expertIds: string[]): Promise<Record<string, boolean>>;
 };
 
 type ReferenceGuard = {
@@ -111,9 +116,10 @@ type ReferenceGuard = {
 };
 ```
 
-- `ReferenceGuard` 是端口，由 `catalog` 实现；领域删除服务只依赖本端口。
+- `ReferenceGuard` 是端口，由 `catalog` 实现；领域删除服务只依赖本端口。`expert` owner 返回引用该专家的去重工作流摘要（`type="workflow"`）。
 - 返回空数组表示可删除；返回非空数组表示被引用，由领域服务抛 `ReferencedError`。
-- 本端口不负责删除后的级联清理；B1 没有跨聚合级联删除。
+- 本端口不负责删除后的级联清理；工作流删除级联自身定义/引用，不跨聚合删除专家。
+- `ExpertStatusReader` 只返回启停状态，不暴露专家实体；供工作流保存/校验判断 `expert_missing` / `expert_disabled`。
 
 ### 3.4 时钟与 ID 端口
 
@@ -164,7 +170,8 @@ type FileStore = {
 | 方法 | 目的 | 输入 | 输出 | 错误 | 说明 |
 |---|---|---|---|---|---|
 | `normalizePageQuery` | 规范化分页参数 | `limit?`, `offset?` | `PageQuery` | `ValidationError` | 默认 50，上限 200 |
-| `ReferenceGuard.check` | 查询引用方 | `owner`, `id` | `Reference[]` | 无 | 空数组表示可删除 |
+| `ReferenceGuard.check` | 查询引用方 | `owner`, `id` | `Reference[]` | 无 | 空数组表示可删除；owner 含 expert |
+| `ExpertStatusReader.statuses` | 批量专家启停 | `expertIds[]` | `Record<string,boolean>` | 无 | 只读状态，不暴露实体 |
 | `FileStore.put` | 原子写/覆盖 | `key`, `data` | `void` | 平台存储错误 | fsync 文件与目录 |
 | `FileStore.get` | 读流 | `key` | `ReadableStream<Uint8Array>` | 平台存储错误 | 不存在由 `head` 判定 |
 | `FileStore.head` | 文件元数据 | `key` | `FileStat \| null` | 平台存储错误 | 不存在返回 null |

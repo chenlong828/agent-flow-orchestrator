@@ -20,6 +20,10 @@ import {
   createExpertRead,
   createExpertService,
 } from "./components/expert/index.ts";
+import {
+  createWorkflowRead,
+  createWorkflowService,
+} from "./components/workflow/index.ts";
 import { createCatalog } from "./components/catalog/index.ts";
 import { createApiDocs, createHttpApp } from "./components/http-gateway/index.ts";
 
@@ -41,7 +45,14 @@ const toolRead = createToolRead({ db });
 const skillStore = createFileStore(config.skillStorageRoot);
 const skillRead = createSkillRead(db, skillStore);
 const expertRead = createExpertRead({ db });
-const catalog = createCatalog({ harnessRead, toolRead, skillRead, expertRead });
+const workflowRead = createWorkflowRead({ db });
+const catalog = createCatalog({
+  harnessRead,
+  toolRead,
+  skillRead,
+  expertRead,
+  workflowRead,
+});
 
 const harnessService = createHarnessService({
   db,
@@ -71,6 +82,14 @@ const expertService = createExpertService({
   clock: systemClock,
   ids: uuidv7Ids,
   actor: config.actor,
+  guard: catalog,
+});
+const workflowService = createWorkflowService({
+  db,
+  clock: systemClock,
+  ids: uuidv7Ids,
+  actor: config.actor,
+  expertStatus: expertRead,
 });
 
 const health = createHealth(db);
@@ -91,6 +110,7 @@ const app = createHttpApp({
   toolService,
   skillDraftService,
   expertService,
+  workflowService,
   health,
   actor: config.actor,
   docs,

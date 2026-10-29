@@ -10,7 +10,7 @@ updated: 2026-10-29
 
 ## 1 主目标
 
-把四类资产的单聚合读契约组合成外部客户端可直接消费的列表、详情与引用只读投影；不拥有表，不执行写操作。Skill 的详情、文档与整包下载也通过本组件透传，保证 HTTP 只依赖一个读面。
+把四类资产与工作流定义的单聚合读契约组合成外部客户端可直接消费的列表、详情与引用只读投影；不拥有表，不执行写操作。Skill 的详情、文档与整包下载也通过本组件透传，保证 HTTP 只依赖一个读面。
 
 **不负责**：业务写规则、数据库访问、HTTP 路由、状态推进、包内容解析。
 
@@ -53,6 +53,9 @@ type CatalogRead = {
   listExperts(query: ExpertQuery): Promise<Page<ExpertListItem>>;
   getExpert(id: string): Promise<ExpertDetailView>;
   listExpertsUsingTool(toolId: string): Promise<Reference[]>;
+
+  listWorkflows(query: WorkflowQuery): Promise<Page<WorkflowSummary>>;
+  getWorkflow(id: string): Promise<WorkflowDetail>;
 
   referencesForHarness(id: string): Promise<ReferencePage>;
   referencesForTool(id: string): Promise<ReferencePage>;
@@ -213,6 +216,8 @@ type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
 | `listExperts` | 专家列表 | `ExpertQuery` | `Page<ExpertListItem>` | `ValidationError` | `ExpertRead.list` + `SkillRead.getSummary`（前 3 个预览） |
 | `getExpert` | 专家详情 | `id` | `ExpertDetailView` | `NotFoundError` | `ExpertRead.get` + `SkillRead.getSummary` + `ToolRead.getSummary` |
 | `listExpertsUsingTool` | 工具的引用专家 | `toolId` | `Reference[]` | 无 | `ExpertRead.listExpertsUsingTool` |
+| `listWorkflows` | 工作流列表 | `WorkflowQuery` | `Page<WorkflowSummary>` | `ValidationError` | `WorkflowRead.list` |
+| `getWorkflow` | 工作流详情 | `id` | `WorkflowDetail` | `NotFoundError` | `WorkflowRead.get` |
 | `referencesForHarness` | 删除前引用页 | `id` | `ReferencePage` | `NotFoundError` | `ReferenceGuard.check` |
 | `referencesForTool` | 删除前引用页 | `id` | `ReferencePage` | `NotFoundError` | `ReferenceGuard.check` |
 | `referencesForSkill` | 删除前引用页 | `id` | `ReferencePage` | `NotFoundError` | `ReferenceGuard.check` |
@@ -230,16 +235,17 @@ type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
 | Skill 整包下载 | `SkillRead.getPackage`（原样透传；不解析 zip） |
 | 专家列表/详情 | `ExpertRead`（列表含 `skillIds`）+ `SkillRead.getSummary` + `ToolRead.getSummary` |
 | 分类列表 | `SkillRead.listCategories` |
-| 引用查询 | `ToolRead.listByHarness` / `ExpertRead.listExpertsUsing*` |
+| 工作流列表/详情 | `WorkflowRead.list` / `WorkflowRead.get` |
+| 引用查询 | `ToolRead.listByHarness` / `ExpertRead.listExpertsUsing*` / `WorkflowRead.listByExpert` |
 
 - 不直接 SQL；不导入任何 store。
 - 单次请求内的多次读尽量在同一数据库快照/事务中完成；是否使用只读事务在实现时定，契约不承诺强一致。
-- 计数口径：Harness `toolCount` = 引用工具数；工具/Skill `usedByCount` = 引用专家数；专家 `refCount=0`（B1）。
+- 计数口径：Harness `toolCount` = 引用工具数；工具/Skill `usedByCount` = 引用专家数；专家 `refCount` = 引用该专家的去重工作流数（`WorkflowRead.countByExperts`）。
 - 专家列表只为前 3 个 `skillIds` 解析名称，不把完整摘要塞进列表；Skill 列表的 `description` 由 `SkillRead` 摘要直接提供，不需要逐条详情。
 
 ## 5 依赖与边界
 
-- 允许：`harness`、`tool`、`skill`、`expert` 的公开读契约；`kernel` 的错误、分页、`ReferenceGuard` 契约。
+- 允许：`harness`、`tool`、`skill`、`expert`、`workflow` 的公开读契约；`kernel` 的错误、分页、`ReferenceGuard` 契约。
 - 禁止：写服务、store、`Bun.sql`、HTTP 类型、其他组件的内部类型。
 - `http-gateway` 只调用本组件的读契约与领域写服务，不直接导入领域 store。
 
@@ -247,7 +253,8 @@ type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
 
 - 组合：每个列表/详情字段完整；跨组件名称/计数正确；空集合返回空数组而非 `null`。
 - 引用：Harness 被工具引用、工具/Skill 被专家引用；删除前引用列表与详情一致。
-- 端口：`ReferenceGuard` 对三类资产分别返回正确引用；无引用返回 `[]`。
+- 端口：`ReferenceGuard` 对 Harness/工具/Skill/专家分别返回正确引用；专家引用项 `type="workflow"`；无引用返回 `[]`。
+- 工作流：列表/详情透传；专家 `refCount` 与 `WorkflowRead.countByExperts` 一致。
 - 架构：无写操作、无 SQL、无 store 导入。
 - 契约：对应 REST 读端点的 3 正 1 反在 `http-gateway` 规格中列明。
 
@@ -257,8 +264,8 @@ type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
 - 单独验证命令：`bun test tests/components/catalog`。
 - 当前状态：`current`；Skill 读投影已按 T-SKP-16 改为 `body`+`files` 并透传整包，验证记录见 [工序 result.md](../../../works/2026-10-28-skill-package/result.md)。
 
-## 8 B1 实现口径与剩余风险
+## 8 B1/B3 实现口径与剩余风险
 
 - 列表/详情按多次只读查询组合，未引入统一只读事务；单次请求内各查询之间不保证同一快照。
-- 专家详情与列表的 Skill 摘要在 catalog 内逐项解析；列表最多 3 个预览，详情为完整装配；B1 接受当前读放大，不提前加缓存。若后续列表规模明显增长，再评估领域读契约合并或批量摘要读。
-- 剩余风险：跨表读一致性由调用方按业务容忍度处理；B1 未出现需要强一致的读路径。
+- 专家详情与列表的 Skill 摘要在 catalog 内逐项解析；列表最多 3 个预览，详情为完整装配；B1/B3 接受当前读放大，不提前加缓存。若后续列表规模明显增长，再评估领域读契约合并或批量摘要读。
+- 剩余风险：跨表读一致性由调用方按业务容忍度处理；当前未出现需要强一致的读路径。

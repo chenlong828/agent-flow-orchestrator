@@ -24,6 +24,7 @@ export {
 export type { Page, PageQuery } from "./pagination.ts";
 export type {
   Clock,
+  ExpertStatusReader,
   FileData,
   FileStat,
   FileStore,

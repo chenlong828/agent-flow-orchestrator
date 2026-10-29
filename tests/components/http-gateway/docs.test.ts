@@ -136,6 +136,7 @@ describe("Swagger 文档端点", () => {
       toolService: ctx.toolService,
       skillDraftService: ctx.skillDraftService,
       expertService: ctx.expertService,
+      workflowService: ctx.workflowService,
       health: createHealth(ctx.db),
       actor: "tester",
       docs,

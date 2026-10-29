@@ -1,11 +1,11 @@
 ---
 openapi: 3.0.3
 info:
-  title: AgentFlow B1 资产注册中心 API
+  title: AgentFlow B1+B3 资产注册与工作流定义 API
   version: 0.1.0
   description: |
-    AgentFlow B1 控制面的 HTTP JSON 契约，覆盖 Harness、工具、Skill、专家、
-    引用页与健康检查。业务端点统一以 `/api/v1` 为前缀，`/healthz` 不参与版本。
+    AgentFlow B1+B3 控制面的 HTTP JSON 契约，覆盖 Harness、工具、Skill、专家、
+    工作流定义、引用页与健康检查。业务端点统一以 `/api/v1` 为前缀，`/healthz` 不参与版本。
 
     本文件是 `CMP-http-gateway` 的运行时 OpenAPI 资产，由 `spec.md` 派生，供外部 HTTP 客户端与接口调试工具对照使用。
     本仓库只提供 HTTP API，不提供产品 UI、CLI 或库；Swagger UI 是开发者文档，不是产品 UI。
@@ -14,12 +14,12 @@ info:
     通用约定：
     - 请求/响应为 `application/json; charset=utf-8`；ID 为 UUIDv7；时间为 ISO-8601 UTC。
     - 列表响应为 `{items,total,limit,offset}`；`limit` 默认 50、上限 200。
-    - 启停、删除、专家装配、已有 Skill 草稿保存需带 `If-Match: "<revision>"`；缺少为 428，旧版本为 409。
+    - 启停、删除、专家装配、工作流保存定义、已有 Skill 草稿保存需带 `If-Match: "<revision>"`；缺少为 428，旧版本为 409。工作流复制/导入/校验不需要 `If-Match`。
     - Skill 新建/更新走草稿保存；`POST /skills`、`PUT /skills/{id}` 已移除。
     - 无登录/鉴权；`X-Actor` 仅用于显示，不是身份。请求可带 `X-Request-Id`，响应可回显。无 CORS 配置。
   x-source-spec: docs/design/components/http-gateway/spec.md
   x-contract-status: current
-  x-api-count: 37
+  x-api-count: 47
   license:
     name: Internal use only
   x-runtime-asset: true
@@ -36,6 +36,8 @@ tags:
   description: Skill 包、草稿、下载、分类、启停与引用。
 - name: Expert
   description: 专家资产、五区、有序装配与引用。
+- name: Workflow
+  description: 工作流定义、图保存/校验、复制与 DSL 交换。
 - name: Reference
   description: 删除前的引用检查页。
 - name: Health
@@ -1367,6 +1369,366 @@ paths:
           "$ref": "#/components/responses/InternalError"
         '503':
           "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/workflows":
+    parameters:
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    get:
+      tags:
+      - Workflow
+      summary: API-31 查询工作流列表
+      operationId: listWorkflows
+      x-api-id: API-31
+      x-component-method: catalog.listWorkflows
+      description: 按名称、类型筛选工作流；返回节点/阶段计数，不返回完整图。
+      parameters:
+      - "$ref": "#/components/parameters/Q"
+      - name: type
+        in: query
+        required: false
+        description: 工作流类型标签精确匹配。
+        schema:
+          type: string
+          maxLength: 40
+      - "$ref": "#/components/parameters/Limit"
+      - "$ref": "#/components/parameters/Offset"
+      - name: sort
+        in: query
+        required: false
+        description: 排序字段与方向。
+        schema:
+          "$ref": "#/components/schemas/WorkflowSort"
+      responses:
+        '200':
+          description: 工作流分页列表。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WorkflowList"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+    post:
+      tags:
+      - Workflow
+      summary: API-32 创建工作流
+      operationId: createWorkflow
+      x-api-id: API-32
+      x-component-method: workflow.create + catalog.getWorkflow
+      description: 创建工作流并写入空图；名称大小写不敏感唯一。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/WorkflowCreate"
+      responses:
+        '201':
+          description: 创建成功，返回含空图的详情。
+          headers:
+            Location:
+              description: 新工作流资源地址。
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WorkflowDetail"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/workflows/import":
+    parameters:
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    post:
+      tags:
+      - Workflow
+      summary: API-40 导入工作流 DSL
+      operationId: importWorkflow
+      x-api-id: API-40
+      x-component-method: workflow.importDsl + catalog.getWorkflow
+      description: 从严校验 DSL 并新建工作流；缺失专家清空为 null 并返回 warning，名称冲突 409。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/WorkflowDsl"
+      responses:
+        '201':
+          description: 导入成功；idMap 当前为恒等映射。
+          headers:
+            Location:
+              description: 新工作流资源地址。
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WorkflowImportResult"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/workflows/{id}":
+    parameters:
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    - "$ref": "#/components/parameters/Id"
+    get:
+      tags:
+      - Workflow
+      summary: API-33 查询工作流详情
+      operationId: getWorkflow
+      x-api-id: API-33
+      x-component-method: catalog.getWorkflow
+      description: 返回工作流元数据与唯一当前图。
+      responses:
+        '200':
+          description: 工作流详情。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WorkflowDetail"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+    put:
+      tags:
+      - Workflow
+      summary: API-34 更新工作流元数据
+      operationId: updateWorkflow
+      x-api-id: API-34
+      x-component-method: workflow.update + catalog.getWorkflow
+      description: 整体更新名称、类型与描述，不修改图；需要当前 revision。
+      parameters:
+      - "$ref": "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/WorkflowUpdate"
+      responses:
+        '200':
+          description: 更新后的详情。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WorkflowDetail"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '428':
+          "$ref": "#/components/responses/PreconditionRequired"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+    delete:
+      tags:
+      - Workflow
+      summary: API-35 删除工作流
+      operationId: deleteWorkflow
+      x-api-id: API-35
+      x-component-method: workflow.delete
+      description: 删除工作流并级联删除当前定义与专家引用投影；需要当前 revision。
+      parameters:
+      - "$ref": "#/components/parameters/IfMatch"
+      responses:
+        '204':
+          description: 删除成功，无响应体。
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '428':
+          "$ref": "#/components/responses/PreconditionRequired"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/workflows/{id}/copy":
+    parameters:
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    - "$ref": "#/components/parameters/Id"
+    post:
+      tags:
+      - Workflow
+      summary: API-36 复制工作流
+      operationId: copyWorkflow
+      x-api-id: API-36
+      x-component-method: workflow.copy + catalog.getWorkflow
+      description: 只复制当前图，节点/阶段/边 ID 原样保留；名称冲突自动追加后缀。
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/WorkflowCopy"
+      responses:
+        '201':
+          description: 复制成功，返回新工作流详情。
+          headers:
+            Location:
+              description: 新工作流资源地址。
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WorkflowDetail"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/workflows/{id}/definition":
+    parameters:
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    - "$ref": "#/components/parameters/Id"
+    put:
+      tags:
+      - Workflow
+      summary: API-37 保存当前工作流图
+      operationId: saveWorkflowDefinition
+      x-api-id: API-37
+      x-component-method: workflow.saveDefinition + catalog.getWorkflow
+      description: 形状错误 400 且不保存；语义问题 200 并返回 warnings；专家不存在 400 且回滚。
+      parameters:
+      - "$ref": "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/WorkflowSaveDefinition"
+      responses:
+        '200':
+          description: 保存成功；workflow 为保存后的详情。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WorkflowSaveResult"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '428':
+          "$ref": "#/components/responses/PreconditionRequired"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/workflows/{id}/validate":
+    parameters:
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    - "$ref": "#/components/parameters/Id"
+    post:
+      tags:
+      - Workflow
+      summary: API-38 校验工作流图
+      operationId: validateWorkflow
+      x-api-id: API-38
+      x-component-method: catalog.getWorkflow + workflow.validate
+      description: 只校验不写入；形状错误与语义问题都放在 ValidationReport 中返回 200。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/WorkflowSaveDefinition"
+      responses:
+        '200':
+          description: 校验报告。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ValidationReport"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/workflows/{id}/dsl":
+    parameters:
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    - "$ref": "#/components/parameters/Id"
+    get:
+      tags:
+      - Workflow
+      summary: API-39 导出工作流 DSL
+      operationId: exportWorkflowDsl
+      x-api-id: API-39
+      x-component-method: workflow.exportDsl
+      description: 导出当前图与元数据；JSON 为权威格式，YAML 是同一结构的无损渲染。
+      parameters:
+      - name: format
+        in: query
+        required: false
+        description: 导出格式，默认 json。
+        schema:
+          type: string
+          enum:
+          - json
+          - yaml
+          default: json
+      responses:
+        '200':
+          description: DSL 文件。
+          headers:
+            Content-Disposition:
+              description: 附件文件名。
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/WorkflowDsl"
+            application/yaml:
+              schema:
+                type: string
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
 components:
   parameters:
     Actor:
@@ -2409,7 +2771,7 @@ components:
         refCount:
           type: integer
           minimum: 0
-          description: 引用数，B1 固定为 0
+          description: 引用该专家的去重工作流数
         revision:
           type: integer
           minimum: 1
@@ -2418,7 +2780,7 @@ components:
           type: string
           format: date-time
           description: 更新时间，ISO-8601 UTC
-      description: 专家列表与详情共享字段；装配计数由关系实时派生，refCount 在 B1 固定为 0。
+      description: 专家列表与详情共享字段；装配计数由关系实时派生，refCount 为引用该专家的去重工作流数。
     ExpertListItem:
       allOf:
       - "$ref": "#/components/schemas/ExpertBase"
@@ -2735,6 +3097,7 @@ components:
           enum:
           - tool
           - expert
+          - workflow
           description: 引用方类型
         id:
           type: string
@@ -2743,7 +3106,7 @@ components:
         name:
           type: string
           description: 引用方名称
-      description: 引用页条目；type 为 tool/expert。
+      description: 引用页条目；type 为 tool/expert/workflow。
     ReferencePage:
       type: object
       required:
@@ -2764,6 +3127,409 @@ components:
             "$ref": "#/components/schemas/ReferenceItem"
           description: 引用方列表
       description: 删除前的引用检查页；total 与 items 由引用关系实时生成。
+    WorkflowSort:
+      type: string
+      enum:
+      - name
+      - "-name"
+      - updatedAt
+      - "-updatedAt"
+      description: 工作流排序字段与方向；默认 -updatedAt。
+    WorkflowNodeType:
+      type: string
+      enum:
+      - start
+      - end
+      - agent
+      - review
+      - confirm
+      - fanout
+      - fanin
+      description: 工作流节点类型；start/end/agent/review/fanout/fanin 必须绑定专家，confirm 禁止绑定。
+    WorkflowEdgeKind:
+      type: string
+      enum:
+      - seq
+      - rollback
+      description: 边类型；seq 构成单主链，rollback 指回祖先节点。
+    WorkflowStage:
+      type: object
+      required:
+      - id
+      - name
+      properties:
+        id:
+          type: string
+          description: 工作流内稳定阶段 ID，不是 UUID。
+        name:
+          type: string
+          description: 阶段显示名称。
+      description: 工作流阶段；只用于展示与节点归组。
+    WorkflowNode:
+      type: object
+      required:
+      - id
+      - type
+      - name
+      - stageId
+      - expertId
+      properties:
+        id:
+          type: string
+          description: 工作流内稳定节点 ID，不是 UUID。
+        type:
+          "$ref": "#/components/schemas/WorkflowNodeType"
+          description: 节点类型。
+        name:
+          type: string
+          description: 节点显示名称。
+        stageId:
+          type: string
+          nullable: true
+          description: 所属阶段 ID；可为 null。
+        expertId:
+          type: string
+          format: uuid
+          nullable: true
+          description: 绑定专家 ID；按节点矩阵必填或禁止。
+      description: 工作流节点；专家绑定用于执行和引用投影。
+    WorkflowEdge:
+      type: object
+      required:
+      - id
+      - from
+      - to
+      - kind
+      properties:
+        id:
+          type: string
+          description: 工作流内稳定边 ID，不是 UUID。
+        from:
+          type: string
+          description: 起点节点 ID。
+        to:
+          type: string
+          description: 终点节点 ID。
+        kind:
+          "$ref": "#/components/schemas/WorkflowEdgeKind"
+          description: 边类型。
+      description: 工作流有向边；from/to 必须指向同一工作流内的节点。
+    WorkflowLayoutViewport:
+      type: object
+      required:
+      - x
+      - y
+      - zoom
+      properties:
+        x:
+          type: number
+          description: 画布水平偏移。
+        y:
+          type: number
+          description: 画布垂直偏移。
+        zoom:
+          type: number
+          description: 缩放比例。
+      description: 可选画布视口，仅用于展示，不参与执行语义。
+    WorkflowLayout:
+      type: object
+      properties:
+        viewport:
+          "$ref": "#/components/schemas/WorkflowLayoutViewport"
+          description: 画布视口。
+      description: 可选布局信息，仅用于展示。
+    WorkflowGraph:
+      type: object
+      required:
+      - stages
+      - nodes
+      - edges
+      properties:
+        stages:
+          type: array
+          items:
+            "$ref": "#/components/schemas/WorkflowStage"
+          description: 阶段列表。
+        nodes:
+          type: array
+          items:
+            "$ref": "#/components/schemas/WorkflowNode"
+          description: 节点列表。
+        edges:
+          type: array
+          items:
+            "$ref": "#/components/schemas/WorkflowEdge"
+          description: 边列表。
+      description: 工作流当前图；只含 stages/nodes/edges，禁止 behavior 与未知字段。
+    WorkflowSummary:
+      type: object
+      required:
+      - id
+      - name
+      - type
+      - description
+      - nodeCount
+      - stageCount
+      - revision
+      - createdAt
+      - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: 工作流 ID（UUIDv7）。
+        name:
+          type: string
+          description: 工作流名称，1–80 字，大小写不敏感唯一。
+        type:
+          type: string
+          description: 类型标签，1–40 字，可编辑。
+        description:
+          type: string
+          description: 描述，0–500 字。
+        nodeCount:
+          type: integer
+          minimum: 0
+          description: 当前图节点数。
+        stageCount:
+          type: integer
+          minimum: 0
+          description: 当前图阶段数。
+        revision:
+          type: integer
+          minimum: 1
+          description: 乐观锁版本，从 1 开始。
+        createdAt:
+          type: string
+          format: date-time
+          description: 创建时间。
+        updatedAt:
+          type: string
+          format: date-time
+          description: 最后更新时间。
+      description: 工作流列表项；不包含完整图。
+    WorkflowDetail:
+      allOf:
+      - "$ref": "#/components/schemas/WorkflowSummary"
+      - type: object
+        required:
+        - graph
+        properties:
+          graph:
+            "$ref": "#/components/schemas/WorkflowGraph"
+            description: 唯一当前图。
+      description: 工作流详情；包含完整 graph。
+    WorkflowCreate:
+      type: object
+      required:
+      - name
+      - type
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: 工作流名称。
+        type:
+          type: string
+          minLength: 1
+          maxLength: 40
+          description: 类型标签。
+        description:
+          type: string
+          maxLength: 500
+          description: 描述，缺省为空串。
+      description: 创建工作流请求。
+    WorkflowUpdate:
+      type: object
+      required:
+      - name
+      - type
+      - description
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: 工作流名称。
+        type:
+          type: string
+          minLength: 1
+          maxLength: 40
+          description: 类型标签。
+        description:
+          type: string
+          maxLength: 500
+          description: 描述，可为空串。
+      description: 整体更新工作流元数据请求。
+    WorkflowCopy:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: 新名称；省略时使用源名称 + “ 副本”并自动加后缀。
+      description: 复制工作流请求。
+    WorkflowSaveDefinition:
+      type: object
+      required:
+      - graph
+      properties:
+        graph:
+          "$ref": "#/components/schemas/WorkflowGraph"
+          description: 要保存或校验的完整图。
+      description: 保存或校验工作流图的请求。
+    ValidationIssue:
+      type: object
+      required:
+      - code
+      - path
+      - message
+      properties:
+        code:
+          type: string
+          description: 稳定问题码，例如 missing_start、expert_missing。
+        path:
+          type: string
+          description: 字段路径，例如 graph.nodes.n1.expertId。
+        message:
+          type: string
+          description: 中文说明。
+      description: 单个校验问题。
+    ValidationReport:
+      type: object
+      required:
+      - errors
+      - warnings
+      properties:
+        errors:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ValidationIssue"
+          description: 形状错误；validate 统一放在这里返回。
+        warnings:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ValidationIssue"
+          description: 语义与专家状态警告。
+      description: 校验报告；不写数据库。
+    WorkflowDslMetadata:
+      type: object
+      required:
+      - name
+      - type
+      - description
+      properties:
+        name:
+          type: string
+          description: 工作流名称。
+        type:
+          type: string
+          description: 类型标签。
+        description:
+          type: string
+          description: 描述。
+      description: DSL 元数据。
+    WorkflowDsl:
+      type: object
+      required:
+      - dslVersion
+      - metadata
+      - stages
+      - nodes
+      - edges
+      properties:
+        dslVersion:
+          type: integer
+          enum:
+          - 1
+          description: DSL 版本，当前只支持 1。
+        metadata:
+          "$ref": "#/components/schemas/WorkflowDslMetadata"
+          description: 工作流元数据。
+        stages:
+          type: array
+          items:
+            "$ref": "#/components/schemas/WorkflowStage"
+          description: 阶段列表。
+        nodes:
+          type: array
+          items:
+            "$ref": "#/components/schemas/WorkflowNode"
+          description: 节点列表。
+        edges:
+          type: array
+          items:
+            "$ref": "#/components/schemas/WorkflowEdge"
+          description: 边列表。
+        layout:
+          "$ref": "#/components/schemas/WorkflowLayout"
+          description: 可选布局，仅用于展示。
+      description: 导入/导出的 JSON DSL 文档；YAML 导出是同一结构的无损渲染。
+    WorkflowList:
+      type: object
+      required:
+      - items
+      - total
+      - limit
+      - offset
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/WorkflowSummary"
+          description: 当前页工作流。
+        total:
+          type: integer
+          minimum: 0
+          description: 总数。
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 200
+          description: 每页数量。
+        offset:
+          type: integer
+          minimum: 0
+          description: 偏移量。
+      description: 工作流分页列表。
+    WorkflowSaveResult:
+      type: object
+      required:
+      - workflow
+      - warnings
+      properties:
+        workflow:
+          "$ref": "#/components/schemas/WorkflowDetail"
+          description: 保存后的工作流详情。
+        warnings:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ValidationIssue"
+          description: 语义与专家状态警告；形状错误不会走到这里。
+      description: 保存定义响应。
+    WorkflowImportResult:
+      type: object
+      required:
+      - workflow
+      - idMap
+      - warnings
+      properties:
+        workflow:
+          "$ref": "#/components/schemas/WorkflowDetail"
+          description: 新建的工作流详情。
+        idMap:
+          type: object
+          additionalProperties:
+            type: string
+          description: 导入 ID 映射；v1 为恒等映射。
+        warnings:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ValidationIssue"
+          description: 缺失/停用专家等警告。
+      description: 导入 DSL 响应。
   responses:
     BadRequest:
       description: 请求形状/字段/枚举/范围错误，或请求体引用的目标不存在。

@@ -14,6 +14,7 @@ function appWith(health: ReturnType<typeof createHealth>) {
     toolService: ctx.toolService,
     skillDraftService: ctx.skillDraftService,
     expertService: ctx.expertService,
+    workflowService: ctx.workflowService,
     health,
     actor: "tester",
   });
@@ -51,6 +52,7 @@ describe("健康检查与 503 映射", () => {
       toolService: ctx.toolService,
       skillDraftService: ctx.skillDraftService,
       expertService: ctx.expertService,
+      workflowService: ctx.workflowService,
       health: createHealth(downDb),
       actor: "tester",
     });
@@ -74,6 +76,7 @@ describe("健康检查与 503 映射", () => {
       toolService: ctx.toolService,
       skillDraftService: ctx.skillDraftService,
       expertService: ctx.expertService,
+      workflowService: ctx.workflowService,
       health: createHealth(downDb),
       actor: "tester",
     });

@@ -51,6 +51,25 @@ export async function readJsonObject(
   return parsed;
 }
 
+export async function readOptionalJsonObject(
+  request: Request,
+  allowedFields: readonly string[],
+): Promise<Record<string, unknown>> {
+  const text = await request.text();
+  if (text.trim() === "") return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new ValidationError("body", "必须是合法 JSON");
+  }
+  if (!isPlainObject(parsed)) {
+    throw new ValidationError("body", "必须是 JSON 对象");
+  }
+  assertAllowedFields(parsed, allowedFields);
+  return parsed;
+}
+
 export function parseIfMatch(request: Request): number {
   const raw = request.headers.get("if-match");
   if (raw === null || raw === "") throw new PreconditionRequiredError();

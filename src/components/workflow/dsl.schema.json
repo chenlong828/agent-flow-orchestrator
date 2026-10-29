@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentflow.local/schemas/workflow-dsl.v1.json",
+  "title": "WorkflowDsl",
+  "description": "工作流定义 DSL v1，供外部编辑器与导入工具消费；服务端运行时校验以 graph.ts 为准。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["dslVersion", "metadata", "stages", "nodes", "edges"],
+  "properties": {
+    "dslVersion": {
+      "const": 1,
+      "description": "DSL 格式版本；不是工作流版本。"
+    },
+    "metadata": { "$ref": "#/$defs/metadata" },
+    "stages": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/stage" }
+    },
+    "nodes": {
+      "type": "array",
+      "maxItems": 500,
+      "items": { "$ref": "#/$defs/node" }
+    },
+    "edges": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": { "$ref": "#/$defs/edge" }
+    },
+    "layout": { "$ref": "#/$defs/viewportLayout" }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+      "description": "工作流内稳定 ID；1–64 位字母、数字、下划线或连字符。"
+    },
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "type": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "description": { "type": "string", "maxLength": 500, "default": "" }
+      }
+    },
+    "layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number" },
+        "height": { "type": "number" }
+      }
+    },
+    "viewportLayout": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "viewport": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y", "zoom"],
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" },
+            "zoom": { "type": "number" }
+          }
+        }
+      }
+    },
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "description": { "type": "string", "maxLength": 500 },
+        "layout": { "$ref": "#/$defs/layout" }
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "name"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": {
+          "enum": ["start", "end", "agent", "review", "confirm", "fanout", "fanin"]
+        },
+        "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "stageId": {
+          "description": "阶段 ID 或 null；不能指向不存在的阶段。",
+          "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }]
+        },
+        "expertId": {
+          "description": "专家 UUID 或 null；节点类型矩阵与专家存在性由服务端校验。",
+          "anyOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }]
+        },
+        "layout": { "$ref": "#/$defs/layout" }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "from", "to", "kind"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "from": { "$ref": "#/$defs/id" },
+        "to": { "$ref": "#/$defs/id" },
+        "kind": { "enum": ["seq", "rollback"] }
+      }
+    }
+  }
+}

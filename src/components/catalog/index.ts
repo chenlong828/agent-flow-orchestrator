@@ -15,6 +15,12 @@ import type {
   SkillRead,
 } from "../skill/contract.ts";
 import type { ExpertQuery, ExpertRead } from "../expert/index.ts";
+import type {
+  WorkflowDetail,
+  WorkflowQuery,
+  WorkflowRead,
+  WorkflowSummary,
+} from "../workflow/index.ts";
 
 export type ReferenceAsset = {
   type: "harness" | "tool" | "skill";
@@ -164,6 +170,9 @@ export type CatalogRead = {
   getExpert(id: string): Promise<ExpertDetailView>;
   listExpertsUsingTool(toolId: string): Promise<Reference[]>;
 
+  listWorkflows(query: WorkflowQuery): Promise<Page<WorkflowSummary>>;
+  getWorkflow(id: string): Promise<WorkflowDetail>;
+
   referencesForHarness(id: string): Promise<ReferencePage>;
   referencesForTool(id: string): Promise<ReferencePage>;
   referencesForSkill(id: string): Promise<ReferencePage>;
@@ -174,6 +183,7 @@ export type CatalogDeps = {
   toolRead: ToolRead;
   skillRead: SkillRead;
   expertRead: ExpertRead;
+  workflowRead: WorkflowRead;
 };
 
 function categoryMap(categories: SkillCategory[]): Map<string, string> {
@@ -187,7 +197,7 @@ function requireCategoryLabel(labels: Map<string, string>, code: string): string
 }
 
 export function createCatalog(deps: CatalogDeps): CatalogRead & ReferenceGuard {
-  const { harnessRead, toolRead, skillRead, expertRead } = deps;
+  const { harnessRead, toolRead, skillRead, expertRead, workflowRead } = deps;
 
   async function listToolsByHarnessReferences(harnessId: string): Promise<Reference[]> {
     const tools = await toolRead.listByHarness(harnessId);
@@ -226,6 +236,14 @@ export function createCatalog(deps: CatalogDeps): CatalogRead & ReferenceGuard {
           return listExpertsUsingToolReferences(id);
         case "skill":
           return listExpertsUsingSkillReferences(id);
+        case "expert": {
+          const workflows = await workflowRead.listByExpert(id);
+          return workflows.map((workflow) => ({
+            type: "workflow" as const,
+            id: workflow.id,
+            name: workflow.name,
+          }));
+        }
       }
     },
 
@@ -372,6 +390,7 @@ export function createCatalog(deps: CatalogDeps): CatalogRead & ReferenceGuard {
 
     async listExperts(query) {
       const page = await expertRead.list(query);
+      const counts = await workflowRead.countByExperts(page.items.map((expert) => expert.id));
       const items: ExpertListItem[] = [];
       for (const expert of page.items) {
         const skills: ExpertSkillPreviewView[] = [];
@@ -388,7 +407,7 @@ export function createCatalog(deps: CatalogDeps): CatalogRead & ReferenceGuard {
           persona: expert.persona,
           skillCount: expert.skillCount,
           toolCount: expert.toolCount,
-          refCount: expert.refCount,
+          refCount: counts[expert.id] ?? 0,
           skills,
           revision: expert.revision,
           updatedAt: expert.updatedAt,
@@ -398,9 +417,10 @@ export function createCatalog(deps: CatalogDeps): CatalogRead & ReferenceGuard {
     },
 
     async getExpert(id) {
-      const [expert, categories] = await Promise.all([
+      const [expert, categories, counts] = await Promise.all([
         expertRead.get(id),
         skillRead.listCategories(),
+        workflowRead.countByExperts([id]),
       ]);
       const labels = categoryMap(categories);
       const skills: ExpertSkillSummaryView[] = [];
@@ -428,7 +448,7 @@ export function createCatalog(deps: CatalogDeps): CatalogRead & ReferenceGuard {
         persona: expert.persona,
         skillCount: expert.skillCount,
         toolCount: expert.toolCount,
-        refCount: expert.refCount,
+        refCount: counts[id] ?? 0,
         revision: expert.revision,
         updatedAt: expert.updatedAt,
         duty: expert.duty,
@@ -448,6 +468,14 @@ export function createCatalog(deps: CatalogDeps): CatalogRead & ReferenceGuard {
 
     async listExpertsUsingTool(toolId) {
       return listExpertsUsingToolReferences(toolId);
+    },
+
+    async listWorkflows(query) {
+      return workflowRead.list(query);
+    },
+
+    async getWorkflow(id) {
+      return workflowRead.get(id);
     },
 
     async referencesForHarness(id) {

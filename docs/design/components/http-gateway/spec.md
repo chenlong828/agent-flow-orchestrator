@@ -12,9 +12,9 @@ updated: 2026-10-29
 
 ## 1 主目标
 
-把 HTTP 请求翻译为 B1 用例调用，校验传输层形状，映射 DTO 与错误；同时托管开发者 API 文档。是唯一对外暴露 HTTP 面的组件。
+把 HTTP 请求翻译为 B1/B3 用例调用，校验传输层形状，映射 DTO 与错误；同时托管开发者 API 文档。是唯一对外暴露 HTTP 面的组件。
 
-**不负责**：业务规则、SQL、读模型拼装、状态推进、包结构解析、B1 之外的业务端点。文档子模块只读取静态文件，不接触业务数据。
+**不负责**：业务规则、SQL、读模型拼装、状态推进、包结构解析、B1/B3 之外的业务端点。文档子模块只读取静态文件，不接触业务数据。
 
 **方法归属**：领域方法、领域输入/输出类型与不变量在各组件规格；本文只定义端点、DTO 与错误映射。
 
@@ -63,7 +63,7 @@ updated: 2026-10-29
 
 ### 3.2 并发与幂等
 
-- Harness/工具/专家的更新、启停、删除、装配，以及 Skill 的启停、删除，必须带 `If-Match: "<revision>"`；`revision` 从 1 开始，每次写 +1。
+- Harness/工具/专家/工作流的更新、删除，专家装配，工作流保存定义，以及 Skill 的启停、删除，必须带 `If-Match: "<revision>"`；`revision` 从 1 开始，每次写 +1。工作流复制、校验、导入不需要 `If-Match`。
 - 已有 Skill 草稿保存必须带 `If-Match: "<baseRevision>"`；新建草稿保存不带 `If-Match`，带了返回 400。
 - 缺少 `If-Match`：428 `precondition_required`；格式非法 400 `validation_error`。
 - 版本不匹配：409 `revision_conflict`，`details.currentRevision` 返回当前值；草稿保存不消费草稿。
@@ -115,7 +115,7 @@ updated: 2026-10-29
 
 ## 4 端点总表
 
-37 个 B1 业务端点；`/healthz` 单独列在 §4.2；开发者文档端点见 §4.3，不计入业务端点。
+47 个业务端点（B1 37 个 + B3 工作流 10 个）；`/healthz` 单独列在 §4.2；开发者文档端点见 §4.3，不计入业务端点。
 
 ### 4.1 业务端点
 
@@ -154,10 +154,20 @@ updated: 2026-10-29
 | `API-24` | POST | `/experts` | `UC-B1-04` | 创建专家；可带初始有序装配 | 201 + Location |
 | `API-25` | PUT | `/experts/{id}` | `UC-B1-04` | 全量更新（不含装配） | 200 详情 |
 | `API-26` | PATCH | `/experts/{id}/enabled` | `UC-B1-04` | 启用/停用 | 200 详情 |
-| `API-27` | DELETE | `/experts/{id}` | `UC-B1-04` | 删除；B1 无引用方 | 204 |
+| `API-27` | DELETE | `/experts/{id}` | `UC-B1-04` | 删除；被工作流引用则 409 | 204 |
 | `API-28` | PUT | `/experts/{id}/skills` | `UC-B1-05` | 整体替换有序 Skill | 200 专家详情 |
 | `API-29` | PUT | `/experts/{id}/tools` | `UC-B1-05` | 整体替换有序工具 | 200 专家详情 |
 | `API-30` | PATCH | `/experts/{id}` | `UC-B1-04` / `UC-B1-05` | 聚合部分更新五区、引用与装配；一次事务 | 200 专家详情 |
+| `API-31` | GET | `/workflows` | `UC-B3-01` | 工作流列表/检索 | 200 列表 |
+| `API-32` | POST | `/workflows` | `UC-B3-01` | 创建工作流；初始为空图 | 201 + Location |
+| `API-33` | GET | `/workflows/{id}` | `UC-B3-01` | 工作流详情（含 graph） | 200 详情 |
+| `API-34` | PUT | `/workflows/{id}` | `UC-B3-01` | 更新名称/类型/描述 | 200 详情 |
+| `API-35` | DELETE | `/workflows/{id}` | `UC-B3-01` | 删除工作流及定义/引用 | 204 |
+| `API-36` | POST | `/workflows/{id}/copy` | `UC-B3-01` | 复制图，自动处理名称后缀 | 201 + Location |
+| `API-37` | PUT | `/workflows/{id}/definition` | `UC-B3-02` | 保存当前图；语义问题返回 warning | 200 `{workflow,warnings}` |
+| `API-38` | POST | `/workflows/{id}/validate` | `UC-B3-02` | 只校验图，不写入 | 200 `ValidationReport` |
+| `API-39` | GET | `/workflows/{id}/dsl` | `UC-B3-03` | 导出 JSON/YAML DSL | 200 文件 |
+| `API-40` | POST | `/workflows/import` | `UC-B3-03` | 从严导入 DSL，新建工作流 | 201 `{workflow,idMap,warnings}` |
 
 ### 4.2 健康检查
 
@@ -410,7 +420,7 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 | `persona` | string[] | 性格/视角标签，有序 |
 | `skillCount` | number | 装配 Skill 数 |
 | `toolCount` | number | 装配工具数 |
-| `refCount` | number | B1 固定 0 |
+| `refCount` | number | 引用该专家的去重工作流数；B3 起由 `workflow_expert_ref` 计算 |
 | `skills` | `ExpertSkillPreview[]` | 前 3 个装配 Skill 预览，按装配顺序；无装配为空数组 |
 | `revision` | number | 乐观锁 |
 | `updatedAt` | string | ISO-8601 |
@@ -473,9 +483,46 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 
 - Harness 引用项 `type="tool"`；工具/Skill 引用项 `type="expert"`。
 - 删除 409 的 `details` 使用 `asset` + `references` 结构，与 §3.3 示例一致。
-- B1 不返回工作流节点引用。
+- B3 起专家被工作流节点引用时，专家删除 409 的 `references` 返回 `type="workflow"` 的 `{id,name}`；工作流目前没有 `references` 端点，B4 实例引用后另加。
 
-### 5.6 端点 → 组件方法
+### 5.6 工作流
+
+**列表项 `WorkflowSummary`**
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `id` | string | UUIDv7 |
+| `name` | string | 1–80 字，大小写不敏感唯一 |
+| `type` | string | 1–40 字，自由标签 |
+| `description` | string | 0–500 字 |
+| `nodeCount` | number | 当前图节点数 |
+| `stageCount` | number | 当前图阶段数 |
+| `revision` | number | 乐观锁，从 1 开始 |
+| `createdAt` | string | ISO-8601 |
+| `updatedAt` | string | ISO-8601 |
+
+**详情 `WorkflowDetail`**：共享字段 + `graph`。
+
+**`WorkflowGraph`**：`{stages: Stage[], nodes: WorkflowNode[], edges: WorkflowEdge[]}`；节点/阶段/边 ID 是工作流内稳定字符串，不是 UUID。
+
+- `Stage`：`{id,name}`。
+- `WorkflowNode`：`{id,type,name,stageId:string|null,expertId:string|null}`；`type` 为 `start|end|agent|review|confirm|fanout|fanin`。
+- `WorkflowEdge`：`{id,from,to,kind}`；`kind` 为 `seq|rollback`。
+- 可选 `layout.viewport={x,y,zoom}` 只用于展示，不参与执行语义。
+
+**查询参数**：`q`、`type`、`limit`、`offset`、`sort`（`name`、`updatedAt`）。
+
+**创建/更新请求**：`{name,type,description?}`；`PUT` 的 `description` 也必填（可为空串）。
+
+**`CopyWorkflow`**：`{name?: string}`；省略时默认 `"{源名称} 副本"`，冲突自动追加 ` (2)`…` (99)`；节点/阶段/边 ID 原样保留。
+
+**`SaveDefinitionInput`**：`{graph: WorkflowGraph}`；形状错误 400，语义问题 200 + `warnings`，专家不存在 400 并回滚。
+
+**`ValidationReport`**：`{errors:[{code,path,message}],warnings:[{code,path,message}]}`；`validate` 只读专家状态，不写库。
+
+**`WorkflowDsl`**：`{dslVersion:1,metadata:{name,type,description},stages,nodes,edges,layout?}`；导入只接受 JSON，导出支持 `?format=json|yaml`。
+
+### 5.7 端点 → 组件方法
 
 本文只定义 HTTP 传输契约；领域方法、领域输入/输出类型与不变量定义在各组件规格中。DTO 是传输形状，不是方法定义来源。
 
@@ -483,6 +530,7 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 - 工具：[`../tool/spec.md`](../tool/spec.md)
 - Skill：[`../skill/spec.md`](../skill/spec.md)
 - 专家：[`../expert/spec.md`](../expert/spec.md)
+- 工作流：[`../workflow/spec.md`](../workflow/spec.md)
 - 目录：[`../catalog/spec.md`](../catalog/spec.md)
 - 平台：[`../platform/spec.md`](../platform/spec.md)
 - 共享契约：[`../kernel/spec.md`](../kernel/spec.md)
@@ -526,6 +574,16 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 | `API-28` | `expert.setSkills` + `catalog.getExpert` |
 | `API-29` | `expert.setTools` + `catalog.getExpert` |
 | `API-30` | `expert.updateAggregate` + `catalog.getExpert` |
+| `API-31` | `catalog.listWorkflows` |
+| `API-32` | `workflow.create` + `catalog.getWorkflow` |
+| `API-33` | `catalog.getWorkflow` |
+| `API-34` | `workflow.update` + `catalog.getWorkflow` |
+| `API-35` | `workflow.delete` |
+| `API-36` | `workflow.copy` + `catalog.getWorkflow` |
+| `API-37` | `workflow.saveDefinition` + `catalog.getWorkflow` |
+| `API-38` | `catalog.getWorkflow`（存在性）+ `workflow.validate` |
+| `API-39` | `workflow.exportDsl` |
+| `API-40` | `workflow.importDsl` + `catalog.getWorkflow` |
 | `API-H` | `platform.Health.check` |
 
 - 写端点由 `http-gateway` 调用领域写方法，再用 `catalog` 回读详情；路由层不拼字段。`SKP-15` 例外：保存返回 `SaveSkillResult`，不回读整包。
@@ -534,19 +592,20 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 
 ## 6 外部 UI 页面映射（参考，不属于本仓库交付与验收）
 
-| UI 页面 / 组件 | B1 端点 | 说明 |
+| UI 页面 / 组件 | 端点 | 说明 |
 |---|---|---|
 | `harnesses.html` / `CMP-harnesses` | `API-01`～`API-07` | 列表、详情、注册、编辑、启停、删除、工具引用 |
 | `tools.html` / `CMP-tools` | `API-08`～`API-13` | 列表、详情、注册、编辑、删除、专家引用；无启停/调试 |
 | `skills.html` / `CMP-skills` | `SKP-01`～`SKP-15` | 列表、详情、整包下载、启停、删除、专家引用、分类、草稿与保存 |
 | `experts.html` / `CMP-experts` | `API-22`～`API-30` | 列表、详情、五区、启停、删除、Skill/工具装配、聚合保存 |
-| 其他页面 | 无 B1 端点 | Key/工作区/工作流/实例/看板不在 B1 |
+| 工作流定义页 | `API-31`～`API-40` | 列表、创建、详情、编辑、删除、复制、图保存/校验、DSL 导入导出 |
+| 其他页面 | 无端点 | Key/工作区、B4 实例/运行、看板不在本仓库 |
 
 外部 UI 夹具与契约字段不同（如 `k`→`key`、`desc`→`description`、`harness`→`harnessId`/`harnessName`、`usedBy`→`usedByCount`、`CLI/MCP/脚本`→`cli/mcp/script`、中文状态→英文代码）；若接入，由该项目适配层映射，不把 `MOCK` 形状带进契约。
 
-B1 不提供的运行时字段：Harness 当前任务数/运行中任务、工具执行历史/成功率、专家工作流节点引用明细、Skill 执行统计。外部 UI 若展示这些字段，由该项目自行标注「未接入」，本仓库不伪造；`lastHeartbeatAt` / `lastDebugAt` 只展示种子值或空值。
+B1/B3 不提供的运行时字段：Harness 当前任务数/运行中任务、工具执行历史/成功率、专家工作流节点引用明细、Skill 执行统计。外部 UI 若展示这些字段，由该项目自行标注「未接入」，本仓库不伪造；`lastHeartbeatAt` / `lastDebugAt` 只展示种子值或空值。
 
-B1 不提供的页面动作：Harness 连接测试/心跳刷新、工具调试/标记可用、Skill 版本历史/回滚、专家绑定工作流/节点引用。外部 UI 若保留这些按钮，只做展示，不接 B1 API。
+B1/B3 不提供的页面动作：Harness 连接测试/心跳刷新、工具调试/标记可用、Skill 版本历史/回滚、专家绑定工作流/节点引用。外部 UI 若保留这些按钮，只做展示，不接本仓库 API。
 
 外部接入验证建议（参考）：
 
@@ -557,7 +616,8 @@ B1 不提供的页面动作：Harness 连接测试/心跳刷新、工具调试/�
 5. 用 Skill 保存验证 `version` 递增与 `SKILL.md` 16 KiB；客户端不传 `version`/`enabled`。
 6. 用整包下载验证 zip、`Content-Disposition`、`ETag`/304；不提供单文件下载。
 7. 用专家装配验证顺序与 `revision`；Skill/工具列表整体替换；一次保存五区与两类装配时使用 `PATCH /experts/{id}`，确认只递增一次 `revision`。
-8. 忽略未知字段；遇到契约缺口先改本文，不跨项目改代码。
+8. 工作流验证：`If-Match` 缺失 428、旧版本 409；保存语义问题 200 + warnings，形状错误 400；DSL 导入缺失专家清空并 warning；专家删除被工作流引用 409。
+9. 忽略未知字段；遇到契约缺口先改本文，不跨项目改代码。
 
 ## 7 契约测试
 
@@ -566,14 +626,15 @@ B1 不提供的页面动作：Harness 连接测试/心跳刷新、工具调试/�
 - Skill 包：列表不读 zip；详情 `body`/`files`；文档逐字一致；下载 zip 可解压、文件名合规；包缺失 500 `package_unavailable`；停用可读/可下载。
 - Skill 草稿：建草稿（空/已有）、文件清单顺序、上传/覆盖/改名/删除、`SKILL.md` 保留、路径穿越、TTL 过期、取消、多草稿并存。
 - Skill 保存：新建/更新、`If-Match` 缺失/非法/旧值、名称冲突、版本进位、`SKILL.md` 超限、文件/总量超限、打包失败、数据库失败、成功后草稿 404。
-- 删除：Harness 被工具引用、工具/Skill 被专家引用；无引用 204。
+- 删除：Harness 被工具引用、工具/Skill 被专家引用、专家被工作流引用；无引用 204。
 - 装配：重复目标、目标不存在、旧 `revision`、顺序回读；聚合保存的省略/替换/清空语义。
+- 工作流：列表/详情、复制后缀、图保存/校验、DSL JSON/YAML、导入缺失专家、revision 冲突、validate 404。
 - 契约快照：响应字段集合与 DTO 表一致；新增字段必须更新本文。
 - 外部 UI 若接入，可用同一份端点/DTO 表做适配层契约测试；不共享代码。
 
 ## 8 依赖与边界
 
-- 允许：`catalog` 读契约；四类资产写服务；`platform` 的 `Health`；`kernel` 的错误、分页、ID/时钟类型；Bun 的 multipart/流读取；文档子模块的 Bun 文件读取与本地静态资源。
+- 允许：`catalog` 读契约；四类资产写服务；工作流写服务；`platform` 的 `Health`；`kernel` 的错误、分页、ID/时钟类型；Bun 的 multipart/流读取；文档子模块的 Bun 文件读取与本地静态资源。
 - 禁止：导入任何 store；执行 SQL；直接使用 `FileStore` 或 Bun 文件 API 读写包/草稿；在路由层实现名称唯一、引用保护、版本递增、路径校验等业务规则；直接序列化领域实体；文档子模块接触数据库或领域服务。
 - 校验分工：HTTP 校验 multipart/JSON 形状、必填、类型、简单范围、未知字段、请求体大小；领域校验路径、文件数/总量、唯一性、引用、状态与事务不变量。
 - 错误映射：领域错误 → HTTP `code`/状态码；未知异常 → 500，不泄漏 SQL/堆栈。
@@ -582,10 +643,10 @@ B1 不提供的页面动作：Harness 连接测试/心跳刷新、工具调试/�
 
 - 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 36 KB；OpenAPI 运行时资产约 85 KB、Swagger UI 静态资源约 2.14 MB，均单独计量，不计入组件预算。
 - 单独验证命令：`bun test tests/components/http-gateway`。
-- 文档入口：启动后访问 `/docs`；机器可读契约：`/openapi.yaml`。OpenAPI 资产随组件发布，覆盖 37 个业务 operation 与 Skill 包/草稿 DTO。
-- 当前状态：`current`；契约 v1 的 15 个 Skill 端点已由 T-SKP-17 实现，运行时 OpenAPI 为 24 个 path、38 个 operation（含 `/healthz`）；验证记录见 [工序 result.md](../../../works/2026-10-28-skill-package/result.md)。
+- 文档入口：启动后访问 `/docs`；机器可读契约：`/openapi.yaml`。OpenAPI 资产随组件发布，覆盖 47 个业务 operation 与 Skill 包/草稿、工作流定义 DTO。
+- 当前状态：`current`；B1 资产端点与 B3 工作流定义端点均已实现，运行时 OpenAPI 为 31 个 path、48 个 operation（含 `/healthz`）；B3 验证记录见 [工作流工序 result.md](../../../history/works/2026-10-28-workflow-definition/result.md)。
 
-## 10 B1 实现口径与剩余问题
+## 10 B1/B3 实现口径与剩余问题
 
 - `SKP-05` 保留为独立只读资源 `GET /skill-categories`，便于外部客户端下拉直接消费。
 - `API-28` / `API-29` 保持分开，避免一次保存两类装配关系时互相覆盖；`API-30` 提供一次保存五区、引用与两类装配的聚合入口，领域内仍是单事务、单 `revision`。

@@ -7,12 +7,17 @@ export type IdGenerator = {
 };
 
 /** 可被引用的资产类型；删除前由领域服务通过 ReferenceGuard 检查。 */
-export type ReferenceOwner = "harness" | "tool" | "skill";
+export type ReferenceOwner = "harness" | "tool" | "skill" | "expert";
 
 export type Reference = {
-  type: "tool" | "expert";
+  type: "tool" | "expert" | "workflow";
   id: string;
   name: string;
+};
+
+/** 只读专家可用性查询；由专家组件实现，供工作流校验不跨组件读表。 */
+export type ExpertStatusReader = {
+  statuses(expertIds: string[]): Promise<Record<string, boolean>>;
 };
 
 /** 引用检查端口，由 catalog 实现，组合根注入领域删除服务。 */

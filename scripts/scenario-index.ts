@@ -164,6 +164,7 @@ async function loadScenarios(testIndex: Map<string, { file: string; title: strin
     if (!["draft", "designed", "verified"].includes(status)) {
       fail(`${file} status 非法：${status}`);
     }
+    const isDraft = status === "draft";
     const id = asString(frontmatter.scenario, `${file} scenario`);
     if (!/^SCN-\d{4}$/.test(id)) fail(`${file} scenario 格式非法：${id}`);
     if (ids.has(id)) fail(`场景 ID 重复：${id}`);
@@ -206,8 +207,10 @@ async function loadScenarios(testIndex: Map<string, { file: string; title: strin
         id: asString(item.id, `${file} tests[${index}].id`),
       };
     });
-    const roles = tests.map((test) => test.role).sort().join(",");
-    if (roles !== "N1,R1,R2,R3") fail(`${file} tests 必须是 R1/R2/R3/N1`);
+    if (!isDraft) {
+      const roles = tests.map((test) => test.role).sort().join(",");
+      if (roles !== "N1,R1,R2,R3") fail(`${file} tests 必须是 R1/R2/R3/N1`);
+    }
     for (const test of tests) {
       if (!/^TC-[A-Z]+-\d{3}$/.test(test.id)) fail(`${file} 测试 ID 格式非法：${test.id}`);
       if (!testIndex.has(test.id)) fail(`${file} 测试 ID 不存在：${test.id}`);
@@ -258,7 +261,7 @@ async function loadScenarios(testIndex: Map<string, { file: string; title: strin
       externalRefs,
     });
   }
-  return result.sort((a, b) => a.file.localeCompare(b.file));
+  return result.sort((a, b) => a.id.localeCompare(b.id));
 }
 
 function docLink(path: string, heading: string): string {
@@ -305,22 +308,32 @@ function render(scenarios: Scenario[]): string {
         const scenarioRoot = `${scenarioPath}/scenario.md`;
         const scenarioLink = `[${scenario.id} ${scenario.title}](${scenarioRoot})`;
         const flowLink = `[scenario.md#3 运行序](${scenarioRoot}#3-运行序)`;
-        const entries = scenario.entries
-          .map((entry) => `\`${entry.component} ${entry.path}#${entry.symbol}\``)
-          .join("<br>");
-        const docs = scenario.docs
-          .map((doc) => `[${doc.path}#${doc.heading}](${docLink(doc.path, doc.heading)})`)
-          .join("<br>");
-        const tests = scenario.tests
-          .map((test) => {
-            const found = scenarioTestIndex.get(test.id);
-            const title = found?.title.replace(`${test.id} `, "").trim();
-            return `\`${test.role} ${test.id}\`${title ? ` ${title}` : ""}`;
-          })
-          .join("<br>");
-        const refs = scenario.externalRefs
-          .map((ref) => `\`${ref.path}#${ref.anchor}\``)
-          .join("<br>");
+        const pending = (value: string) =>
+          value === "" && scenario.status === "draft" ? "待实现" : value;
+        const entries = pending(
+          scenario.entries
+            .map((entry) => `\`${entry.component} ${entry.path}#${entry.symbol}\``)
+            .join("<br>"),
+        );
+        const docs = pending(
+          scenario.docs
+            .map((doc) => `[${doc.path}#${doc.heading}](${docLink(doc.path, doc.heading)})`)
+            .join("<br>"),
+        );
+        const tests = pending(
+          scenario.tests
+            .map((test) => {
+              const found = scenarioTestIndex.get(test.id);
+              const title = found?.title.replace(`${test.id} `, "").trim();
+              return `\`${test.role} ${test.id}\`${title ? ` ${title}` : ""}`;
+            })
+            .join("<br>"),
+        );
+        const refs = pending(
+          scenario.externalRefs
+            .map((ref) => `\`${ref.path}#${ref.anchor}\``)
+            .join("<br>"),
+        );
         lines.push(
           `| ${scenarioLink} | ${scenario.status} | ${flowLink} | ${entries} | ${docs} | ${tests} | ${refs} |`,
         );
