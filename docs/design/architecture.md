@@ -154,6 +154,7 @@ config
 ## 9 验证
 
 - **架构测试**：领域组件只依赖 `kernel`/`platform`，互调检查先把相对导入解析成绝对路径再判归属，并含“合成违规导入必须被抓到”的自测；无跨组件 store 导入；`Bun.sql` 只在 `platform/db`；Bun 文件 API 只出现在 `config`（读 TOML）、`http-gateway`（读文档静态资源）与 `platform`（存储适配器）；`FileStore` 只由 `skill` 依赖、由 `platform` 实现；无循环依赖；`http-gateway` 不碰 store、不碰 `FileStore`；`catalog` 无写操作；`kernel` 不导入运行时组件；`config` 只被入口/脚本/测试引用。
+- **字段白名单测试**：`http-gateway` 的请求字段白名单与 `openapi.yaml` 的请求体 schema 逐项对齐，避免网关 DTO 与契约漂移。
 - **组件测试**：每个组件能只加载自身源码 + 规格 + 测试运行验证命令。
 - **契约测试**：HTTP 端点按 `http-gateway/spec.md` 的 3 正 1 反验证；错误码、字段、分页、`If-Match`、引用列表、multipart、下载头；文档端点验证 HTML、静态资源与 OpenAPI 结构。
 - **项目边界检查**：仓库内不出现 `agent-flow-ui` 的源码导入；不出现跨项目相对路径依赖；外部 UI 只通过 HTTP 契约交互。
@@ -167,4 +168,5 @@ config
 - `ReferenceGuard` 按端口方案实现：端口在 `kernel`，由 `catalog` 实现，领域删除服务经组合根注入。
 - 组件状态均为 `current`；历史实现见 [`result.md`](../history/works/2026-10-24-db-backend-infra/result.md)（归档件，仅作追溯）。
 - 2026-10-29：`CMP-workflow` P1 冻结，10 个端点与三张表已实现；B4 运行不在本批。
+- 2026-10-29：`http-gateway` 协议件与按资源路由分离，`app.ts` 只保留入口、健康检查与分派；REST 契约不变。
 - `CMP-config` 已从 `CMP-platform` 拆出；启动配置历史见 [`core-config/result.md`](../history/works/2026-10-25-core-config/result.md)（归档件，仅作追溯）。
