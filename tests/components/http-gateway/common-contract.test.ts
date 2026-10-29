@@ -80,7 +80,6 @@ describe("B1 公共契约", () => {
     const cases = [
       { path: "/api/v1/harnesses", body: harnessBody("重复资产"), list: "/api/v1/harnesses" },
       { path: "/api/v1/tools", body: toolBody("重复资产"), list: "/api/v1/tools" },
-      { path: "/api/v1/skills", body: skillBody("重复资产"), list: "/api/v1/skills" },
       { path: "/api/v1/experts", body: expertBody("重复资产"), list: "/api/v1/experts" },
     ];
 
@@ -122,17 +121,6 @@ describe("B1 公共契约", () => {
     const toolAfter = await call(ctx.app, "GET", `/api/v1/tools/${toolA.id}`);
     expect(toolAfter.body).toMatchObject({ name: "tool-a", revision: 1 });
 
-    const skillA = await post("/api/v1/skills", skillBody("skill-a"));
-    await post("/api/v1/skills", skillBody("skill-b"));
-    const skillConflict = await call(ctx.app, "PUT", `/api/v1/skills/${skillA.id}`, {
-      body: skillBody("skill-b"),
-      headers: withRevision(1),
-    });
-    expect(skillConflict.status).toBe(409);
-    expect(skillConflict.body.error.code).toBe("name_conflict");
-    const skillAfter = await call(ctx.app, "GET", `/api/v1/skills/${skillA.id}`);
-    expect(skillAfter.body).toMatchObject({ name: "skill-a", revision: 1, version: "v1.0" });
-
     const expertA = await post("/api/v1/experts", expertBody("expert-a"));
     await post("/api/v1/experts", expertBody("expert-b"));
     const expertConflict = await call(ctx.app, "PUT", `/api/v1/experts/${expertA.id}`, {
@@ -148,7 +136,6 @@ describe("B1 公共契约", () => {
   test("更新、启停、删除与装配缺少 If-Match 一律返回 428", async () => {
     const harness = await post("/api/v1/harnesses", harnessBody("harness-428"));
     const tool = await post("/api/v1/tools", toolBody("tool-428"));
-    const skill = await post("/api/v1/skills", skillBody("skill-428"));
     const expert = await post("/api/v1/experts", expertBody("expert-428"));
 
     const cases = [
@@ -157,9 +144,6 @@ describe("B1 公共契约", () => {
       { method: "DELETE", path: `/api/v1/harnesses/${harness.id}` },
       { method: "PUT", path: `/api/v1/tools/${tool.id}`, body: toolBody("tool-428") },
       { method: "DELETE", path: `/api/v1/tools/${tool.id}` },
-      { method: "PUT", path: `/api/v1/skills/${skill.id}`, body: skillBody("skill-428") },
-      { method: "PATCH", path: `/api/v1/skills/${skill.id}/enabled`, body: { enabled: false } },
-      { method: "DELETE", path: `/api/v1/skills/${skill.id}` },
       { method: "PUT", path: `/api/v1/experts/${expert.id}`, body: expertBody("expert-428") },
       { method: "PATCH", path: `/api/v1/experts/${expert.id}/enabled`, body: { enabled: false } },
       { method: "DELETE", path: `/api/v1/experts/${expert.id}` },
@@ -185,11 +169,6 @@ describe("B1 公共契约", () => {
       { method: "PUT", path: `/api/v1/tools/${MISSING_ID}`, body: toolBody("x") },
       { method: "DELETE", path: `/api/v1/tools/${MISSING_ID}` },
       { method: "GET", path: `/api/v1/tools/${MISSING_ID}/references` },
-      { method: "GET", path: `/api/v1/skills/${MISSING_ID}` },
-      { method: "PUT", path: `/api/v1/skills/${MISSING_ID}`, body: skillBody("x") },
-      { method: "PATCH", path: `/api/v1/skills/${MISSING_ID}/enabled`, body: { enabled: true } },
-      { method: "DELETE", path: `/api/v1/skills/${MISSING_ID}` },
-      { method: "GET", path: `/api/v1/skills/${MISSING_ID}/references` },
       { method: "GET", path: `/api/v1/experts/${MISSING_ID}` },
       { method: "PUT", path: `/api/v1/experts/${MISSING_ID}`, body: expertBody("x") },
       { method: "PATCH", path: `/api/v1/experts/${MISSING_ID}/enabled`, body: { enabled: true } },
@@ -246,13 +225,11 @@ describe("B1 公共契约", () => {
 
     const harness = await post("/api/v1/harnesses", harnessBody("harness-unknown"));
     const tool = await post("/api/v1/tools", toolBody("tool-unknown"));
-    const skill = await post("/api/v1/skills", skillBody("skill-unknown"));
     const expert = await post("/api/v1/experts", expertBody("expert-unknown"));
 
     const createCases = [
       { path: "/api/v1/harnesses", body: { ...harnessBody("c1"), toolCount: 0 } },
       { path: "/api/v1/tools", body: { ...toolBody("c2"), usedByCount: 0 } },
-      { path: "/api/v1/skills", body: { ...skillBody("c3"), version: "v9.9" } },
       { path: "/api/v1/experts", body: { ...expertBody("c4"), skillCount: 0 } },
     ];
     for (const item of createCases) {
@@ -264,7 +241,6 @@ describe("B1 公共契约", () => {
     const updateCases = [
       { path: `/api/v1/harnesses/${harness.id}`, body: { ...harnessBody("u1"), toolCount: 0 } },
       { path: `/api/v1/tools/${tool.id}`, body: { ...toolBody("u2"), paramCount: 0 } },
-      { path: `/api/v1/skills/${skill.id}`, body: { ...skillBody("u3"), version: "v9.9" } },
       { path: `/api/v1/experts/${expert.id}`, body: { ...expertBody("u4"), skillCount: 0 } },
     ];
     for (const item of updateCases) {
@@ -342,29 +318,6 @@ describe("B1 公共契约", () => {
         field: "params[0]",
       },
       {
-        path: "/api/v1/skills",
-        body: {
-          ...skillBody("nested-skill"),
-          sections: {
-            overview: "o",
-            steps: "s",
-            examples: "e",
-            scripts: "sc",
-            verification: "v",
-            extra: "x",
-          },
-        },
-        field: "sections",
-      },
-      {
-        path: "/api/v1/skills",
-        body: {
-          ...skillBody("nested-ref"),
-          refs: [{ label: "参考", refType: "经验", extra: 1 }],
-        },
-        field: "refs[0]",
-      },
-      {
         path: "/api/v1/experts",
         body: {
           ...expertBody("nested-expert"),
@@ -432,25 +385,6 @@ describe("B1 公共契约", () => {
       "sort-tool-b",
     ]);
 
-    const skillA = await post("/api/v1/skills", skillBody("sort-skill-a"));
-    const skillB = await post("/api/v1/skills", skillBody("sort-skill-b"));
-    await ctx.db.query("update skill set updated_at = $1 where id = $2", [older, skillA.id]);
-    await ctx.db.query("update skill set updated_at = $1 where id = $2", [newer, skillB.id]);
-    const skillDefault = await call(ctx.app, "GET", "/api/v1/skills?q=sort-skill-");
-    expect(skillDefault.body.items.map((item: any) => item.name)).toEqual([
-      "sort-skill-b",
-      "sort-skill-a",
-    ]);
-    const skillAsc = await call(
-      ctx.app,
-      "GET",
-      "/api/v1/skills?q=sort-skill-&sort=updatedAt:asc",
-    );
-    expect(skillAsc.body.items.map((item: any) => item.name)).toEqual([
-      "sort-skill-a",
-      "sort-skill-b",
-    ]);
-
     const expertA = await post("/api/v1/experts", expertBody("sort-expert-a"));
     const expertB = await post("/api/v1/experts", expertBody("sort-expert-b"));
     await ctx.db.query("update expert set updated_at = $1 where id = $2", [older, expertA.id]);
@@ -475,7 +409,6 @@ describe("B1 公共契约", () => {
     const resources = [
       await post("/api/v1/harnesses", harnessBody("uuid-harness")),
       await post("/api/v1/tools", toolBody("uuid-tool")),
-      await post("/api/v1/skills", skillBody("uuid-skill")),
       await post("/api/v1/experts", expertBody("uuid-expert")),
     ];
     const uuidV7 =
@@ -564,40 +497,6 @@ describe("B1 公共契约", () => {
       "timeoutMs",
       "updatedAt",
       "usedByCount",
-    ]);
-
-    const skill = await post("/api/v1/skills", skillBody("snapshot-skill"));
-    const skillList = await call(ctx.app, "GET", "/api/v1/skills?q=snapshot-skill");
-    expect(keys(skillList.body.items[0])).toEqual([
-      "categoryCode",
-      "categoryLabel",
-      "description",
-      "enabled",
-      "id",
-      "name",
-      "revision",
-      "tags",
-      "updatedAt",
-      "usedByCount",
-      "version",
-    ]);
-    const skillDetail = await call(ctx.app, "GET", `/api/v1/skills/${skill.id}`);
-    expect(keys(skillDetail.body)).toEqual([
-      "categoryCode",
-      "categoryLabel",
-      "createdAt",
-      "description",
-      "enabled",
-      "id",
-      "name",
-      "pitfalls",
-      "refs",
-      "revision",
-      "sections",
-      "tags",
-      "updatedAt",
-      "usedByCount",
-      "version",
     ]);
 
     const expert = await post("/api/v1/experts", expertBody("snapshot-expert"));

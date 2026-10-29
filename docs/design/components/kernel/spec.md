@@ -3,14 +3,14 @@ layer: design
 module: kernel
 status: current
 component: CMP-kernel
-updated: 2026-10-25
+updated: 2026-10-28
 ---
 
 # `CMP-kernel` 共享契约组件规格
 
 ## 1. 主目标
 
-**只定义跨组件共享的契约词汇与端口**：统一错误分类、分页类型、引用检查端口、时钟与 ID 生成端口；不实现业务规则、不访问数据库、不处理 HTTP。
+**只定义跨组件共享的契约词汇与端口**：统一错误分类、分页类型、引用检查端口、时钟与 ID 生成端口、文件存储端口；不实现业务规则、不访问数据库、不处理 HTTP。
 
 ## 2. 不负责
 
@@ -18,6 +18,7 @@ updated: 2026-10-25
 - 不连接数据库、不执行 SQL、不管理迁移。
 - 不解析 HTTP、不生成 DTO、不映射状态码。
 - 不组合跨组件读模型；`catalog` 负责组合，`http-gateway` 负责传输。
+- 不实现文件存储；只定义端口，由 `platform` 适配。
 - 不持有任何业务数据或运行时可变状态。
 
 ## 3. 公共契约
@@ -31,7 +32,13 @@ type ErrorCode =
   | "name_conflict"           // 409
   | "revision_conflict"       // 409
   | "referenced"              // 409
+  | "file_conflict"           // 409
+  | "draft_expired"           // 410
+  | "payload_too_large"       // 413
+  | "unsupported_media_type"  // 415
+  | "skill_md_too_large"      // 422
   | "precondition_required"   // 428
+  | "package_unavailable"     // 500
   | "database_unavailable";   // 503
 
 type ErrorDetails = Record<string, unknown>;
@@ -47,13 +54,23 @@ class NotFoundError extends AppError {}
 class NameConflictError extends AppError {}
 class RevisionConflictError extends AppError {}
 class ReferencedError extends AppError {}
+class FileConflictError extends AppError {}
+class DraftExpiredError extends AppError {}
+class PayloadTooLargeError extends AppError {}
+class UnsupportedMediaTypeError extends AppError {}
+class SkillMdTooLargeError extends AppError {}
 class PreconditionRequiredError extends AppError {}
+class PackageUnavailableError extends AppError {}
 class DatabaseUnavailableError extends AppError {}
 ```
 
 - 领域组件只抛上述错误类型；`http-gateway` 负责映射为 HTTP 状态码与 `error` 响应体。
 - `ReferencedError.details` 至少包含 `references`，与 REST 契约的 `details` 结构一致。
 - `name_conflict` 用于任何名称唯一约束冲突；Harness、工具、Skill、专家按各自唯一规则使用。
+- `draft_expired` 只用于草稿记录仍在但 `expires_at` 已过；草稿已清理时用 `not_found`。
+- `file_conflict` 用于草稿附件改名目标已存在；`revision_conflict` 只用于 revision/baseRevision 闸门。
+- `payload_too_large` 覆盖单文件、文件数、包总量/草稿总量；`skill_md_too_large` 只覆盖生成的 `SKILL.md`。
+- `package_unavailable` 表示已保存 Skill 的包缺失/损坏/`SKILL.md` 无效；不用于草稿目录缺失。
 - `database_unavailable` 只由 `platform` 在连接不可用时抛出；`http-gateway` 映射为 503。
 
 ### 3.2 分页
@@ -113,12 +130,47 @@ type IdGenerator = {
 - `platform` 提供实现；领域组件通过构造参数接收，不在内部直接读系统时钟或生成随机 ID。
 - B1 的 ID 为 UUIDv7 字符串；端口签名不暴露 UUID 细节，替换实现不改变领域契约。
 
-### 3.5 方法契约
+### 3.5 文件存储端口
+
+```ts
+type FileData = Uint8Array | ReadableStream<Uint8Array>;
+
+type FileStat = {
+  key: string;        // 相对存储根的 POSIX 键
+  size: number;       // 字节数
+  modifiedAt: Date;
+};
+
+type FileStore = {
+  put(key: string, data: FileData): Promise<void>;
+  get(key: string): Promise<ReadableStream<Uint8Array>>;
+  head(key: string): Promise<FileStat | null>;
+  list(prefix: string): Promise<FileStat[]>;
+  delete(key: string): Promise<void>;
+  move(from: string, to: string): Promise<void>;
+};
+```
+
+- 端口由 `platform` 实现；`skill` 只依赖本端口，不直接使用 Bun 文件 API。
+- `key` 必须是相对存储根的 POSIX 路径；实现拒绝绝对路径、`..`、反斜杠与控制字符。
+- `put` 原子覆盖：同根临时文件 → fsync 文件 → rename → fsync 目录；失败不留下半文件。
+- `get` 返回流；不存在由调用方按 `head` 判定，`get` 失败抛平台存储错误。
+- `head` 不存在返回 `null`；`list` 只返回文件，不返回目录，按 `key` 排序。
+- `delete` 幂等，不存在视为成功；只删文件或空目录，不递归删非空目录。
+- `move` 在同一存储根内原子改名；目标存在时由调用方先保证不存在。
+
+### 3.6 方法契约
 
 | 方法 | 目的 | 输入 | 输出 | 错误 | 说明 |
 |---|---|---|---|---|---|
 | `normalizePageQuery` | 规范化分页参数 | `limit?`, `offset?` | `PageQuery` | `ValidationError` | 默认 50，上限 200 |
 | `ReferenceGuard.check` | 查询引用方 | `owner`, `id` | `Reference[]` | 无 | 空数组表示可删除 |
+| `FileStore.put` | 原子写/覆盖 | `key`, `data` | `void` | 平台存储错误 | fsync 文件与目录 |
+| `FileStore.get` | 读流 | `key` | `ReadableStream<Uint8Array>` | 平台存储错误 | 不存在由 `head` 判定 |
+| `FileStore.head` | 文件元数据 | `key` | `FileStat \| null` | 平台存储错误 | 不存在返回 null |
+| `FileStore.list` | 列文件 | `prefix` | `FileStat[]` | 平台存储错误 | 只返回文件，按 key 排序 |
+| `FileStore.delete` | 幂等删除 | `key` | `void` | 平台存储错误 | 不存在成功；不递归 |
+| `FileStore.move` | 原子改名 | `from`, `to` | `void` | 平台存储错误 | 同根内 |
 
 ## 4. 依赖与边界
 
@@ -139,9 +191,10 @@ bunx tsc --noEmit
 | 错误码映射 | 每个 `AppError` 子类的 `code` 与 `retryable` 正确 |
 | 分页 | 缺省、边界、超上限、负数均符合契约 |
 | 引用端口 | 空/非空引用返回结构稳定，领域可用假实现替换 |
+| 存储端口 | `put/get/head/list/delete/move` 的 key 约束、幂等与流语义稳定，领域可用假实现替换 |
 | 依赖边界 | `kernel` 不导入 `platform`/领域/`catalog`/`http-gateway` |
 
 ## 6. 预算
 
-- 目标 ≤30 KB；上限 ≤50 KB（源码 + 规格 + 测试）。
+- 目标 ≤35 KB；上限 ≤55 KB（源码 + 规格 + 测试）。
 - 超出先合并重复类型，不新增抽象层。

@@ -1,4 +1,4 @@
--- Skill 聚合：分类参考数据、聚合根与五类有序子表。
+-- Skill 聚合：分类参考数据、brief、标签与草稿；包内容在文件系统。
 
 create table skill_category (
   code text primary key,
@@ -18,7 +18,8 @@ create table skill (
   id uuid primary key,
   name text not null,
   category_code text not null references skill_category (code) on delete restrict,
-  summary text not null check (char_length(summary) <= 200),
+  description text not null check (char_length(description) between 1 and 400),
+  package_key text not null unique,
   version text not null check (version ~ '^v[0-9]+\.[0-9]+$'),
   enabled boolean not null default true,
   revision integer not null default 1 check (revision >= 1),
@@ -45,33 +46,23 @@ create table skill_tag (
 
 create index skill_tag_tag_idx on skill_tag (tag);
 
-create table skill_trigger (
-  skill_id uuid not null references skill (id) on delete cascade,
-  position integer not null check (position >= 0),
-  keyword text not null check (char_length(keyword) > 0),
-  primary key (skill_id, position),
-  unique (skill_id, keyword)
+create table skill_draft (
+  id uuid primary key,
+  skill_id uuid references skill (id) on delete cascade,
+  base_revision integer check (base_revision is null or base_revision >= 1),
+  base_version text check (
+    base_version is null or base_version ~ '^v[0-9]+\.[0-9]+$'
+  ),
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  created_by text,
+  updated_by text,
+  check (
+    (skill_id is null and base_revision is null and base_version is null)
+    or
+    (skill_id is not null and base_revision is not null and base_version is not null)
+  )
 );
 
-create table skill_section (
-  skill_id uuid not null references skill (id) on delete cascade,
-  kind text not null check (kind in ('overview', 'steps', 'examples', 'scripts', 'verification')),
-  content_md text not null default '',
-  primary key (skill_id, kind)
-);
-
-create table skill_pitfall (
-  skill_id uuid not null references skill (id) on delete cascade,
-  position integer not null check (position >= 0),
-  content text not null check (char_length(content) > 0),
-  primary key (skill_id, position)
-);
-
-create table skill_ref (
-  skill_id uuid not null references skill (id) on delete cascade,
-  position integer not null check (position >= 0),
-  label text not null check (char_length(label) > 0),
-  ref_type text not null,
-  path text,
-  primary key (skill_id, position)
-);
+create index skill_draft_skill_id_idx on skill_draft (skill_id);
+create index skill_draft_expires_at_idx on skill_draft (expires_at);

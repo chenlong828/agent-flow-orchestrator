@@ -6,7 +6,14 @@ import type {
 } from "../../core/kernel/index.ts";
 import type { HarnessQuery, HarnessRead } from "../harness/index.ts";
 import type { ToolQuery, ToolRead } from "../tool/index.ts";
-import type { SkillCategory, SkillDocument, SkillQuery, SkillRead } from "../skill/index.ts";
+import type {
+  SkillCategory,
+  SkillDetail,
+  SkillDocument,
+  SkillPackage,
+  SkillQuery,
+  SkillRead,
+} from "../skill/contract.ts";
 import type { ExpertQuery, ExpertRead } from "../expert/index.ts";
 
 export type ReferenceAsset = {
@@ -85,17 +92,9 @@ export type SkillListItem = {
   updatedAt: string;
 };
 
-export type SkillDetailView = SkillListItem & {
-  sections: {
-    overview: string;
-    steps: string;
-    examples: string;
-    scripts: string;
-    verification: string;
-  };
-  pitfalls: string[];
-  refs: { label: string; refType: string; path: string | null }[];
-  createdAt: string;
+export type SkillDetailView = SkillDetail & {
+  categoryLabel: string;
+  usedByCount: number;
 };
 
 export type SkillCategoryView = SkillCategory;
@@ -157,6 +156,7 @@ export type CatalogRead = {
   listSkills(query: SkillQuery): Promise<Page<SkillListItem>>;
   getSkill(id: string): Promise<SkillDetailView>;
   getSkillDocument(id: string): Promise<SkillDocument>;
+  getSkillPackage(id: string): Promise<SkillPackage>;
   listSkillCategories(): Promise<SkillCategoryView[]>;
   listExpertsUsingSkill(skillId: string): Promise<Reference[]>;
 
@@ -348,19 +348,18 @@ export function createCatalog(deps: CatalogDeps): CatalogRead & ReferenceGuard {
         usedByCount: usedBy.length,
         revision: skill.revision,
         updatedAt: skill.updatedAt,
-        sections: skill.sections,
-        pitfalls: skill.pitfalls,
-        refs: skill.refs.map((ref) => ({
-          label: ref.label,
-          refType: ref.refType,
-          path: ref.path ?? null,
-        })),
+        body: skill.body,
+        files: skill.files,
         createdAt: skill.createdAt,
       };
     },
 
     async getSkillDocument(id) {
       return skillRead.getDocument(id);
+    },
+
+    async getSkillPackage(id) {
+      return skillRead.getPackage(id);
     },
 
     async listSkillCategories() {
@@ -472,7 +471,7 @@ export function createCatalog(deps: CatalogDeps): CatalogRead & ReferenceGuard {
     },
 
     async referencesForSkill(id) {
-      const skill = await skillRead.get(id);
+      const skill = await skillRead.getSummary(id);
       const items = await catalog.check("skill", id);
       return {
         asset: { type: "skill", id, name: skill.name },

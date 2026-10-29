@@ -1,6 +1,8 @@
 import {
   AppError,
   NotFoundError,
+  PreconditionRequiredError,
+  UnsupportedMediaTypeError,
   ValidationError,
   type Page,
 } from "../../core/kernel/index.ts";
@@ -13,10 +15,9 @@ import type {
 } from "../harness/index.ts";
 import type { CreateTool, ToolService, UpdateTool } from "../tool/index.ts";
 import type {
-  CreateSkill,
-  SkillService,
-  UpdateSkill,
-} from "../skill/index.ts";
+  SaveSkill,
+  SkillDraftService,
+} from "../skill/contract.ts";
 import type {
   CreateExpert,
   ExpertService,
@@ -42,7 +43,7 @@ export type HttpDeps = {
   catalog: CatalogRead;
   harnessService: HarnessService;
   toolService: ToolService;
-  skillService: SkillService;
+  skillDraftService: SkillDraftService;
   expertService: ExpertService;
   health: Health;
   actor: string;
@@ -71,14 +72,12 @@ const TOOL_WRITE_FIELDS = [
   "timeoutMs",
   "params",
 ] as const;
-const SKILL_WRITE_FIELDS = [
+const SKILL_SAVE_FIELDS = [
   "name",
   "categoryCode",
   "description",
   "tags",
-  "sections",
-  "pitfalls",
-  "refs",
+  "body",
 ] as const;
 const EXPERT_WRITE_FIELDS = [
   "name",
@@ -153,9 +152,20 @@ function statusFor(error: AppError): number {
     case "name_conflict":
     case "revision_conflict":
     case "referenced":
+    case "file_conflict":
       return 409;
+    case "draft_expired":
+      return 410;
+    case "payload_too_large":
+      return 413;
+    case "unsupported_media_type":
+      return 415;
+    case "skill_md_too_large":
+      return 422;
     case "precondition_required":
       return 428;
+    case "package_unavailable":
+      return 500;
     case "database_unavailable":
       return 503;
   }
@@ -210,16 +220,6 @@ function validateNestedRefs(body: Record<string, unknown>, key: string): void {
     const ref = requireObject(item, `${key}[${index}]`);
     assertAllowedFields(ref, ["label", "refType", "path"], `${key}[${index}]`);
   });
-}
-
-function validateSections(body: Record<string, unknown>): void {
-  if (body.sections === undefined) return;
-  const sections = requireObject(body.sections, "sections");
-  assertAllowedFields(
-    sections,
-    ["overview", "steps", "examples", "scripts", "verification"],
-    "sections",
-  );
 }
 
 function assemblyIds(body: Record<string, unknown>, key: "skillId" | "toolId"): string[] {
@@ -309,7 +309,7 @@ export function createHttpApp(deps: HttpDeps): (request: Request) => Promise<Res
     catalog,
     harnessService,
     toolService,
-    skillService,
+    skillDraftService,
     expertService,
     health,
     actor,
@@ -378,13 +378,37 @@ export function createHttpApp(deps: HttpDeps): (request: Request) => Promise<Res
             const page = await catalog.listSkills(parseSkillListQuery(url));
             return json(pagePayload(page));
           }
+          throw new NotFoundError("路径", path);
+        }
+        case "skill-drafts": {
           if (request.method === "POST") {
-            const body = await readJsonObject(request, SKILL_WRITE_FIELDS);
-            validateSections(body);
-            validateNestedRefs(body, "refs");
-            const created = await skillService.create(body as unknown as CreateSkill, actorFrom(request, actor));
-            const detail = await catalog.getSkill(created.id);
-            return json(detail, 201, { Location: `/api/v1/skills/${created.id}` });
+            const rawBody = await request.text();
+            let body: Record<string, unknown> = {};
+            if (rawBody.trim() !== "") {
+              let parsed: unknown;
+              try {
+                parsed = JSON.parse(rawBody);
+              } catch {
+                throw new ValidationError("body", "必须是合法 JSON");
+              }
+              if (!isPlainObject(parsed)) {
+                throw new ValidationError("body", "必须是 JSON 对象");
+              }
+              assertAllowedFields(parsed, ["skillId"]);
+              body = parsed;
+            }
+            const skillId = body.skillId;
+            if (skillId !== undefined && skillId !== null) {
+              if (typeof skillId !== "string") {
+                throw new ValidationError("skillId", "必须是 UUID");
+              }
+              assertUuid(skillId, "skillId");
+            }
+            const draft = await skillDraftService.createDraft(
+              (skillId as string | null | undefined) ?? null,
+              actorFrom(request, actor),
+            );
+            return json(draft, 201, { Location: `/api/v1/skill-drafts/${draft.id}` });
           }
           throw new NotFoundError("路径", path);
         }
@@ -446,16 +470,18 @@ export function createHttpApp(deps: HttpDeps): (request: Request) => Promise<Res
         }
         case "skills": {
           if (request.method === "GET") return json(await catalog.getSkill(id));
-          if (request.method === "PUT") {
-            const revision = parseIfMatch(request);
-            const body = await readJsonObject(request, SKILL_WRITE_FIELDS);
-            validateSections(body);
-            validateNestedRefs(body, "refs");
-            await skillService.update(id, revision, body as unknown as UpdateSkill, actorFrom(request, actor));
-            return json(await catalog.getSkill(id));
+          if (request.method === "DELETE") {
+            await skillDraftService.delete(id, parseIfMatch(request));
+            return noContent();
+          }
+          throw new NotFoundError("路径", path);
+        }
+        case "skill-drafts": {
+          if (request.method === "GET") {
+            return json(await skillDraftService.getDraft(id));
           }
           if (request.method === "DELETE") {
-            await skillService.delete(id, parseIfMatch(request));
+            await skillDraftService.cancelDraft(id);
             return noContent();
           }
           throw new NotFoundError("路径", path);
@@ -502,6 +528,90 @@ export function createHttpApp(deps: HttpDeps): (request: Request) => Promise<Res
         return markdown(document.markdown, { etag, "cache-control": "no-cache" });
       }
 
+      if (resource === "skills" && subresource === "download" && request.method === "GET") {
+        const skill = await catalog.getSkill(id);
+        const packageFile = await catalog.getSkillPackage(id);
+        const etag = `"${skill.revision}"`;
+        if (request.headers.get("if-none-match")?.trim() === etag) return notModified();
+        const asciiName = packageFile.fileName.replace(/[^\x20-\x7e]/g, "_");
+        const disposition =
+          `attachment; filename="${asciiName}"; ` +
+          `filename*=UTF-8''${encodeURIComponent(packageFile.fileName)}`;
+        return new Response(packageFile.data as unknown as BodyInit, {
+          status: 200,
+          headers: {
+            "content-type": "application/zip",
+            "content-disposition": disposition,
+            "x-content-type-options": "nosniff",
+            etag,
+            "cache-control": "no-cache",
+          },
+        });
+      }
+
+      if (resource === "skill-drafts" && subresource === "files") {
+        if (request.method === "POST") {
+          const contentType = request.headers.get("content-type") ?? "";
+          if (!contentType.toLowerCase().startsWith("multipart/form-data")) {
+            throw new UnsupportedMediaTypeError();
+          }
+          const form = await request.formData();
+          const pathValue = form.get("path");
+          const fileValue = form.get("file");
+          if (typeof pathValue !== "string" || pathValue === "") {
+            throw new ValidationError("path", "缺少 path 字段");
+          }
+          if (!(fileValue instanceof File)) {
+            throw new ValidationError("file", "缺少 file 字段");
+          }
+          const data = new Uint8Array(await fileValue.arrayBuffer());
+          return json(
+            await skillDraftService.uploadDraftFile(id, pathValue, data),
+          );
+        }
+        if (request.method === "PATCH") {
+          const body = await readJsonObject(request, ["path", "newPath"]);
+          if (typeof body.path !== "string" || typeof body.newPath !== "string") {
+            throw new ValidationError("path", "path 与 newPath 必须是字符串");
+          }
+          return json(
+            await skillDraftService.renameDraftFile(id, body.path, body.newPath),
+          );
+        }
+        if (request.method === "DELETE") {
+          const pathValue = url.searchParams.get("path");
+          if (pathValue === null || pathValue === "") {
+            throw new ValidationError("path", "缺少 path 查询参数");
+          }
+          await skillDraftService.deleteDraftFile(id, pathValue);
+          return noContent();
+        }
+        throw new NotFoundError("路径", path);
+      }
+
+      if (resource === "skill-drafts" && subresource === "save" && request.method === "POST") {
+        const draft = await skillDraftService.getDraft(id);
+        const rawIfMatch = request.headers.get("if-match");
+        let baseRevision: number | null = null;
+        if (draft.skillId !== null) {
+          if (rawIfMatch === null || rawIfMatch === "") throw new PreconditionRequiredError();
+          baseRevision = parseIfMatch(request);
+        } else if (rawIfMatch !== null && rawIfMatch !== "") {
+          throw new ValidationError("If-Match", "新建草稿不能带 If-Match");
+        }
+        const body = await readJsonObject(request, SKILL_SAVE_FIELDS);
+        const saved = await skillDraftService.saveDraft(
+          id,
+          baseRevision,
+          body as unknown as SaveSkill,
+          actorFrom(request, actor),
+        );
+        const status = draft.skillId === null ? 201 : 200;
+        return json(saved, status, {
+          Location: `/api/v1/skills/${saved.id}`,
+        });
+      }
+
       if (subresource === "references" && request.method === "GET") {
         switch (resource) {
           case "harnesses":
@@ -526,7 +636,7 @@ export function createHttpApp(deps: HttpDeps): (request: Request) => Promise<Res
             await harnessService.setEnabled(id, revision, body.enabled, actorFrom(request, actor));
             return json(await catalog.getHarness(id));
           case "skills":
-            await skillService.setEnabled(id, revision, body.enabled, actorFrom(request, actor));
+            await skillDraftService.setEnabled(id, revision, body.enabled, actorFrom(request, actor));
             return json(await catalog.getSkill(id));
           case "experts":
             await expertService.setEnabled(id, revision, body.enabled, actorFrom(request, actor));

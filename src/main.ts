@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import {
   createDb,
+  createFileStore,
   createHealth,
   createMigrator,
   ensureDatabase,
@@ -13,7 +14,8 @@ import {
   createHarnessService,
 } from "./components/harness/index.ts";
 import { createToolRead, createToolService } from "./components/tool/index.ts";
-import { createSkillRead, createSkillService } from "./components/skill/index.ts";
+import { createSkillRead } from "./components/skill/read.ts";
+import { createSkillDraftService } from "./components/skill/draft.ts";
 import {
   createExpertRead,
   createExpertService,
@@ -36,7 +38,8 @@ if (migration.applied.length > 0) {
 
 const harnessRead = createHarnessRead({ db });
 const toolRead = createToolRead({ db });
-const skillRead = createSkillRead({ db });
+const skillStore = createFileStore(config.skillStorageRoot);
+const skillRead = createSkillRead(db, skillStore);
 const expertRead = createExpertRead({ db });
 const catalog = createCatalog({ harnessRead, toolRead, skillRead, expertRead });
 
@@ -54,11 +57,13 @@ const toolService = createToolService({
   guard: catalog,
   actor: config.actor,
 });
-const skillService = createSkillService({
+const skillDraftService = createSkillDraftService({
   db,
+  store: skillStore,
   clock: systemClock,
   ids: uuidv7Ids,
   guard: catalog,
+  draftTtlHours: config.skillDraftTtlHours,
   actor: config.actor,
 });
 const expertService = createExpertService({
@@ -84,7 +89,7 @@ const app = createHttpApp({
   catalog,
   harnessService,
   toolService,
-  skillService,
+  skillDraftService,
   expertService,
   health,
   actor: config.actor,

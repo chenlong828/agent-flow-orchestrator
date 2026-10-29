@@ -3,16 +3,16 @@ layer: design
 module: catalog
 status: current
 component: CMP-catalog
-updated: 2026-10-26
+updated: 2026-10-29
 ---
 
 # `CMP-catalog` 组件规格
 
 ## 1 主目标
 
-把四类资产的单聚合读契约组合成外部客户端可直接消费的列表、详情与引用只读投影；不拥有表，不执行写操作。
+把四类资产的单聚合读契约组合成外部客户端可直接消费的列表、详情与引用只读投影；不拥有表，不执行写操作。Skill 的详情、文档与整包下载也通过本组件透传，保证 HTTP 只依赖一个读面。
 
-**不负责**：业务写规则、数据库访问、HTTP 路由、状态推进。
+**不负责**：业务写规则、数据库访问、HTTP 路由、状态推进、包内容解析。
 
 ## 2 拥有的数据
 
@@ -46,6 +46,7 @@ type CatalogRead = {
   listSkills(query: SkillQuery): Promise<Page<SkillListItem>>;
   getSkill(id: string): Promise<SkillDetailView>;
   getSkillDocument(id: string): Promise<SkillDocument>;
+  getSkillPackage(id: string): Promise<SkillPackage>;
   listSkillCategories(): Promise<SkillCategoryView[]>;
   listExpertsUsingSkill(skillId: string): Promise<Reference[]>;
 
@@ -123,16 +124,15 @@ type SkillListItem = {
 };
 
 type SkillDetailView = SkillListItem & {
-  sections: {
-    overview: string;
-    steps: string;
-    examples: string;
-    scripts: string;
-    verification: string;
-  };
-  pitfalls: string[];
-  refs: { label: string; refType: string; path: string | null }[];
+  body: string;
+  files: SkillFileView[];
   createdAt: string;
+};
+
+type SkillFileView = {
+  path: string;
+  size: number;
+  readOnly: boolean;
 };
 
 type SkillCategoryView = {
@@ -205,8 +205,9 @@ type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
 | `getTool` | 工具详情 | `id` | `ToolDetailView` | `NotFoundError` | `ToolRead.get` + `HarnessRead.get` + `ExpertRead.listExpertsUsingTool` |
 | `listToolsByHarness` | Harness 下工具引用 | `harnessId` | `Reference[]` | 无 | `ToolRead.listByHarness` |
 | `listSkills` | Skill 列表 | `SkillQuery` | `Page<SkillListItem>` | `ValidationError` | `SkillRead.list` + `ExpertRead.listExpertsUsingSkill` |
-| `getSkill` | Skill 详情 | `id` | `SkillDetailView` | `NotFoundError` | `SkillRead.get` + `ExpertRead.listExpertsUsingSkill` |
-| `getSkillDocument` | Skill 编排文档 | `id` | `SkillDocument` | `NotFoundError` | `SkillRead.getDocument`（原样透传，不二次加工） |
+| `getSkill` | Skill 详情 | `id` | `SkillDetailView` | `NotFoundError`、`PackageUnavailableError` | `SkillRead.get` + `ExpertRead.listExpertsUsingSkill` |
+| `getSkillDocument` | Skill 编排文档 | `id` | `SkillDocument` | `NotFoundError`、`PackageUnavailableError` | `SkillRead.getDocument`（原样透传，不二次加工） |
+| `getSkillPackage` | Skill 整包下载 | `id` | `SkillPackage` | `NotFoundError`、`PackageUnavailableError` | `SkillRead.getPackage`（原样透传，不读入内存） |
 | `listSkillCategories` | 分类参考数据 | 无 | `SkillCategoryView[]` | 无 | `SkillRead.listCategories` |
 | `listExpertsUsingSkill` | Skill 的引用专家 | `skillId` | `Reference[]` | 无 | `ExpertRead.listExpertsUsingSkill` |
 | `listExperts` | 专家列表 | `ExpertQuery` | `Page<ExpertListItem>` | `ValidationError` | `ExpertRead.list` + `SkillRead.getSummary`（前 3 个预览） |
@@ -224,8 +225,9 @@ type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
 |---|---|
 | Harness 列表/详情 | `HarnessRead` + `ToolRead.listByHarness` |
 | 工具列表/详情 | `ToolRead` + `HarnessRead.get`（名称）+ `ExpertRead.listExpertsUsingTool` |
-| Skill 列表/详情 | `SkillRead`（列表摘要含 `description`）+ `ExpertRead.listExpertsUsingSkill` |
+| Skill 列表/详情 | `SkillRead`（列表摘要含 `description`；详情含 `body`/`files`）+ `ExpertRead.listExpertsUsingSkill` |
 | Skill 编排文档 | `SkillRead.getDocument`（原样透传；不做跨资产组合） |
+| Skill 整包下载 | `SkillRead.getPackage`（原样透传；不解析 zip） |
 | 专家列表/详情 | `ExpertRead`（列表含 `skillIds`）+ `SkillRead.getSummary` + `ToolRead.getSummary` |
 | 分类列表 | `SkillRead.listCategories` |
 | 引用查询 | `ToolRead.listByHarness` / `ExpertRead.listExpertsUsing*` |
@@ -253,7 +255,7 @@ type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
 
 - 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 10 KB。
 - 单独验证命令：`bun test tests/components/catalog`。
-- 当前状态：`current`；已实现并通过契约测试，实施与验证的历史记录见 [`result.md`](../../../history/works/2026-10-24-db-backend-infra/result.md)（归档件，仅作追溯）。
+- 当前状态：`current`；Skill 读投影已按 T-SKP-16 改为 `body`+`files` 并透传整包，验证记录见 [工序 result.md](../../../works/2026-10-28-skill-package/result.md)。
 
 ## 8 B1 实现口径与剩余风险
 

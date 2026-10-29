@@ -1,12 +1,18 @@
 export {
   AppError,
   DatabaseUnavailableError,
+  DraftExpiredError,
+  FileConflictError,
   MultiFieldValidationError,
   NameConflictError,
   NotFoundError,
+  PackageUnavailableError,
+  PayloadTooLargeError,
   PreconditionRequiredError,
   ReferencedError,
   RevisionConflictError,
+  SkillMdTooLargeError,
+  UnsupportedMediaTypeError,
   ValidationError,
 } from "./errors.ts";
 export type { ErrorCode, ErrorDetails } from "./errors.ts";
@@ -18,6 +24,9 @@ export {
 export type { Page, PageQuery } from "./pagination.ts";
 export type {
   Clock,
+  FileData,
+  FileStat,
+  FileStore,
   IdGenerator,
   Reference,
   ReferenceGuard,

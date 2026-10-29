@@ -7,7 +7,13 @@ export type ErrorCode =
   | "name_conflict"
   | "revision_conflict"
   | "referenced"
+  | "file_conflict"
+  | "draft_expired"
+  | "payload_too_large"
+  | "unsupported_media_type"
+  | "skill_md_too_large"
   | "precondition_required"
+  | "package_unavailable"
   | "database_unavailable";
 
 export type ErrorDetails = Record<string, unknown>;
@@ -78,6 +84,57 @@ export class ReferencedError extends AppError {
   ) {
     super("referenced", "资产仍被引用，不能删除", {
       details: { asset, references },
+    });
+  }
+}
+
+export class FileConflictError extends AppError {
+  constructor(path: string, newPath: string) {
+    super("file_conflict", `目标文件 ${newPath} 已存在`, {
+      details: { path, newPath },
+    });
+  }
+}
+
+export class DraftExpiredError extends AppError {
+  constructor(expiresAt: string) {
+    super("draft_expired", "草稿已过期", {
+      details: { expiresAt },
+    });
+  }
+}
+
+export class PayloadTooLargeError extends AppError {
+  constructor(
+    limit: "file_bytes" | "file_count" | "package_bytes" | "draft_bytes",
+    limitValue: number,
+    actualValue: number,
+  ) {
+    super("payload_too_large", "请求内容超过限制", {
+      details: { limit, limitValue, actualValue },
+    });
+  }
+}
+
+export class UnsupportedMediaTypeError extends AppError {
+  constructor() {
+    super("unsupported_media_type", "请求内容类型必须是 multipart/form-data");
+  }
+}
+
+export class SkillMdTooLargeError extends AppError {
+  constructor(limitBytes: number, actualBytes: number) {
+    super("skill_md_too_large", `SKILL.md 超过 ${limitBytes} 字节`, {
+      details: { limitBytes, actualBytes },
+    });
+  }
+}
+
+export class PackageUnavailableError extends AppError {
+  constructor(skillId: string, cause?: unknown) {
+    super("package_unavailable", `Skill ${skillId} 的包不可用`, {
+      details: { skillId },
+      cause,
     });
   }
 }

@@ -45,6 +45,8 @@ describe("CMP-config 默认值与文件覆盖", () => {
       databaseUrl: "postgres://postgres@127.0.0.1:54329/agentflow",
       actor: "local",
       logLevel: "info",
+      skillStorageRoot: ".local/skills",
+      skillDraftTtlHours: 24,
     });
   });
 
@@ -70,6 +72,8 @@ describe("CMP-config 默认值与文件覆盖", () => {
       databaseUrl: "postgres://postgres@127.0.0.1:54329/agentflow",
       actor: "team",
       logLevel: "warn",
+      skillStorageRoot: ".local/skills",
+      skillDraftTtlHours: 24,
     });
   });
 
@@ -86,6 +90,8 @@ describe("CMP-config 默认值与文件覆盖", () => {
           DATABASE_URL: "postgres://u@db:5432/x",
           DEV_ACTOR: "alice",
           LOG_LEVEL: "debug",
+          SKILL_STORAGE_ROOT: "/srv/skills",
+          SKILL_DRAFT_TTL_HOURS: "48",
         }),
       ),
     ).toEqual({
@@ -94,6 +100,8 @@ describe("CMP-config 默认值与文件覆盖", () => {
       databaseUrl: "postgres://u@db:5432/x",
       actor: "alice",
       logLevel: "debug",
+      skillStorageRoot: "/srv/skills",
+      skillDraftTtlHours: 48,
     });
 
     expect(
@@ -104,6 +112,8 @@ describe("CMP-config 默认值与文件覆盖", () => {
           DEV_ACTOR: "",
           LOG_LEVEL: "",
           DATABASE_URL: "",
+          SKILL_STORAGE_ROOT: "",
+          SKILL_DRAFT_TTL_HOURS: "",
         }),
       ),
     ).toMatchObject({
@@ -111,6 +121,8 @@ describe("CMP-config 默认值与文件覆盖", () => {
       port: 3000,
       actor: "local",
       logLevel: "info",
+      skillStorageRoot: ".local/skills",
+      skillDraftTtlHours: 24,
     });
   });
 
@@ -205,5 +217,41 @@ describe("CMP-config 校验与失败语义", () => {
     expect(missing).toBeInstanceOf(ConfigError);
     expect(missing.code).toBe("config_read_error");
     expect(missing.source).toBe(missingPath);
+  });
+
+  test("空 SKILL_STORAGE_ROOT 回退默认值，空白值被拒绝", async () => {
+    const configDir = await tempConfigDir();
+
+    expect(
+      await loadConfig(options(configDir, { SKILL_STORAGE_ROOT: "" })),
+    ).toMatchObject({ skillStorageRoot: ".local/skills" });
+
+    expect(
+      await loadConfig(
+        options(configDir, { SKILL_STORAGE_ROOT: "/srv/af skills" }),
+      ),
+    ).toMatchObject({ skillStorageRoot: "/srv/af skills" });
+
+    const blank = await loadConfig(
+      options(configDir, { SKILL_STORAGE_ROOT: "   " }),
+    ).catch((caught) => caught);
+    expect(blank).toBeInstanceOf(ConfigError);
+    expect(blank.code).toBe("config_validation_error");
+    expect(blank.source).toBe("env");
+    expect(blank.field).toBe("SKILL_STORAGE_ROOT");
+  });
+
+  test("非法 SKILL_DRAFT_TTL_HOURS 被拒绝，并带环境字段", async () => {
+    const configDir = await tempConfigDir();
+
+    for (const value of ["0", "-1", "1.5", "abc"]) {
+      const error = await loadConfig(
+        options(configDir, { SKILL_DRAFT_TTL_HOURS: value }),
+      ).catch((caught) => caught);
+      expect(error).toBeInstanceOf(ConfigError);
+      expect(error.code).toBe("config_validation_error");
+      expect(error.source).toBe("env");
+      expect(error.field).toBe("SKILL_DRAFT_TTL_HOURS");
+    }
   });
 });

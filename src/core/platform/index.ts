@@ -11,5 +11,7 @@ export {
 export type { Migrator, MigratorOptions } from "./migrator.ts";
 export { createMigrator, MigrationError } from "./migrator.ts";
 export { systemClock, uuidv7Ids } from "./clock.ts";
+export type { FileStoreFactory } from "./storage.ts";
+export { createFileStore, fileStoreFactory, StorageError } from "./storage.ts";
 export type { Health } from "./health.ts";
 export { createHealth } from "./health.ts";

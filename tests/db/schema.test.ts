@@ -13,9 +13,7 @@ const BUSINESS_TABLES = [
   "harness_tag",
   "skill",
   "skill_category",
-  "skill_pitfall",
-  "skill_ref",
-  "skill_section",
+  "skill_draft",
   "skill_tag",
   "tool",
   "tool_param",
@@ -30,7 +28,7 @@ afterAll(async () => {
 });
 
 describe("数据库结构", () => {
-  test("业务表恰好 15 张，另有 schema_migrations", async () => {
+  test("业务表恰好 13 张，另有 schema_migrations", async () => {
     const rows = await db.query<{ table_name: string }>(
       `select table_name from information_schema.tables
        where table_schema = 'public' and table_type = 'BASE TABLE'
@@ -40,7 +38,7 @@ describe("数据库结构", () => {
     expect(names).toEqual([...BUSINESS_TABLES, "schema_migrations"].sort());
   });
 
-  test("5 个迁移按顺序记录，分类参考数据为 4 条", async () => {
+  test("4 个迁移按顺序记录，分类参考数据为 4 条", async () => {
     const migrations = await db.query<{ version: string }>(
       "select version from schema_migrations order by version",
     );
@@ -49,7 +47,6 @@ describe("数据库结构", () => {
       "0002_tool.sql",
       "0003_skill.sql",
       "0004_expert.sql",
-      "0005_skill_description.sql",
     ]);
 
     const categories = await db.query<{ code: string; position: number }>(
@@ -83,5 +80,47 @@ describe("数据库结构", () => {
          and t.relname = 'harness_tag' and r.relname = 'harness'`,
     );
     expect(cascade).toEqual([{ delete_rule: "c" }]);
+
+    const draftCascade = await db.query<{ delete_rule: string }>(
+      `select c.confdeltype as delete_rule
+       from pg_constraint c
+       join pg_class t on t.oid = c.conrelid
+       join pg_class r on r.oid = c.confrelid
+       where c.contype = 'f'
+         and t.relname = 'skill_draft' and r.relname = 'skill'`,
+    );
+    expect(draftCascade).toEqual([{ delete_rule: "c" }]);
+  });
+
+  test("Skill brief、包指针与草稿字段按契约落库", async () => {
+    const columns = await db.query<{ table_name: string; column_name: string }>(
+      `select table_name, column_name
+       from information_schema.columns
+       where table_schema = 'public'
+         and table_name in ('skill', 'skill_draft')
+       order by table_name, ordinal_position`,
+    );
+    expect(columns).toEqual([
+      { table_name: "skill", column_name: "id" },
+      { table_name: "skill", column_name: "name" },
+      { table_name: "skill", column_name: "category_code" },
+      { table_name: "skill", column_name: "description" },
+      { table_name: "skill", column_name: "package_key" },
+      { table_name: "skill", column_name: "version" },
+      { table_name: "skill", column_name: "enabled" },
+      { table_name: "skill", column_name: "revision" },
+      { table_name: "skill", column_name: "created_at" },
+      { table_name: "skill", column_name: "updated_at" },
+      { table_name: "skill", column_name: "created_by" },
+      { table_name: "skill", column_name: "updated_by" },
+      { table_name: "skill_draft", column_name: "id" },
+      { table_name: "skill_draft", column_name: "skill_id" },
+      { table_name: "skill_draft", column_name: "base_revision" },
+      { table_name: "skill_draft", column_name: "base_version" },
+      { table_name: "skill_draft", column_name: "expires_at" },
+      { table_name: "skill_draft", column_name: "created_at" },
+      { table_name: "skill_draft", column_name: "created_by" },
+      { table_name: "skill_draft", column_name: "updated_by" },
+    ]);
   });
 });

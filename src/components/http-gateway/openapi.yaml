@@ -14,11 +14,12 @@ info:
     通用约定：
     - 请求/响应为 `application/json; charset=utf-8`；ID 为 UUIDv7；时间为 ISO-8601 UTC。
     - 列表响应为 `{items,total,limit,offset}`；`limit` 默认 50、上限 200。
-    - 更新、启停、删除、专家装配需带 `If-Match: "<revision>"`；缺少为 428，旧版本为 409。
+    - 启停、删除、专家装配、已有 Skill 草稿保存需带 `If-Match: "<revision>"`；缺少为 428，旧版本为 409。
+    - Skill 新建/更新走草稿保存；`POST /skills`、`PUT /skills/{id}` 已移除。
     - 无登录/鉴权；`X-Actor` 仅用于显示，不是身份。请求可带 `X-Request-Id`，响应可回显。无 CORS 配置。
   x-source-spec: docs/design/components/http-gateway/spec.md
   x-contract-status: current
-  x-api-count: 31
+  x-api-count: 37
   license:
     name: Internal use only
   x-runtime-asset: true
@@ -32,7 +33,7 @@ tags:
 - name: Tool
   description: 工具资产、参数、Harness 归属与引用。
 - name: Skill
-  description: Skill 资产、五章、分类、启停与引用。
+  description: Skill 包、草稿、下载、分类、启停与引用。
 - name: Expert
   description: 专家资产、五区、有序装配与引用。
 - name: Reference
@@ -506,9 +507,9 @@ paths:
     get:
       tags:
       - Skill
-      summary: API-14 查询 Skill 列表
+      summary: SKP-01 查询 Skill 列表
       operationId: listSkills
-      x-api-id: API-14
+      x-api-id: SKP-01
       x-component-method: catalog.listSkills
       description: 按名称或描述（`q`）、分类、启停状态、标签筛选；支持分页与排序。
       parameters:
@@ -552,41 +553,6 @@ paths:
           "$ref": "#/components/responses/InternalError"
         '503':
           "$ref": "#/components/responses/ServiceUnavailable"
-    post:
-      tags:
-      - Skill
-      summary: API-16 创建 Skill
-      operationId: createSkill
-      x-api-id: API-16
-      x-component-method: skill.create + catalog.getSkill
-      description: 创建时服务端生成 `v1.0`，`enabled` 默认 `true`；不接收 `version`/`enabled`。
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/SkillCreate"
-      responses:
-        '201':
-          description: 创建成功。
-          headers:
-            Location:
-              description: 新资源详情路径。
-              schema:
-                type: string
-                example: "/api/v1/skills/0191f2f0-7a5e-7c3b-9d1a-3f2b4c5d6e7f"
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/SkillDetail"
-        '400':
-          "$ref": "#/components/responses/BadRequest"
-        '409':
-          "$ref": "#/components/responses/Conflict"
-        '500':
-          "$ref": "#/components/responses/InternalError"
-        '503':
-          "$ref": "#/components/responses/ServiceUnavailable"
   "/api/v1/skills/{id}":
     parameters:
     - "$ref": "#/components/parameters/Id"
@@ -595,9 +561,9 @@ paths:
     get:
       tags:
       - Skill
-      summary: API-15 查询 Skill 详情
+      summary: SKP-02 查询 Skill 详情
       operationId: getSkill
-      x-api-id: API-15
+      x-api-id: SKP-02
       x-component-method: catalog.getSkill
       responses:
         '200':
@@ -612,48 +578,13 @@ paths:
           "$ref": "#/components/responses/InternalError"
         '503':
           "$ref": "#/components/responses/ServiceUnavailable"
-      description: 按 ID 返回 Skill 详情；包含描述、五章、踩坑与 `refs`。
-    put:
-      tags:
-      - Skill
-      summary: API-17 全量更新 Skill
-      operationId: updateSkill
-      x-api-id: API-17
-      x-component-method: skill.update + catalog.getSkill
-      description: 服务端递增版本：minor+1；minor 超过 9 时 major+1 且 minor 归零。不接收 `version`/`enabled`。
-      parameters:
-      - "$ref": "#/components/parameters/IfMatch"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/SkillUpdate"
-      responses:
-        '200':
-          description: 更新后的 Skill 详情。
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/SkillDetail"
-        '400':
-          "$ref": "#/components/responses/BadRequest"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '409':
-          "$ref": "#/components/responses/Conflict"
-        '428':
-          "$ref": "#/components/responses/PreconditionRequired"
-        '500':
-          "$ref": "#/components/responses/InternalError"
-        '503':
-          "$ref": "#/components/responses/ServiceUnavailable"
+      description: 按 ID 返回 Skill 详情；`body` 来自包内 `SKILL.md`，`files` 来自 zip 中央目录；名称/描述/版本以 `SKILL.md` 为准。
     delete:
       tags:
       - Skill
-      summary: API-19 删除 Skill
+      summary: SKP-08 删除 Skill
       operationId: deleteSkill
-      x-api-id: API-19
+      x-api-id: SKP-08
       x-component-method: skill.delete
       description: 被专家引用时返回 409 `referenced`；成功后无响应体。
       parameters:
@@ -679,9 +610,9 @@ paths:
     patch:
       tags:
       - Skill
-      summary: API-18 启用/停用 Skill
+      summary: SKP-07 启用/停用 Skill
       operationId: setSkillEnabled
-      x-api-id: API-18
+      x-api-id: SKP-07
       x-component-method: skill.setEnabled + catalog.getSkill
       parameters:
       - "$ref": "#/components/parameters/IfMatch"
@@ -719,9 +650,9 @@ paths:
     get:
       tags:
       - Skill
-      summary: API-31 获取 Skill 编排文档
+      summary: SKP-03 获取 Skill 编排文档
       operationId: getSkillDocument
-      x-api-id: API-31
+      x-api-id: SKP-03
       x-component-method: catalog.getSkillDocument
       parameters:
       - name: If-None-Match
@@ -733,13 +664,18 @@ paths:
           example: '"3"'
       responses:
         '200':
-          description: Skill 编排文档；纯文本 markdown，不含管理面字段。
+          description: 包内 SKILL.md 原文；纯文本 markdown，不含管理面字段。
           headers:
             ETag:
               description: 当前 revision，与 `If-Match` 同格式。
               schema:
                 type: string
                 example: '"3"'
+            Cache-Control:
+              description: 固定 no-cache。
+              schema:
+                type: string
+                example: no-cache
           content:
             text/markdown:
               schema:
@@ -752,7 +688,69 @@ paths:
           "$ref": "#/components/responses/InternalError"
         '503':
           "$ref": "#/components/responses/ServiceUnavailable"
-      description: 返回供编排器直接载入的合成文档；停用 Skill 同样可读。
+      description: 返回包内 `SKILL.md` 原始字节；停用 Skill 同样可读；包缺失/损坏返回 500 `package_unavailable`。
+  "/api/v1/skills/{id}/download":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    get:
+      tags:
+      - Skill
+      summary: SKP-04 下载 Skill 整包
+      operationId: downloadSkillPackage
+      x-api-id: SKP-04
+      x-component-method: catalog.getSkillPackage
+      parameters:
+      - name: If-None-Match
+        in: header
+        required: false
+        description: 上次响应的 `ETag`；一致时返回 304。
+        schema:
+          type: string
+          example: '"3"'
+      responses:
+        '200':
+          description: 已保存的 zip 包。
+          headers:
+            ETag:
+              description: 当前 revision，与 `If-Match` 同格式。
+              schema:
+                type: string
+                example: '"3"'
+            Content-Disposition:
+              description: attachment；文件名为 `<name>-<version>.zip`，带 ASCII 回退与 UTF-8 扩展。
+              schema:
+                type: string
+                example: attachment; filename="skill-v1.0.zip"; filename*=UTF-8''skill-v1.0.zip
+            Content-Length:
+              description: zip 文件字节数。
+              schema:
+                type: integer
+            Cache-Control:
+              description: 固定 no-cache。
+              schema:
+                type: string
+                example: no-cache
+            X-Content-Type-Options:
+              description: 固定 nosniff。
+              schema:
+                type: string
+                example: nosniff
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '304':
+          description: 包未变化，无响应体。
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+      description: 返回当前 zip；包缺失/损坏返回 500 `package_unavailable`；停用 Skill 可下载；不提供单文件读取、Range 或内联预览。
   "/api/v1/skills/{id}/references":
     parameters:
     - "$ref": "#/components/parameters/Id"
@@ -761,9 +759,9 @@ paths:
     get:
       tags:
       - Reference
-      summary: API-20 查询 Skill 的引用专家
+      summary: SKP-06 查询 Skill 的引用专家
       operationId: listSkillReferences
-      x-api-id: API-20
+      x-api-id: SKP-06
       x-component-method: catalog.referencesForSkill
       responses:
         '200':
@@ -786,9 +784,9 @@ paths:
     get:
       tags:
       - Skill
-      summary: API-21 查询 Skill 分类
+      summary: SKP-05 查询 Skill 分类
       operationId: listSkillCategories
-      x-api-id: API-21
+      x-api-id: SKP-05
       x-component-method: catalog.listSkillCategories
       description: 返回只读参考数据，不提供分页。
       responses:
@@ -798,6 +796,260 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/SkillCategoryList"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/skill-drafts":
+    parameters:
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    post:
+      tags:
+      - Skill
+      summary: SKP-09 创建 Skill 草稿
+      operationId: createSkillDraft
+      x-api-id: SKP-09
+      x-component-method: skill.createDraft
+      description: 已有 Skill 复制当前完整包；新建建空草稿。允许停用 Skill，允许多个草稿并存。
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/SkillDraftCreate"
+      responses:
+        '201':
+          description: 草稿创建成功。
+          headers:
+            Location:
+              description: 草稿资源路径。
+              schema:
+                type: string
+                example: "/api/v1/skill-drafts/0191f2f0-7a5e-7c3b-9d1a-3f2b4c5d6e7f"
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/SkillDraft"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/skill-drafts/{id}":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    get:
+      tags:
+      - Skill
+      summary: SKP-10 读取 Skill 草稿
+      operationId: getSkillDraft
+      x-api-id: SKP-10
+      x-component-method: skill.getDraft
+      description: 返回草稿元数据与文件清单；不返回正文；过期但未清理为 410。
+      responses:
+        '200':
+          description: 草稿详情。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/SkillDraft"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '410':
+          "$ref": "#/components/responses/Gone"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+    delete:
+      tags:
+      - Skill
+      summary: SKP-14 取消 Skill 草稿
+      operationId: cancelSkillDraft
+      x-api-id: SKP-14
+      x-component-method: skill.cancelDraft
+      description: 删除草稿记录与目录；已过期按 204 处理；不影响已保存 Skill。
+      responses:
+        '204':
+          description: 取消成功，无响应体。
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/skill-drafts/{id}/files":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    post:
+      tags:
+      - Skill
+      summary: SKP-11 上传或覆盖草稿附件
+      operationId: uploadSkillDraftFile
+      x-api-id: SKP-11
+      x-component-method: skill.uploadDraftFile
+      description: 一次一个文件；path 必须在 scripts/ 或 references/ 下；同路径覆盖；不改变 expiresAt。
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - path
+              - file
+              properties:
+                path:
+                  type: string
+                  description: 目标相对路径，如 scripts/build.sh、references/api.md。
+                file:
+                  type: string
+                  format: binary
+                  description: 单个文件，0–20 MiB。
+      responses:
+        '200':
+          description: 上传后的文件与清单。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/SkillDraftFileResult"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '410':
+          "$ref": "#/components/responses/Gone"
+        '413':
+          "$ref": "#/components/responses/PayloadTooLarge"
+        '415':
+          "$ref": "#/components/responses/UnsupportedMediaType"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+    patch:
+      tags:
+      - Skill
+      summary: SKP-12 重命名草稿附件
+      operationId: renameSkillDraftFile
+      x-api-id: SKP-12
+      x-component-method: skill.renameDraftFile
+      description: 源必须是附件；目标不能存在；允许跨 scripts/ 与 references/；SKILL.md 保留。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/SkillDraftFileRename"
+      responses:
+        '200':
+          description: 改名后的文件与清单。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/SkillDraftFileResult"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '410':
+          "$ref": "#/components/responses/Gone"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+    delete:
+      tags:
+      - Skill
+      summary: SKP-13 删除草稿附件
+      operationId: deleteSkillDraftFile
+      x-api-id: SKP-13
+      x-component-method: skill.deleteDraftFile
+      parameters:
+      - name: path
+        in: query
+        required: true
+        description: 要删除的附件相对路径；SKILL.md 不可删除。
+        schema:
+          type: string
+      description: 只删附件；成功 204；不推进 revision/version。
+      responses:
+        '204':
+          description: 删除成功，无响应体。
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '410':
+          "$ref": "#/components/responses/Gone"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/skill-drafts/{id}/save":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    post:
+      tags:
+      - Skill
+      summary: SKP-15 保存 Skill 草稿
+      operationId: saveSkillDraft
+      x-api-id: SKP-15
+      x-component-method: skill.saveDraft
+      description: 生成 SKILL.md 与 zip，原子切换包指针并消费草稿；已有草稿必须带 If-Match。
+      parameters:
+      - "$ref": "#/components/parameters/IfMatchOptional"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/SkillDraftSave"
+      responses:
+        '200':
+          description: 更新成功；返回保存结果，需要详情时再 GET。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/SkillSaveResult"
+        '201':
+          description: 新建成功；返回保存结果。
+          headers:
+            Location:
+              description: 新 Skill 详情路径。
+              schema:
+                type: string
+                example: "/api/v1/skills/0191f2f0-7a5e-7c3b-9d1a-3f2b4c5d6e7f"
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/SkillSaveResult"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '410':
+          "$ref": "#/components/responses/Gone"
+        '413':
+          "$ref": "#/components/responses/PayloadTooLarge"
+        '422':
+          "$ref": "#/components/responses/UnprocessableEntity"
+        '428':
+          "$ref": "#/components/responses/PreconditionRequired"
         '500':
           "$ref": "#/components/responses/InternalError"
         '503':
@@ -1150,6 +1402,15 @@ components:
         type: string
         pattern: ^"[1-9][0-9]*"$
         example: '"3"'
+    IfMatchOptional:
+      name: If-Match
+      in: header
+      required: false
+      description: 已有草稿保存必须带 baseRevision（带双引号）；新建草稿必须不带。缺失时已有草稿 428，新建带了 400。
+      schema:
+        type: string
+        pattern: ^"[1-9][0-9]*"$
+        example: '"3"'
     Q:
       name: q
       in: query
@@ -1185,7 +1446,13 @@ components:
       - name_conflict
       - revision_conflict
       - referenced
+      - file_conflict
+      - draft_expired
+      - payload_too_large
+      - unsupported_media_type
+      - skill_md_too_large
       - precondition_required
+      - package_unavailable
       - internal
       - service_unavailable
       description: 稳定错误码；客户端按 code 分支，不依赖中文 message。
@@ -1712,48 +1979,24 @@ components:
       - version:desc
       default: updatedAt:desc
       description: Skill 列表排序字段与方向。
-    SkillSections:
+    SkillFile:
       type: object
       required:
-      - overview
-      - steps
-      - examples
-      - scripts
-      - verification
+      - path
+      - size
+      - readOnly
       properties:
-        overview:
-          type: string
-          description: 概览
-        steps:
-          type: string
-          description: 步骤
-        examples:
-          type: string
-          description: 示例
-        scripts:
-          type: string
-          description: 脚本
-        verification:
-          type: string
-          description: 验证
-      description: Skill 五章；五个字段全部必填。
-    SkillRef:
-      type: object
-      required:
-      - label
-      - refType
-      properties:
-        label:
-          type: string
-          description: 展示名称
-        refType:
-          type: string
-          description: 引用类型
         path:
           type: string
-          nullable: true
-          description: 引用路径；可省略或为 null
-      description: Skill 引用链接；path 可省略或为 null。
+          description: 相对包根的 POSIX 路径；SKILL.md 为根文件
+        size:
+          type: integer
+          minimum: 0
+          description: 未压缩字节数
+        readOnly:
+          type: boolean
+          description: 已保存包全部 true；草稿中仅 SKILL.md 为 true
+      description: Skill 包或草稿内的一个文件条目；详情 files 含 SKILL.md 且首项。
     SkillListItem:
       type: object
       required:
@@ -1819,36 +2062,110 @@ components:
       - "$ref": "#/components/schemas/SkillListItem"
       - type: object
         required:
-        - sections
-        - pitfalls
-        - refs
+        - body
+        - files
         - createdAt
         properties:
-          sections:
-            "$ref": "#/components/schemas/SkillSections"
-            description: 五章，全部必填
-          pitfalls:
+          body:
+            type: string
+            description: SKILL.md 去掉 frontmatter 后的正文，读取时不 trim
+          files:
             type: array
             items:
-              type: string
-            description: 踩坑，有序
-          refs:
-            type: array
-            items:
-              "$ref": "#/components/schemas/SkillRef"
-            description: 引用，有序
+              "$ref": "#/components/schemas/SkillFile"
+            description: 含 SKILL.md 且首项；其余按 path 升序；已保存状态全部 readOnly
           createdAt:
             type: string
             format: date-time
             description: 创建时间，ISO-8601 UTC
-      description: Skill 详情；列表项字段加五章、踩坑与引用。
-    SkillCreate:
+      description: Skill 详情；列表项字段加 body、files 与创建时间；名称/描述/版本以包内 SKILL.md 为准。
+    SkillDraft:
+      type: object
+      required:
+      - id
+      - skillId
+      - baseRevision
+      - baseVersion
+      - expiresAt
+      - createdAt
+      - files
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: 草稿 ID；bearer capability，不做所有权校验
+        skillId:
+          type: string
+          format: uuid
+          nullable: true
+          description: 新建草稿为 null
+        baseRevision:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: 新建草稿为 null
+        baseVersion:
+          type: string
+          nullable: true
+          description: 新建草稿为 null
+        expiresAt:
+          type: string
+          format: date-time
+          description: 创建后 24 小时，不滑动
+        createdAt:
+          type: string
+          format: date-time
+          description: 创建时间
+        files:
+          type: array
+          items:
+            "$ref": "#/components/schemas/SkillFile"
+          description: 已有 Skill 含只读 SKILL.md；新建为空；SKILL.md 首项
+      description: Skill 草稿元数据；不返回正文，不返回包预览。
+    SkillDraftCreate:
+      type: object
+      properties:
+        skillId:
+          type: string
+          format: uuid
+          nullable: true
+          description: 已有 Skill 的 ID；缺省或 null 表示新建空草稿
+      description: 建草稿请求；空对象表示新建。
+    SkillDraftFileResult:
+      type: object
+      required:
+      - file
+      - files
+      properties:
+        file:
+          "$ref": "#/components/schemas/SkillFile"
+          description: 本次上传或改名后的文件
+        files:
+          type: array
+          items:
+            "$ref": "#/components/schemas/SkillFile"
+          description: 当前草稿完整清单；SKILL.md 首项
+      description: 草稿文件操作结果。
+    SkillDraftFileRename:
+      type: object
+      required:
+      - path
+      - newPath
+      properties:
+        path:
+          type: string
+          description: 源附件路径，必须在 scripts/ 或 references/ 下
+        newPath:
+          type: string
+          description: 目标路径；目标必须不存在，SKILL.md 不可用
+      description: 草稿附件改名请求。
+    SkillDraftSave:
       type: object
       required:
       - name
       - categoryCode
       - description
-      - sections
+      - body
       properties:
         name:
           type: string
@@ -1862,30 +2179,41 @@ components:
           type: string
           minLength: 1
           maxLength: 400
-          description: 路由描述：适用场景、触发条件与不适用场景，1–400 字
+          description: 路由描述，1–400 字
         tags:
           type: array
           items:
             type: string
-          description: 标签，有序
-        sections:
-          "$ref": "#/components/schemas/SkillSections"
-          description: 五章，全部必填
-        pitfalls:
-          type: array
-          items:
-            type: string
-          description: 踩坑，有序
-        refs:
-          type: array
-          items:
-            "$ref": "#/components/schemas/SkillRef"
-          description: 引用，有序
-      description: 创建 Skill 请求；不接收 version/enabled，服务端生成 v1.0 并默认启用。
-    SkillUpdate:
-      description: 全量更新 Skill 请求；不接收 version/enabled，服务端递增 minor 版本。
-      allOf:
-      - "$ref": "#/components/schemas/SkillCreate"
+          description: 标签，有序；缺省为空数组
+        body:
+          type: string
+          description: SKILL.md 正文；可为空；服务端生成 frontmatter
+      description: 保存草稿请求；不接收 enabled/version/id/file 清单。
+    SkillSaveResult:
+      type: object
+      required:
+      - id
+      - revision
+      - version
+      - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Skill ID
+        revision:
+          type: integer
+          minimum: 1
+          description: 保存后的 revision
+        version:
+          type: string
+          pattern: "^v[0-9]+\\.[0-9]+$"
+          description: 保存后的版本，形如 vX.Y
+        updatedAt:
+          type: string
+          format: date-time
+          description: 更新时间，ISO-8601 UTC
+      description: Skill 保存结果；需要详情时再 GET /skills/{id}。
     SkillList:
       type: object
       required:
@@ -2444,13 +2772,37 @@ components:
           schema:
             "$ref": "#/components/schemas/ErrorResponse"
     NotFound:
-      description: 路径资源不存在。
+      description: 路径资源不存在；草稿已清理也返回 404。
       content:
         application/json:
           schema:
             "$ref": "#/components/schemas/ErrorResponse"
     Conflict:
-      description: 名称重复、revision 冲突，或删除时仍被引用；`error.code` 区分。
+      description: 名称重复、revision/baseRevision 冲突、附件改名目标已存在，或删除时仍被引用；`error.code` 区分。
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    Gone:
+      description: 草稿记录仍在但已过期；`error.code=draft_expired`，`details.expiresAt` 为过期时间。
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    PayloadTooLarge:
+      description: 单文件、文件数、包总量或草稿总量超限；`error.code=payload_too_large`，`details.limit` 区分口径。
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    UnsupportedMediaType:
+      description: 草稿附件上传不是 `multipart/form-data`；`error.code=unsupported_media_type`。
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+    UnprocessableEntity:
+      description: 生成的 `SKILL.md` 超过 16384 字节；`error.code=skill_md_too_large`，带 `limitBytes` 与 `actualBytes`。
       content:
         application/json:
           schema:
@@ -2462,7 +2814,7 @@ components:
           schema:
             "$ref": "#/components/schemas/ErrorResponse"
     InternalError:
-      description: 未分类服务端错误；不返回堆栈或 SQL。
+      description: 未分类服务端错误，或已保存包缺失/损坏（`package_unavailable`）；不返回堆栈或 SQL。
       content:
         application/json:
           schema:

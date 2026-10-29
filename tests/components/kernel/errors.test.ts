@@ -2,12 +2,18 @@ import { describe, expect, test } from "bun:test";
 import {
   AppError,
   DatabaseUnavailableError,
+  DraftExpiredError,
+  FileConflictError,
   MultiFieldValidationError,
   NameConflictError,
   NotFoundError,
+  PackageUnavailableError,
+  PayloadTooLargeError,
   PreconditionRequiredError,
   ReferencedError,
   RevisionConflictError,
+  SkillMdTooLargeError,
+  UnsupportedMediaTypeError,
   ValidationError,
   normalizePageQuery,
 } from "../../../src/core/kernel/index.ts";
@@ -78,6 +84,50 @@ describe("kernel 错误分类", () => {
       retryable: true,
     });
     expect(unavailable.cause).toBe(cause);
+  });
+
+  test("草稿、文件、限额与包错误保留 HTTP details", () => {
+    expect(new FileConflictError("scripts/a.ts", "scripts/b.ts")).toMatchObject({
+      code: "file_conflict",
+      details: { path: "scripts/a.ts", newPath: "scripts/b.ts" },
+      retryable: false,
+    });
+
+    expect(new DraftExpiredError("2026-10-30T00:00:00.000Z")).toMatchObject({
+      code: "draft_expired",
+      details: { expiresAt: "2026-10-30T00:00:00.000Z" },
+      retryable: false,
+    });
+
+    expect(new PayloadTooLargeError("file_bytes", 20 * 1024 * 1024, 20 * 1024 * 1024 + 1)).toMatchObject({
+      code: "payload_too_large",
+      details: {
+        limit: "file_bytes",
+        limitValue: 20 * 1024 * 1024,
+        actualValue: 20 * 1024 * 1024 + 1,
+      },
+      retryable: false,
+    });
+
+    expect(new UnsupportedMediaTypeError()).toMatchObject({
+      code: "unsupported_media_type",
+      retryable: false,
+    });
+
+    expect(new SkillMdTooLargeError(16_384, 16_385)).toMatchObject({
+      code: "skill_md_too_large",
+      details: { limitBytes: 16_384, actualBytes: 16_385 },
+      retryable: false,
+    });
+
+    const cause = new Error("zip 损坏");
+    const packageUnavailable = new PackageUnavailableError("s-1", cause);
+    expect(packageUnavailable).toMatchObject({
+      code: "package_unavailable",
+      details: { skillId: "s-1" },
+      retryable: false,
+    });
+    expect(packageUnavailable.cause).toBe(cause);
   });
 });
 

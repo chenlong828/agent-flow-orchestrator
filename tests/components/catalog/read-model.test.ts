@@ -40,12 +40,13 @@ async function createTool(harnessId: string, name = "catalog-tool") {
 }
 
 async function createSkill(name = "catalog-skill", categoryCode = "coding") {
-  return ctx.skillService.create({
+  const draft = await ctx.skillDraftService.createDraft(null);
+  return ctx.skillDraftService.saveDraft(draft.id, null, {
     name,
     categoryCode,
     description: `${name} 描述`,
     tags: ["标签"],
-    sections: sections(name),
+    body: `## 概览\n`,
   });
 }
 
@@ -132,14 +133,14 @@ describe("catalog 只读组合", () => {
     });
 
     const detail = await ctx.catalog.getSkill(skill.id);
+    expect(detail.files[0]!.path).toBe("SKILL.md");
+    expect(detail.files[0]!.readOnly).toBe(true);
     expect(detail).toMatchObject({
       categoryLabel: "编码",
       usedByCount: 1,
       description: "skill-a 描述",
-      pitfalls: [],
-      refs: [],
+      body: "## 概览\n",
     });
-    expect(detail.sections).toEqual(sections("skill-a"));
   });
 
   test("专家投影组合 Skill/工具摘要、计数与 refCount=0", async () => {

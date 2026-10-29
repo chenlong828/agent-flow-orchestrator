@@ -9,6 +9,8 @@ export type Config = {
   databaseUrl: string;
   actor: string;
   logLevel: LogLevel;
+  skillStorageRoot: string;
+  skillDraftTtlHours: number;
 };
 
 export type LoadConfigOptions = {
@@ -34,6 +36,8 @@ const DEFAULT_PORT = 3000;
 const DEFAULT_DATABASE_URL = "postgres://postgres@127.0.0.1:54329/agentflow";
 const DEFAULT_ACTOR = "local";
 const DEFAULT_LOG_LEVEL: LogLevel = "info";
+const DEFAULT_SKILL_STORAGE_ROOT = ".local/skills";
+const DEFAULT_SKILL_DRAFT_TTL_HOURS = 24;
 const LOG_LEVELS: LogLevel[] = ["debug", "info", "warn", "error"];
 const TOP_LEVEL_KEYS = new Set(["server", "app", "log"]);
 const SERVER_KEYS = new Set(["host", "port"]);
@@ -95,6 +99,18 @@ function parsePort(value: number | string, source: string, field: string): numbe
     fail("config_validation_error", source, field, `${field} 不合法：${String(value)}`);
   }
   return port;
+}
+
+function parsePositiveIntegerHours(
+  value: string,
+  source: string,
+  field: string,
+): number {
+  const hours = Number(value);
+  if (!Number.isInteger(hours) || hours < 1) {
+    fail("config_validation_error", source, field, `${field} 不合法：${value}`);
+  }
+  return hours;
 }
 
 function parseFile(raw: unknown, source: string): FileConfig {
@@ -217,6 +233,8 @@ export async function loadConfig(
   const envPort = envValue(env, "PORT");
   const envActor = envValue(env, "DEV_ACTOR");
   const envLogLevel = envValue(env, "LOG_LEVEL");
+  const envSkillStorageRoot = envValue(env, "SKILL_STORAGE_ROOT");
+  const envSkillDraftTtlHours = envValue(env, "SKILL_DRAFT_TTL_HOURS");
 
   const host = nonEmpty(
     envHost ?? file.server?.host ?? DEFAULT_HOST,
@@ -241,6 +259,19 @@ export async function loadConfig(
     "env",
     "DATABASE_URL",
   );
+  const skillStorageRoot = nonEmpty(
+    envSkillStorageRoot ?? DEFAULT_SKILL_STORAGE_ROOT,
+    envSkillStorageRoot === undefined ? "default" : "env",
+    "SKILL_STORAGE_ROOT",
+  );
+  const skillDraftTtlHours =
+    envSkillDraftTtlHours === undefined
+      ? DEFAULT_SKILL_DRAFT_TTL_HOURS
+      : parsePositiveIntegerHours(
+          envSkillDraftTtlHours,
+          "env",
+          "SKILL_DRAFT_TTL_HOURS",
+        );
 
   return {
     host,
@@ -248,5 +279,7 @@ export async function loadConfig(
     databaseUrl,
     actor,
     logLevel,
+    skillStorageRoot,
+    skillDraftTtlHours,
   };
 }

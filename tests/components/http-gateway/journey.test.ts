@@ -117,23 +117,22 @@ describe("B1 全链路旅程（仅通过 HTTP）", () => {
       "testing",
     ]);
 
-    const skillCreated = await call(ctx.app, "POST", "/api/v1/skills", {
-      body: {
-        name: "journey-skill",
-        categoryCode: "coding",
-        description: "旅程技能",
-        tags: ["旅程"],
-        sections: {
-          overview: "概览",
-          steps: "步骤",
-          examples: "示例",
-          scripts: "脚本",
-          verification: "验证",
+    const skillDraft = await call(ctx.app, "POST", "/api/v1/skill-drafts", { body: {} });
+    expect(skillDraft.status).toBe(201);
+    const skillCreated = await call(
+      ctx.app,
+      "POST",
+      `/api/v1/skill-drafts/${skillDraft.body.id}/save`,
+      {
+        body: {
+          name: "journey-skill",
+          categoryCode: "coding",
+          description: "旅程技能",
+          tags: ["旅程"],
+          body: "## 概览\n\n概览",
         },
-        pitfalls: ["跳过验证"],
-        refs: [{ label: "旅程参考", refType: "经验" }],
       },
-    });
+    );
     expect(skillCreated.status).toBe(201);
     const skillId = skillCreated.body.id as string;
     expect(skillCreated.body.version).toBe("v1.0");
@@ -149,31 +148,31 @@ describe("B1 全链路旅程（仅通过 HTTP）", () => {
     });
     expect(skillEnabled.body.enabled).toBe(true);
 
-    const skillUpdated = await call(ctx.app, "PUT", `/api/v1/skills/${skillId}`, {
-      body: {
-        name: "journey-skill",
-        categoryCode: "coding",
-        description: "旅程技能（已改造）",
-        tags: [],
-        sections: {
-          overview: "概览2",
-          steps: "步骤2",
-          examples: "示例2",
-          scripts: "脚本2",
-          verification: "验证2",
-        },
-        pitfalls: [],
-        refs: [],
-      },
-      headers: withRevision(3),
+    const updateDraft = await call(ctx.app, "POST", "/api/v1/skill-drafts", {
+      body: { skillId },
     });
+    const skillUpdated = await call(
+      ctx.app,
+      "POST",
+      `/api/v1/skill-drafts/${updateDraft.body.id}/save`,
+      {
+        body: {
+          name: "journey-skill",
+          categoryCode: "coding",
+          description: "旅程技能（已改造）",
+          tags: [],
+          body: "## 概览\n\n概览2",
+        },
+        headers: withRevision(3),
+      },
+    );
     expect(skillUpdated.status).toBe(200);
     expect(skillUpdated.body).toMatchObject({ version: "v1.1", revision: 4 });
 
     const skillList = await call(ctx.app, "GET", "/api/v1/skills?category=coding&tag=旅程");
     expect(skillList.body.total).toBe(0);
     const skillDetail = await call(ctx.app, "GET", `/api/v1/skills/${skillId}`);
-    expect(skillDetail.body.sections.verification).toBe("验证2");
+    expect(skillDetail.body.body).toBe("## 概览\n\n概览2\n");
 
     const expertCreated = await call(ctx.app, "POST", "/api/v1/experts", {
       body: {

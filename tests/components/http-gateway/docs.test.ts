@@ -134,7 +134,7 @@ describe("Swagger 文档端点", () => {
       catalog: ctx.catalog,
       harnessService: ctx.harnessService,
       toolService: ctx.toolService,
-      skillService: ctx.skillService,
+      skillDraftService: ctx.skillDraftService,
       expertService: ctx.expertService,
       health: createHealth(ctx.db),
       actor: "tester",

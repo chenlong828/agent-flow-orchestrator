@@ -1,8 +1,19 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { closeTestDb, getTestDb, resetBusinessData } from "../helpers/test-db.ts";
+import { createFileStore } from "../../src/core/platform/index.ts";
+import type { FileStore } from "../../src/core/kernel/index.ts";
+import {
+  parseSkillMarkdown,
+  readSkillPackage,
+} from "../../src/components/skill/package.ts";
 import { seedAll } from "../../scripts/seed.ts";
 
 let db: Awaited<ReturnType<typeof getTestDb>>;
+let store: FileStore;
+const directories: string[] = [];
 
 beforeAll(async () => {
   db = await getTestDb();
@@ -10,15 +21,23 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await resetBusinessData();
+  const directory = await mkdtemp(join(tmpdir(), "agentflow-seed-"));
+  directories.push(directory);
+  store = createFileStore(join(directory, "skills"));
 });
 
 afterAll(async () => {
   await closeTestDb();
+  await Promise.all(
+    directories.map((directory) =>
+      rm(directory, { recursive: true, force: true }),
+    ),
+  );
 });
 
 describe("演示种子", () => {
-  test("首轮写入 5/10/12/8 与 23/23 条装配边", async () => {
-    const result = await seedAll(db);
+  test("首轮写入 5/10/12/8 与 23/23 条装配边，并为每个 Skill 写合法包", async () => {
+    const result = await seedAll(db, store);
     expect(result).toEqual({
       harnesses: 5,
       tools: 10,
@@ -32,19 +51,41 @@ describe("演示种子", () => {
       tools: number;
       skills: number;
       experts: number;
+      missingPackages: number;
     }>(
       `select
         (select count(*)::int from harness) as harnesses,
         (select count(*)::int from tool) as tools,
         (select count(*)::int from skill) as skills,
-        (select count(*)::int from expert) as experts`,
+        (select count(*)::int from expert) as experts,
+        (select count(*)::int from skill where package_key is null or package_key = '') as "missingPackages"`,
     );
-    expect(counts).toEqual({ harnesses: 5, tools: 10, skills: 12, experts: 8 });
+    expect(counts).toEqual({
+      harnesses: 5,
+      tools: 10,
+      skills: 12,
+      experts: 8,
+      missingPackages: 0,
+    });
+
+    expect(await store.list("packages/")).toHaveLength(12);
+    const cres = await db.one<{ package_key: string }>(
+      "select package_key from skill where name = 'CRES 技能'",
+    );
+    expect(cres).not.toBeNull();
+    const entries = readSkillPackage(
+      await new Response(await store.get(`packages/${cres!.package_key}`)).bytes(),
+    );
+    expect(entries[0]!.path).toBe("SKILL.md");
+    expect(parseSkillMarkdown(new TextDecoder().decode(entries[0]!.data))).toMatchObject({
+      name: "CRES 技能",
+      version: "v1.4",
+    });
   });
 
   test("重复执行幂等，不产生重复行与重复装配边，版本保持 UI 值", async () => {
-    await seedAll(db);
-    await seedAll(db);
+    await seedAll(db, store);
+    await seedAll(db, store);
     const counts = await db.one<{ harnesses: number; skills: number; skillEdges: number }>(
       `select
         (select count(*)::int from harness) as harnesses,
@@ -52,6 +93,7 @@ describe("演示种子", () => {
         (select count(*)::int from expert_skill) as "skillEdges"`,
     );
     expect(counts).toEqual({ harnesses: 5, skills: 12, skillEdges: 23 });
+    expect(await store.list("packages/")).toHaveLength(12);
 
     const cres = await db.one<{ version: string; tags: number }>(
       `select s.version,
@@ -62,7 +104,7 @@ describe("演示种子", () => {
   });
 
   test("种子数据满足引用完整性与分类覆盖", async () => {
-    await seedAll(db);
+    await seedAll(db, store);
     const categories = await db.query<{ category_code: string; count: number }>(
       "select category_code, count(*)::int from skill group by category_code order by category_code",
     );

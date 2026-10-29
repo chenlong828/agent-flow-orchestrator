@@ -1,7 +1,9 @@
 import { join } from "node:path";
-import { createDb, createMigrator, ensureDatabase } from "../src/core/platform/index.ts";
+import { createDb, createFileStore, createMigrator, ensureDatabase } from "../src/core/platform/index.ts";
 import { loadConfig } from "../src/core/config/index.ts";
 import type { Db } from "../src/core/platform/index.ts";
+import type { FileStore } from "../src/core/kernel/index.ts";
+import { buildSkillPackage } from "../src/components/skill/package.ts";
 
 type LegacyHarness = {
   id: string;
@@ -167,6 +169,39 @@ function skillSections(id: string, name: string) {
   };
 }
 
+function skillPackageKey(skill: LegacySkill): string {
+  return `seed-${skill.id}-${skill.version}.zip`;
+}
+
+function skillPackageBody(skill: LegacySkill): string {
+  const sections = skillSections(skill.id, skill.name);
+  const blocks = [
+    `## 适用场景\n\n${sections.overview}`,
+    `## 执行步骤\n\n${sections.steps}`,
+    `## 示例\n\n${sections.examples}`,
+    `## 脚本\n\n${sections.scripts}`,
+    `## 完成验证\n\n${sections.verification}`,
+  ];
+  if (skill.pitfalls.length > 0) {
+    blocks.push(`## 常见踩坑\n\n${skill.pitfalls.map((item) => `- ${item}`).join("\n")}`);
+  }
+  blocks.push(
+    "## 参考资料\n\n- 关联 Skill: AB交叉审视\n- 外部规范: 平台接入指南 v2.3",
+  );
+  return blocks.join("\n\n");
+}
+
+function skillPackageFiles(skill: LegacySkill) {
+  return [
+    {
+      path: "references/usage.md",
+      data: new TextEncoder().encode(
+        `# ${skill.name}\n\n${skill.description}\n\n版本：${skill.version}\n`,
+      ),
+    },
+  ];
+}
+
 export type SeedResult = {
   harnesses: number;
   tools: number;
@@ -179,7 +214,7 @@ export type SeedResult = {
 /**
  * 写入 UI 夹具对应的演示数据。种子 ID 由 legacy ID 稳定派生，重复执行会覆盖同一批种子行。
  */
-export async function seedAll(db: Db): Promise<SeedResult> {
+export async function seedAll(db: Db, store: FileStore): Promise<SeedResult> {
   const now = Date.now();
   return db.transaction(async (tx) => {
     for (const harness of HARNESSES) {
@@ -259,51 +294,41 @@ export async function seedAll(db: Db): Promise<SeedResult> {
     for (const skill of SKILLS) {
       const id = uuidFrom("skill", skill.id);
       const updatedAt = minutesAgo(now, skill.updatedM);
+      const packageKey = skillPackageKey(skill);
+      const packageBytes = buildSkillPackage({
+        name: skill.name,
+        description: skill.description,
+        version: skill.version,
+        body: skillPackageBody(skill),
+        files: skillPackageFiles(skill),
+      });
+      await store.put(`packages/${packageKey}`, packageBytes);
       await tx.query(
         `insert into skill
-          (id, name, category_code, description, version, enabled, revision,
-           created_at, updated_at, created_by, updated_by)
-         values ($1, $2, $3, $4, $5, $6, 1, $7, $7, 'seed', 'seed')
+          (id, name, category_code, description, package_key, version, enabled,
+           revision, created_at, updated_at, created_by, updated_by)
+         values ($1, $2, $3, $4, $5, $6, $7, 1, $8, $8, 'seed', 'seed')
          on conflict (id) do update set
            name = excluded.name, category_code = excluded.category_code,
-           description = excluded.description, version = excluded.version,
-           enabled = excluded.enabled, updated_at = excluded.updated_at,
-           updated_by = 'seed'`,
-        [id, skill.name, CATEGORY[skill.category]!, skill.description, skill.version, skill.enabled, updatedAt],
+           description = excluded.description, package_key = excluded.package_key,
+           version = excluded.version, enabled = excluded.enabled,
+           updated_at = excluded.updated_at, updated_by = 'seed'`,
+        [
+          id,
+          skill.name,
+          CATEGORY[skill.category]!,
+          skill.description,
+          packageKey,
+          skill.version,
+          skill.enabled,
+          updatedAt,
+        ],
       );
       await tx.query("delete from skill_tag where skill_id = $1", [id]);
-      await tx.query("delete from skill_section where skill_id = $1", [id]);
-      await tx.query("delete from skill_pitfall where skill_id = $1", [id]);
-      await tx.query("delete from skill_ref where skill_id = $1", [id]);
       for (const [position, tag] of skill.tags.entries()) {
         await tx.query(
           "insert into skill_tag (skill_id, position, tag) values ($1, $2, $3)",
           [id, position, tag],
-        );
-      }
-      const sections = skillSections(skill.id, skill.name);
-      for (const [kind, content] of Object.entries(sections)) {
-        await tx.query(
-          "insert into skill_section (skill_id, kind, content_md) values ($1, $2, $3)",
-          [id, kind, content],
-        );
-      }
-      for (const [position, content] of skill.pitfalls.entries()) {
-        await tx.query(
-          "insert into skill_pitfall (skill_id, position, content) values ($1, $2, $3)",
-          [id, position, content],
-        );
-      }
-      const refs = [
-        { label: "关联 Skill: AB交叉审视", refType: "skill", path: null },
-        { label: `workspace:/skills/${skill.id}/templates/`, refType: "模板", path: null },
-        { label: "外部规范: 平台接入指南 v2.3", refType: "外部规范", path: null },
-      ];
-      for (const [position, ref] of refs.entries()) {
-        await tx.query(
-          `insert into skill_ref (skill_id, position, label, ref_type, path)
-           values ($1, $2, $3, $4, $5)`,
-          [id, position, ref.label, ref.refType, ref.path],
         );
       }
     }
@@ -393,7 +418,8 @@ if (import.meta.main) {
       directory: join(process.cwd(), "db", "migrations"),
     });
     await migrator.up();
-    const result = await seedAll(db);
+    const store = createFileStore(config.skillStorageRoot);
+    const result = await seedAll(db, store);
     console.log(
       `种子完成：Harness ${result.harnesses}、工具 ${result.tools}、Skill ${result.skills}、专家 ${result.experts}；关联边 Skill ${result.expertSkills} / 工具 ${result.expertTools}`,
     );

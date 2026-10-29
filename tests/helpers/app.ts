@@ -1,5 +1,9 @@
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   createDb,
+  createFileStore,
   createHealth,
   systemClock,
   uuidv7Ids,
@@ -9,7 +13,8 @@ import {
   createHarnessService,
 } from "../../src/components/harness/index.ts";
 import { createToolRead, createToolService } from "../../src/components/tool/index.ts";
-import { createSkillRead, createSkillService } from "../../src/components/skill/index.ts";
+import { createSkillRead } from "../../src/components/skill/read.ts";
+import { createSkillDraftService } from "../../src/components/skill/draft.ts";
 import { createExpertRead, createExpertService } from "../../src/components/expert/index.ts";
 import { createCatalog } from "../../src/components/catalog/index.ts";
 import { createHttpApp } from "../../src/components/http-gateway/index.ts";
@@ -21,11 +26,11 @@ export type TestContext = {
   catalog: ReturnType<typeof createCatalog>;
   harnessRead: ReturnType<typeof createHarnessRead>;
   toolRead: ReturnType<typeof createToolRead>;
-  skillRead: ReturnType<typeof createSkillRead>;
+  skillDraftService: ReturnType<typeof createSkillDraftService>;
   expertRead: ReturnType<typeof createExpertRead>;
   harnessService: ReturnType<typeof createHarnessService>;
   toolService: ReturnType<typeof createToolService>;
-  skillService: ReturnType<typeof createSkillService>;
+  skillService: { create(input: { name: string; categoryCode: string; description: string; tags?: string[]; sections?: Record<string, string> }): Promise<{ id: string }> };
   expertService: ReturnType<typeof createExpertService>;
 };
 
@@ -33,9 +38,17 @@ export async function createTestContext(): Promise<TestContext> {
   const db = await getTestDb();
   const harnessRead = createHarnessRead({ db });
   const toolRead = createToolRead({ db });
-  const skillRead = createSkillRead({ db });
+  const skillStore = createFileStore(
+    join(await mkdtemp(join(tmpdir(), "agentflow-app-")), "skills"),
+  );
+  const catalogSkillRead = createSkillRead(db, skillStore);
   const expertRead = createExpertRead({ db });
-  const catalog = createCatalog({ harnessRead, toolRead, skillRead, expertRead });
+  const catalog = createCatalog({
+    harnessRead,
+    toolRead,
+    skillRead: catalogSkillRead,
+    expertRead,
+  });
 
   const harnessService = createHarnessService({
     db,
@@ -51,13 +64,37 @@ export async function createTestContext(): Promise<TestContext> {
     guard: catalog,
     actor: "tester",
   });
-  const skillService = createSkillService({
+  const skillDraftService = createSkillDraftService({
     db,
+    store: skillStore,
     clock: systemClock,
     ids: uuidv7Ids,
     guard: catalog,
+    draftTtlHours: 24,
     actor: "tester",
   });
+  const legacySkillCreate = async (input: {
+    name: string;
+    categoryCode: string;
+    description: string;
+    tags?: string[];
+    sections?: Record<string, string>;
+  }) => {
+    const draft = await skillDraftService.createDraft(null);
+    const sections = input.sections ?? {};
+    const body = ["overview", "steps", "examples", "scripts", "verification"]
+      .filter((key) => sections[key] !== undefined)
+      .map((key) => `## ${key}\n\n${sections[key]}`)
+      .join("\n\n");
+    return skillDraftService.saveDraft(draft.id, null, {
+      name: input.name,
+      categoryCode: input.categoryCode,
+      description: input.description,
+      tags: input.tags,
+      body,
+    });
+  };
+  const skillService = { create: legacySkillCreate };
   const expertService = createExpertService({
     db,
     clock: systemClock,
@@ -69,7 +106,7 @@ export async function createTestContext(): Promise<TestContext> {
     catalog,
     harnessService,
     toolService,
-    skillService,
+    skillDraftService,
     expertService,
     health: createHealth(db),
     actor: "tester",
@@ -81,11 +118,11 @@ export async function createTestContext(): Promise<TestContext> {
     catalog,
     harnessRead,
     toolRead,
-    skillRead,
     expertRead,
     harnessService,
     toolService,
     skillService,
+    skillDraftService,
     expertService,
   };
 }
