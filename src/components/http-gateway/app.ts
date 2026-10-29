@@ -31,9 +31,7 @@ import type {
 import type { ApiDocs } from "./docs.ts";
 import {
   actorFrom,
-  assertAllowedFields,
   assertUuid,
-  isPlainObject,
   parseIfMatch,
   queryValue,
   readJsonObject,
@@ -62,6 +60,13 @@ import {
   parseToolListQuery,
   parseWorkflowListQuery,
 } from "./queries.ts";
+import {
+  assemblyIds,
+  normalizeToolParams,
+  validateNestedRefs,
+  validateOptionalIdArray,
+} from "./dto.ts";
+import { toYaml } from "./yaml.ts";
 
 export type HttpDeps = {
   catalog: CatalogRead;
@@ -74,114 +79,6 @@ export type HttpDeps = {
   actor: string;
   docs?: ApiDocs;
 };
-
-function requireObject(value: unknown, field: string): Record<string, unknown> {
-  if (!isPlainObject(value)) throw new ValidationError(field, "必须是对象");
-  return value;
-}
-
-function normalizeToolParams(body: Record<string, unknown>): Record<string, unknown> {
-  if (body.params === undefined) return body;
-  if (!Array.isArray(body.params)) throw new ValidationError("params", "必须是数组");
-  const params = body.params.map((item, index) => {
-    const param = requireObject(item, `params[${index}]`);
-    assertAllowedFields(param, ["key", "type", "description"], `params[${index}]`);
-    if (typeof param.key !== "string" || param.key.trim() === "") {
-      throw new ValidationError(`params[${index}].key`, "必须是非空字符串");
-    }
-    return {
-      paramKey: param.key,
-      type: param.type,
-      description: param.description,
-    };
-  });
-  return { ...body, params };
-}
-
-function validateNestedRefs(body: Record<string, unknown>, key: string): void {
-  if (body[key] === undefined) return;
-  if (!Array.isArray(body[key])) throw new ValidationError(key, "必须是数组");
-  (body[key] as unknown[]).forEach((item, index) => {
-    const ref = requireObject(item, `${key}[${index}]`);
-    assertAllowedFields(ref, ["label", "refType", "path"], `${key}[${index}]`);
-  });
-}
-
-function assemblyIds(body: Record<string, unknown>, key: "skillId" | "toolId"): string[] {
-  if (!Array.isArray(body.items)) throw new ValidationError("items", "必须是数组");
-  return body.items.map((item, index) => {
-    const entry = requireObject(item, `items[${index}]`);
-    assertAllowedFields(entry, [key], `items[${index}]`);
-    const value = entry[key];
-    if (typeof value !== "string") {
-      throw new ValidationError(`items[${index}].${key}`, "必须是 UUID");
-    }
-    return assertUuid(value, `items[${index}].${key}`);
-  });
-}
-
-function validateOptionalIdArray(body: Record<string, unknown>, field: string): void {
-  if (body[field] === undefined) return;
-  if (!Array.isArray(body[field])) throw new ValidationError(field, "必须是 UUID 数组");
-  body[field] = (body[field] as unknown[]).map((value, index) => {
-    if (typeof value !== "string") {
-      throw new ValidationError(`${field}[${index}]`, "必须是 UUID");
-    }
-    return assertUuid(value, `${field}[${index}]`);
-  });
-}
-
-function yamlScalar(value: unknown): string {
-  if (value === null) return "null";
-  if (typeof value === "string") return JSON.stringify(value);
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  throw new ValidationError("dsl", "DSL 包含无法序列化的值");
-}
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function toYaml(value: unknown, indent = 0): string {
-  const pad = " ".repeat(indent);
-  if (Array.isArray(value)) {
-    if (value.length === 0) return `${pad}[]`;
-    return value
-      .map((item) => {
-        if (!isPlainRecord(item)) return `${pad}- ${yamlScalar(item)}`;
-        const entries = Object.entries(item);
-        if (entries.length === 0) return `${pad}- {}`;
-        const [first, ...rest] = entries;
-        if (first === undefined) return `${pad}- {}`;
-        const firstValue = isPlainRecord(first[1])
-          ? `\n${toYaml(first[1], indent + 4)}`
-          : yamlScalar(first[1]);
-        const lines = [`${pad}- ${first[0]}: ${firstValue}`];
-        for (const [key, entry] of rest) {
-          if (isPlainRecord(entry)) {
-            lines.push(`${" ".repeat(indent + 2)}${key}:\n${toYaml(entry, indent + 4)}`);
-          } else {
-            lines.push(`${" ".repeat(indent + 2)}${key}: ${yamlScalar(entry)}`);
-          }
-        }
-        return lines.join("\n");
-      })
-      .join("\n");
-  }
-  if (isPlainRecord(value)) {
-    const entries = Object.entries(value);
-    if (entries.length === 0) return `${pad}{}`;
-    return entries
-      .map(([key, entry]) => {
-        if (isPlainRecord(entry) || Array.isArray(entry)) {
-          return `${pad}${key}:\n${toYaml(entry, indent + 2)}`;
-        }
-        return `${pad}${key}: ${yamlScalar(entry)}`;
-      })
-      .join("\n");
-  }
-  return `${pad}${yamlScalar(value)}`;
-}
 
 export function createHttpApp(deps: HttpDeps): (request: Request) => Promise<Response> {
   const {
