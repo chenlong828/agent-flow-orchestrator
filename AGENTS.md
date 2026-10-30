@@ -31,6 +31,7 @@ AgentFlow 研发智能体工作流编排服务的编排侧：只提供 HTTP API�
 - 改动级别与人工确认门按 `arch-design-spec` 的 P0–P3 执行；未达到对应级别的要求，停在设计与确认，不抢先动手。
 - 技术栈 D0 已定 Bun + PostgreSQL；运行形态与 ACP 执行模型等实际需求出现时另立设计，不预置。环境/工具类工序按本次改动定级，不按系统重要性套 P1 模板。
 - 密钥只进 `.env`（已 ignore），不进 README、日志、注释、commit；提交前过 `git status` 与 `git diff --cached`。
+- 代码改完运行 `bun run quality:report`；阈值、级别与反馈闭环见 `docs/playbook/code-health-rules.md`。报告里的 `ERROR` 表示工具失效或输入缺失，先修工具，不能当通过；需要按阈值卡门禁时运行 `bun run quality:gate`。存量基线是修复起点，不是新代码继续新增的理由。
 - 一个 commit 一件事，绑定任务与场景 ID；不夹带无关重构、依赖升级或格式化。
 - 删除、覆盖工作区、`git reset --hard`、`git clean`、对外发布，执行前必须确认。
 - 临时文件只放 `docs/works/<工序>/`，不散落仓库根。

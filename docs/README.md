@@ -39,7 +39,8 @@ docs/
 │               └── workflow-definition-exchange/
 │                   └── scenario.md
 ├── playbook/                               ← 方法：同类问题怎么判断（项目本地，待技能合并）
-│   └── backend-contract-boundaries.md
+│   ├── backend-contract-boundaries.md
+│   └── code-health-rules.md
 ├── works/                                  ← 执行：正在做什么
 │   ├── 2026-10-24-agentflow-execution-concept/
 │   │   ├── brief.md
@@ -103,6 +104,7 @@ docs/
 17. [`history/decisions/2026-10-23-project-init.md`](history/decisions/2026-10-23-project-init.md) —— 初始化时的取舍与被否决方案
 18. [`history/decisions/2026-10-25-project-boundary-and-open-questions.md`](history/decisions/2026-10-25-project-boundary-and-open-questions.md) —— 仅 HTTP API、无 CLI/库/产品 UI，以及早期开放问题归档
 19. [`history/decisions/2026-10-25-playbook-method-layer.md`](history/decisions/2026-10-25-playbook-method-layer.md) —— `playbook/` 方法层、首份 playbook 的范围与上游技能延迟合并
+20. [`playbook/code-health-rules.md`](playbook/code-health-rules.md) —— 代码健康规则的阈值、级别、基线策略与 agent 反馈闭环
 
 ## 维护纪律（速记）
 

@@ -1,0 +1,6 @@
+{
+  "entry": ["src/main.ts", "scripts/**/*.ts", "tests/**/*.ts"],
+  "project": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts"],
+  "ignore": ["src/components/http-gateway/docs-assets/**"],
+  "include": ["files", "exports", "types"]
+}

@@ -10,6 +10,8 @@
     "check": "bun run typecheck && bun test --max-concurrency=1 && bun run docs:check",
     "docs:index": "bun run scripts/scenario-index.ts",
     "docs:check": "bun run scripts/scenario-index.ts --check",
+    "quality:report": "bun run scripts/quality-report.ts",
+    "quality:gate": "bun run scripts/quality-report.ts --gate",
     "db:start": "bash scripts/pg.sh start",
     "db:stop": "bash scripts/pg.sh stop",
     "db:status": "bash scripts/pg.sh status",
@@ -19,6 +21,11 @@
   },
   "devDependencies": {
     "@types/bun": "^1.4.4",
+    "jscpd": "^5.4.2",
+    "knip": "^6.43.0",
+    "oxlint": "^1.90.0",
+    "pgsql-ast-parser": "^12.0.2",
+    "ts-morph": "^28.0.0",
     "typescript": "^7.0.2"
   }
 }
