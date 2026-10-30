@@ -1,0 +1,305 @@
+$ bun run scripts/quality-report.ts
+id	指标	值	阈值	状态
+0	外部工具健康	8/8	全部可用	PASS
+1	文件行数最大值	623（src/components/skill/draft.ts）	≤600（>500 提醒）	WARN	>500 的文件 5 个
+2	函数行数最大值	424	≤80	WARN	物理行；oxlint 配置已自检
+3	函数参数最大值	6	≤5	WARN
+4	嵌套深度最大值	0（无超限）	≤4	PASS
+5	圈复杂度最大值	78	≤15	WARN
+6	单文件直接导出最大值（含类型/默认导出，排除 re-export）	18（src/components/catalog/index.ts）	≤20	PASS
+7	单文件 import 最大值	17	≤20	PASS
+8	单文件函数数量最大值（含箭头函数）	18（src/components/skill/package.ts）	≤20	PASS
+9	组件扇出最大值（排除 main）	8（src/components/http-gateway/app.ts）	≤8	PASS	main 组合根扇出 9
+10	跨组件深导入	2	0	WARN	src/main.ts -> src/components/skill/read.ts; src/main.ts -> src/components/skill/draft.ts
+11	循环依赖 SCC	0	0	PASS
+12	孤儿文件	1	0	WARN	src/components/skill/index.ts
+13	孤儿运行时导出（knip）	8	0	WARN	未使用类型 85（多为 barrel 再导出，仅报告）: src/components/skill/package.ts#PATH_LIMIT_BYTES; src/components/skill/package.ts#PATH_SEGMENT_LIMIT_BYTES; src/components/skill/package.ts#SkillPackageFile; src/components/harness/index.ts#createHarnessStore; src/components/harness/index.ts#HarnessAccessMode; src/components/harness/index.ts#HarnessDetail; src/components/harness/index.ts#HarnessHealth; src/components/harness/index.ts#HarnessKind
+14	单类方法数最大值	6（src/core/platform/storage.ts#FileStoreImpl）	≤10	PASS
+15	重复字符串组（跨 ≥3 个文件）	50	报告（噪声高）	INFO	"enabled"×11 文件; "-name"×11 文件; "updatedAt"×11 文件
+16	克隆块	12 块 / 2.21%	0	WARN
+17	any 使用	0	0	PASS
+18	ts-ignore/ts-expect-error	0	0	PASS
+19	非空断言 !	17	0	WARN
+20	可选字段比例最大值	75.0%（src/components/expert/types.ts#CreateExpert）	≤30%	WARN
+21	路由方法分支最大值	14（src/components/http-gateway/routes/skill.ts）	≤12	WARN	按 IfStatement 计数，避免 && 重复计数
+22	OpenAPI/DTO 字段测试	13 pass / 0 fail	0 fail	PASS
+23	表最大列数	16（harness）	≤20	PASS
+24	可空列比例最大值	62.5%（skill_draft）	≤50%	WARN
+25	非入口 console 调用	0	0	PASS
+26	配置外 process.env	0	0	PASS
+27	Bun 文件/SQL API 越界	0	0	PASS
+28	TODO/FIXME 债务	0 处，最老 0 天	≤90 天	PASS
+29	弱断言 / skip	0 / 0	0 / 0	PASS
+30	git 变化信号	hotspot 0；fix churn 0；多任务 23；上次 commit 1592 行/26 文件	仅报告	INFO	多任务示例: src/components/http-gateway/openapi.yaml(9 任务); src/components/workflow/dsl.schema.json(3 任务); src/components/workflow/graph.ts(4 任务); src/components/workflow/index.ts(3 任务); src/components/workflow/service.ts(3 任务)
+31	类型错误（tsc --noEmit）	0	0	PASS
+
+违规明细（每条一行 路径:行号 → 详情）：
+
+[文件行数超限（1 处）]
+  src/components/skill/draft.ts:623    实测 623行（限 600行）
+
+[函数行数超限（19 处）]
+  src/components/catalog/index.ts:199  `createCatalog`  实测 315行（限 80行）
+  src/components/expert/service.ts:239  `createExpertService`  实测 245行（限 80行）
+  src/components/expert/store.ts:87  `createExpertStore`  实测 238行（限 80行）
+  src/components/harness/service.ts:158  `createHarnessService`  实测 101行（限 80行）
+  src/components/harness/store.ts:86  `createHarnessStore`  实测 121行（限 80行）
+  src/components/http-gateway/app.ts:31  `createHttpApp`  实测 92行（限 80行）
+  src/components/http-gateway/routes/expert.ts:22  `handleExpert`  实测 93行（限 80行）
+  src/components/http-gateway/routes/skill.ts:19  `handleSkill`  实测 148行（限 80行）
+  src/components/http-gateway/routes/workflow.ts:28  `handleWorkflow`  实测 112行（限 80行）
+  src/components/skill/draft.ts:200  `createSkillDraftService`  实测 424行（限 80行）
+  src/components/skill/draft.ts:367  `saveDraft`  实测 173行（限 80行）
+  src/components/skill/draft.ts:428    实测 94行（限 80行）
+  src/components/skill/read.ts:119  `createSkillRead`  实测 124行（限 80行）
+  src/components/tool/service.ts:176  `createToolService`  实测 102行（限 80行）
+  src/components/tool/store.ts:84  `createToolStore`  实测 106行（限 80行）
+  src/components/workflow/graph.ts:157  `collectGraph`  实测 166行（限 80行）
+  src/components/workflow/graph.ts:342  `analyzeTopology`  实测 151行（限 80行）
+  src/components/workflow/service.ts:208  `createWorkflowService`  实测 262行（限 80行）
+  src/components/workflow/store.ts:79  `createWorkflowStore`  实测 155行（限 80行）
+
+[函数参数超限（2 处）]
+  src/components/expert/store.ts:139    实测 6个参数（限 5个参数）
+  src/components/harness/store.ts:139    实测 6个参数（限 5个参数）
+
+[圈复杂度超限（12 处）]
+  src/components/expert/service.ts:192  `normalizePatch`  实测 17（限 15）
+  src/components/expert/service.ts:357    实测 17（限 15）
+  src/components/http-gateway/app.ts:54  `route`  实测 20（限 15）
+  src/components/http-gateway/routes/expert.ts:22  `handleExpert`  实测 17（限 15）
+  src/components/http-gateway/routes/skill.ts:19  `handleSkill`  实测 57（限 15）
+  src/components/http-gateway/routes/workflow.ts:28  `handleWorkflow`  实测 24（限 15）
+  src/components/workflow/graph.ts:222    实测 19（限 15）
+  src/components/workflow/graph.ts:283    实测 20（限 15）
+  src/components/workflow/graph.ts:342  `analyzeTopology`  实测 78（限 15）
+  src/components/workflow/service.ts:115  `normalizeDsl`  实测 24（限 15）
+  src/core/config/config.ts:116  `parseFile`  实测 16（限 15）
+  src/core/config/config.ts:216  `loadConfig`  实测 23（限 15）
+
+[非空断言 !（17 处）]
+  src/components/http-gateway/routes/expert.ts:46    const id = assertUuid(segments[1]!, "id");
+  src/components/http-gateway/routes/expert.ts:84    const subresource = segments[2]!;
+  src/components/http-gateway/routes/harness.ts:30    const id = assertUuid(segments[1]!, "id");
+  src/components/http-gateway/routes/skill.ts:22    const resource = segments[0]!;
+  src/components/http-gateway/routes/skill.ts:47    const id = assertUuid(segments[1]!, "id");
+  src/components/http-gateway/routes/skill.ts:68    const subresource = segments[2]!;
+  src/components/http-gateway/routes/tool.ts:32    const id = assertUuid(segments[1]!, "id");
+  src/components/http-gateway/routes/workflow.ts:63    const id = assertUuid(segments[1]!, "id");
+  src/components/http-gateway/routes/workflow.ts:86    const subresource = segments[2]!;
+  src/components/skill/draft.ts:348    file: toFile(target, (await store.head(`${draftPrefix(id)}/${target}`))!.size),
+  src/components/skill/package.ts:132    crc = CRC_TABLE[(crc ^ byte) & 0xff]! ^ (crc >>> 8);
+  src/components/skill/package.ts:321    const name = values.get("name")!;
+  src/components/skill/package.ts:322    const description = values.get("description")!;
+  src/components/skill/package.ts:323    const version = values.get("version")!;
+  src/components/skill/package.ts:401    if (entries.length === 0 || entries[0]!.path !== SKILL_MD) {
+  src/components/skill/read.ts:196    new TextDecoder("utf-8", { fatal: true }).decode(contents.entries[0]!.data),
+  src/components/skill/read.ts:219    contents.entries[0]!.data,
+
+[文件超过 500 行（5 个）]
+  src/components/skill/draft.ts:1  623 行
+  src/components/expert/service.ts:1  537 行
+  src/components/workflow/graph.ts:1  514 行
+  src/components/catalog/index.ts:1  513 行
+  src/components/workflow/service.ts:1  502 行
+
+[跨组件深导入（2 处）]
+  src/main.ts:17 导入 src/components/skill/read.ts（绕过 components/skill 的 index.ts）
+  src/main.ts:18 导入 src/components/skill/draft.ts（绕过 components/skill 的 index.ts）
+
+[孤儿文件（1 个，从 main.ts 不可达）]
+  src/components/skill/index.ts:1
+
+[knip 未被引用的文件（1 个）]
+  src/components/skill/index.ts:1
+
+[knip 孤儿运行时导出（8 个）]
+  src/components/expert/index.ts:15  createExpertStore
+  src/components/harness/index.ts:16  createHarnessStore
+  src/components/http-gateway/dto.ts:4  requireObject
+  src/components/skill/draft.ts:105  removeDraftTree
+  src/components/skill/package.ts:13  PATH_LIMIT_BYTES
+  src/components/skill/package.ts:14  PATH_SEGMENT_LIMIT_BYTES
+  src/components/tool/index.ts:18  createToolStore
+  src/components/workflow/index.ts:26  createWorkflowStore
+
+[knip 孤儿类型（85 个，仅报告）]
+  src/components/catalog/index.ts:101  SkillDetailView
+  src/components/catalog/index.ts:106  SkillCategoryView
+  src/components/catalog/index.ts:108  ExpertSkillSummaryView
+  src/components/catalog/index.ts:116  ExpertSkillPreviewView
+  src/components/catalog/index.ts:121  ExpertToolSummaryView
+  src/components/catalog/index.ts:128  ExpertListItem
+  src/components/catalog/index.ts:143  ExpertDetailView
+  src/components/catalog/index.ts:25  ReferenceAsset
+  src/components/catalog/index.ts:31  ReferencePage
+  src/components/catalog/index.ts:37  HarnessListItem
+  src/components/catalog/index.ts:54  HarnessDetailView
+  src/components/catalog/index.ts:59  ToolParamView
+  src/components/catalog/index.ts:65  ToolListItem
+  src/components/catalog/index.ts:82  ToolDetailView
+  src/components/catalog/index.ts:87  SkillListItem
+  src/components/expert/index.ts:14  ExpertDeps
+  src/components/expert/index.ts:16  ExpertRootRow
+  src/components/expert/index.ts:3  ExpertDetail
+  src/components/expert/index.ts:6  ExpertReference
+  src/components/expert/index.ts:7  ExpertRefInput
+  src/components/expert/index.ts:9  ExpertSummary
+  src/components/expert/store.ts:85  ExpertStore
+  src/components/harness/index.ts:10  HarnessSummary
+  src/components/harness/index.ts:11  QueuePolicy
+  src/components/harness/index.ts:15  HarnessDeps
+  src/components/harness/index.ts:17  HarnessRootRow
+  src/components/harness/index.ts:3  HarnessAccessMode
+  src/components/harness/index.ts:4  HarnessDetail
+  src/components/harness/index.ts:5  HarnessHealth
+  src/components/harness/index.ts:6  HarnessKind
+  src/components/harness/store.ts:84  HarnessStore
+  src/components/http-gateway/index.ts:1  HttpDeps
+  src/components/skill/package.ts:23  SkillPackageFile
+  src/components/tool/index.ts:10  ToolRef
+  src/components/tool/index.ts:12  ToolStatus
+  src/components/tool/index.ts:13  ToolSummary
+  src/components/tool/index.ts:17  ToolDeps
+  src/components/tool/index.ts:19  ToolParamRow
+  src/components/tool/index.ts:19  ToolRootRow
+  src/components/tool/index.ts:3  ToolDetail
+  src/components/tool/index.ts:4  ToolKind
+  src/components/tool/index.ts:5  ToolParam
+  src/components/tool/index.ts:6  ToolParamInput
+  src/components/tool/index.ts:7  ToolParamType
+  src/components/tool/service.ts:316  ToolKind
+  src/components/tool/service.ts:316  ToolParamType
+  src/components/tool/service.ts:316  ToolStatus
+  src/components/tool/store.ts:82  ToolStore
+  src/components/workflow/graph.ts:3  NodeType
+  src/components/workflow/graph.ts:4  EdgeKind
+  src/components/workflow/graph.ts:6  JsonObject
+  src/components/workflow/graph.ts:9  Layout
+  src/components/workflow/index.ts:10  ValidationIssue
+  src/components/workflow/index.ts:11  ValidationReport
+  src/components/workflow/index.ts:12  Viewport
+  src/components/workflow/index.ts:15  WorkflowEdge
+  src/components/workflow/index.ts:17  WorkflowNode
+  src/components/workflow/index.ts:20  WorkflowReference
+  src/components/workflow/index.ts:25  WorkflowDeps
+  src/components/workflow/index.ts:27  WorkflowRootRow
+  src/components/workflow/index.ts:4  EdgeKind
+  src/components/workflow/index.ts:5  Layout
+  src/components/workflow/index.ts:6  NodeType
+  src/components/workflow/index.ts:7  SaveDefinitionInput
+  src/components/workflow/index.ts:8  Stage
+  src/components/workflow/store.ts:77  WorkflowStore
+  src/components/workflow/types.ts:13  EdgeKind
+  src/components/workflow/types.ts:14  Layout
+  src/components/workflow/types.ts:15  NodeType
+  src/components/workflow/types.ts:16  Stage
+  src/components/workflow/types.ts:17  ValidationIssue
+  src/components/workflow/types.ts:18  ValidationReport
+  src/components/workflow/types.ts:19  Viewport
+  src/components/workflow/types.ts:20  WorkflowEdge
+  src/components/workflow/types.ts:22  WorkflowNode
+  src/components/workflow/types.ts:72  WorkflowDslMetadata
+  src/core/config/config.ts:4  LogLevel
+  src/core/config/index.ts:1  Config
+  src/core/config/index.ts:1  LogLevel
+  src/core/config/index.ts:3  ConfigErrorCode
+  src/core/kernel/index.ts:18  ErrorCode
+  src/core/kernel/index.ts:18  ErrorDetails
+  src/core/platform/index.ts:11  Migrator
+  src/core/platform/index.ts:11  MigratorOptions
+  src/core/platform/index.ts:14  FileStoreFactory
+
+[克隆块（12 个）]
+  components/catalog/index.ts:333 ↔ components/catalog/index.ts:357  12 行 72 tokens
+  components/expert/service.ts:76 ↔ components/harness/service.ts:62  15 行 100 tokens
+  components/expert/service.ts:77 ↔ components/tool/service.ts:88  14 行 98 tokens
+  components/expert/service.ts:308 ↔ components/tool/service.ts:204  14 行 92 tokens
+  components/expert/service.ts:315 ↔ components/expert/service.ts:353  13 行 98 tokens
+  components/expert/service.ts:398 ↔ components/harness/service.ts:208  17 行 77 tokens
+  components/expert/service.ts:450 ↔ components/expert/service.ts:467  10 行 81 tokens
+  components/expert/store.ts:129 ↔ components/harness/store.ts:129  19 行 79 tokens
+  components/expert/types.ts:85 ↔ components/harness/types.ts:57  10 行 71 tokens
+  components/harness/service.ts:24 ↔ components/tool/service.ts:45  17 行 88 tokens
+  components/harness/service.ts:67 ↔ components/tool/service.ts:92  24 行 193 tokens
+  components/harness/store.ts:45 ↔ components/tool/store.ts:43  12 行 109 tokens
+
+[重复字符串组（跨 ≥3 文件，50 组，仅报告）]
+  src/components/expert/service.ts, src/components/expert/store.ts, src/components/expert/types.ts 等11个文件  "enabled"
+  src/components/expert/store.ts, src/components/expert/types.ts, src/components/harness/store.ts 等11个文件  "-name"
+  src/components/expert/store.ts, src/components/expert/types.ts, src/components/harness/store.ts 等11个文件  "updatedAt"
+  src/components/expert/store.ts, src/components/expert/types.ts, src/components/harness/store.ts 等11个文件  "-updatedAt"
+  src/components/harness/service.ts, src/components/http-gateway/dto.ts, src/components/http-gateway/fields.ts 等8个文件  "description"
+  src/components/expert/service.ts, src/components/harness/service.ts, src/components/skill/draft.ts 等6个文件  "必须是字符串"
+  src/components/expert/service.ts, src/components/harness/service.ts, src/components/http-gateway/dto.ts 等6个文件  "必须是对象"
+  src/components/catalog/index.ts, src/components/harness/service.ts, src/components/harness/types.ts 等5个文件  "server"
+  src/components/expert/service.ts, src/components/http-gateway/dto.ts, src/components/skill/draft.ts 等5个文件  "必须是数组"
+  src/components/expert/service.ts, src/components/harness/service.ts, src/components/http-gateway/routes/expert.ts 等5个文件  "必须是布尔值"
+  src/components/expert/store.ts, src/components/harness/store.ts, src/components/skill/read.ts 等5个文件  " and "
+  src/components/http-gateway/fields.ts, src/components/skill/contract.ts, src/components/skill/draft.ts 等5个文件  "version"
+  src/components/http-gateway/routes/expert.ts, src/components/http-gateway/routes/harness.ts, src/components/http-gateway/routes/skill.ts 等5个文件  "DELETE"
+  src/components/catalog/index.ts, src/components/skill/draft.ts, src/components/skill/read.ts 等4个文件  "skill"
+  src/components/catalog/index.ts, src/components/harness/service.ts, src/components/harness/types.ts 等4个文件  "container"
+  src/components/catalog/index.ts, src/components/harness/service.ts, src/components/harness/types.ts 等4个文件  "desktop"
+  src/components/catalog/index.ts, src/components/harness/service.ts, src/components/harness/types.ts 等4个文件  "laptop"
+  src/components/catalog/index.ts, src/components/harness/service.ts, src/components/harness/types.ts 等4个文件  "agent"
+  src/components/catalog/index.ts, src/components/http-gateway/queries.ts, src/components/tool/service.ts 等4个文件  "script"
+  src/components/catalog/index.ts, src/components/http-gateway/app.ts, src/components/http-gateway/routes/expert.ts 等4个文件  "skills"
+  src/components/expert/service.ts, src/components/expert/types.ts, src/components/http-gateway/fields.ts 等4个文件  "skillIds"
+  src/components/expert/service.ts, src/components/expert/types.ts, src/components/http-gateway/fields.ts 等4个文件  "toolIds"
+  src/components/http-gateway/fields.ts, src/components/http-gateway/queries.ts, src/components/http-gateway/routes/tool.ts 等4个文件  "harnessId"
+  src/components/catalog/index.ts, src/components/harness/service.ts, src/core/kernel/ports.ts  "harness"
+  src/components/catalog/index.ts, src/components/harness/service.ts, src/components/harness/types.ts  "container_registry"
+  src/components/catalog/index.ts, src/components/harness/types.ts, src/components/http-gateway/queries.ts  "unknown"
+  src/components/catalog/index.ts, src/components/harness/types.ts, src/components/http-gateway/queries.ts  "online"
+  src/components/catalog/index.ts, src/components/harness/types.ts, src/components/http-gateway/queries.ts  "offline"
+  src/components/catalog/index.ts, src/components/harness/types.ts, src/components/http-gateway/queries.ts  "overloaded"
+  src/components/catalog/index.ts, src/components/harness/service.ts, src/components/harness/types.ts  "priority"
+  src/components/catalog/index.ts, src/components/http-gateway/queries.ts, src/components/tool/types.ts  "unverified"
+  src/components/catalog/index.ts, src/components/http-gateway/queries.ts, src/components/tool/types.ts  "available"
+  src/components/catalog/index.ts, src/components/http-gateway/queries.ts, src/components/tool/types.ts  "unavailable"
+  src/components/catalog/index.ts, src/components/expert/service.ts, src/core/kernel/ports.ts  "expert"
+  src/components/expert/service.ts, src/components/http-gateway/dto.ts, src/components/http-gateway/routes/expert.ts  "items"
+  src/components/http-gateway/dto.ts, src/components/http-gateway/fields.ts, src/components/tool/service.ts  "params"
+  src/components/http-gateway/dto.ts, src/components/workflow/graph.ts, src/components/workflow/service.ts  "必须是非空字符串"
+  src/components/http-gateway/dto.ts, src/components/http-gateway/routes/expert.ts, src/components/http-gateway/routes/skill.ts  "skillId"
+  src/components/http-gateway/dto.ts, src/components/http-gateway/routes/skill.ts, src/components/http-gateway/validation.ts  "必须是 UUID"
+  src/components/http-gateway/fields.ts, src/components/skill/contract.ts, src/components/skill/read.ts  "-version"
+  src/components/http-gateway/fields.ts, src/components/workflow/graph.ts, src/components/workflow/service.ts  "graph"
+  src/components/http-gateway/fields.ts, src/components/workflow/graph.ts, src/components/workflow/service.ts  "stages"
+  src/components/http-gateway/fields.ts, src/components/workflow/graph.ts, src/components/workflow/service.ts  "nodes"
+  src/components/http-gateway/fields.ts, src/components/workflow/graph.ts, src/components/workflow/service.ts  "edges"
+  src/components/http-gateway/fields.ts, src/components/workflow/graph.ts, src/components/workflow/service.ts  "layout"
+  src/components/skill/draft.ts, src/components/skill/package.ts, src/core/kernel/errors.ts  "file_count"
+  src/components/skill/draft.ts, src/components/skill/package.ts, src/core/kernel/errors.ts  "file_bytes"
+  src/components/skill/draft.ts, src/components/skill/package.ts, src/core/kernel/errors.ts  "package_bytes"
+  src/components/http-gateway/routes/expert.ts, src/components/http-gateway/routes/harness.ts, src/components/http-gateway/routes/skill.ts  "PATCH"
+  src/components/http-gateway/routes/harness.ts, src/components/http-gateway/routes/skill.ts, src/components/http-gateway/routes/tool.ts  "references"
+
+[git 变化信号（仅报告）]
+  多任务 src/components/http-gateway/openapi.yaml（9 个任务）
+  多任务 src/components/workflow/dsl.schema.json（3 个任务）
+  多任务 src/components/workflow/graph.ts（4 个任务）
+  多任务 src/components/workflow/index.ts（3 个任务）
+  多任务 src/components/workflow/service.ts（3 个任务）
+  多任务 src/components/workflow/types.ts（3 个任务）
+  多任务 src/core/kernel/errors.ts（3 个任务）
+  多任务 src/components/http-gateway/app.ts（13 个任务）
+  多任务 src/components/skill/draft.ts（3 个任务）
+  多任务 src/components/expert/service.ts（5 个任务）
+  多任务 src/components/http-gateway/validation.ts（3 个任务）
+  多任务 src/components/expert/store.ts（3 个任务）
+  多任务 src/components/skill/service.ts（5 个任务）
+  多任务 src/components/skill/store.ts（4 个任务）
+  多任务 src/components/skill/types.ts（5 个任务）
+  多任务 src/components/http-gateway/docs.ts（3 个任务）
+  多任务 src/main.ts（7 个任务）
+  多任务 src/components/catalog/index.ts（5 个任务）
+  多任务 src/components/expert/types.ts（4 个任务）
+  多任务 src/core/kernel/index.ts（3 个任务）
+  多任务 src/core/kernel/ports.ts（3 个任务）
+  多任务 src/components/skill/index.ts（3 个任务）
+  多任务 src/core/platform/index.ts（3 个任务）
+
+合计：违规 80 条；仅报告 158 条；规则分组 14 组；工具健康 8/8
+工具：oxlint, tsc, knip, jscpd, ts-morph, pgsql-ast-parser, git, OpenAPI 测试（oxlint diagnostics=65; knip issues=21; jscpd=12/2.21%）

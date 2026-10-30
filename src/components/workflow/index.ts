@@ -21,13 +21,9 @@ export type {
   WorkflowService,
   WorkflowSummary,
 } from "./types.ts";
-export { createWorkflowRead, createWorkflowService } from "./service.ts";
+export { createWorkflowService } from "./service.ts";
+export { createWorkflowRead } from "./read.ts";
 export type { WorkflowDeps } from "./service.ts";
-export { createWorkflowStore } from "./store.ts";
 export type { WorkflowRootRow } from "./store.ts";
-export {
-  analyzeBindings,
-  analyzeTopology,
-  collectGraph,
-  parseGraph,
-} from "./graph.ts";
+export { collectGraph, parseGraph } from "./graph.ts";
+export { analyzeBindings, analyzeTopology } from "./graph-analysis.ts";

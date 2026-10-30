@@ -1,7 +1,7 @@
 import { ValidationError } from "../../core/kernel/index.ts";
 import { assertAllowedFields, assertUuid, isPlainObject } from "./validation.ts";
 
-export function requireObject(value: unknown, field: string): Record<string, unknown> {
+function requireObject(value: unknown, field: string): Record<string, unknown> {
   if (!isPlainObject(value)) throw new ValidationError(field, "必须是对象");
   return value;
 }

@@ -41,17 +41,11 @@ describe("数据库结构", () => {
     expect(names).toEqual([...BUSINESS_TABLES, "schema_migrations"].sort());
   });
 
-  test("5 个迁移按顺序记录，分类参考数据为 4 条", async () => {
+  test("1 个迁移按顺序记录，分类参考数据为 4 条", async () => {
     const migrations = await db.query<{ version: string }>(
       "select version from schema_migrations order by version",
     );
-    expect(migrations.map((row) => row.version)).toEqual([
-      "0001_harness.sql",
-      "0002_tool.sql",
-      "0003_skill.sql",
-      "0004_expert.sql",
-      "0005_workflow.sql",
-    ]);
+    expect(migrations.map((row) => row.version)).toEqual(["0001_baseline.sql"]);
 
     const categories = await db.query<{ code: string; position: number }>(
       "select code, position from skill_category order by position",

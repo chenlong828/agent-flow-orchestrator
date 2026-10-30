@@ -113,13 +113,7 @@ describe("platform 迁移执行", () => {
     const migrator = createMigrator({ db, directory: MIGRATIONS });
     const result = await migrator.up();
     expect(result.applied).toEqual([]);
-    expect(result.skipped).toEqual([
-      "0001_harness.sql",
-      "0002_tool.sql",
-      "0003_skill.sql",
-      "0004_expert.sql",
-      "0005_workflow.sql",
-    ]);
+    expect(result.skipped).toEqual(["0001_baseline.sql"]);
     const after = await db.query("select version, checksum from schema_migrations order by version");
     expect(after).toEqual(before);
   });
@@ -127,8 +121,8 @@ describe("platform 迁移执行", () => {
   test("已应用迁移内容变化时校验和不匹配，执行失败且不新增记录", async () => {
     const directory = await mkdtemp(join(tmpdir(), "agentflow-migrations-"));
     try {
-      const original = await readFile(join(MIGRATIONS, "0001_harness.sql"), "utf8");
-      await writeFile(join(directory, "0001_harness.sql"), `${original}\n-- tampered\n`);
+      const original = await readFile(join(MIGRATIONS, "0001_baseline.sql"), "utf8");
+      await writeFile(join(directory, "0001_baseline.sql"), `${original}\n-- tampered\n`);
       const before = await db.query("select version, checksum from schema_migrations order by version");
       const migrator = createMigrator({ db, directory });
       const error = await migrator.up().catch((e) => e);

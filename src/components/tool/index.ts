@@ -15,5 +15,4 @@ export type {
 } from "./types.ts";
 export { createToolRead, createToolService, HarnessNotFoundError } from "./service.ts";
 export type { ToolDeps } from "./service.ts";
-export { createToolStore } from "./store.ts";
 export type { ToolParamRow, ToolRootRow } from "./store.ts";

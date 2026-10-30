@@ -1,4 +1,10 @@
 import {
+  ensureBoolean,
+  toIso,
+  toIsoOrNull,
+  ensureEnum,
+  ensureOptionalText,
+  ensureText,
   NameConflictError,
   NotFoundError,
   ReferencedError,
@@ -10,7 +16,7 @@ import {
   type ReferenceGuard,
 } from "../../core/kernel/index.ts";
 import { isForeignKeyViolation, isUniqueViolation, type Db } from "../../core/platform/index.ts";
-import { createHarnessStore, type HarnessRootRow } from "./store.ts";
+import { createHarnessStore, type HarnessRootRow, type HarnessStore } from "./store.ts";
 import type {
   CreateHarness,
   HarnessDetail,
@@ -28,14 +34,6 @@ export type HarnessDeps = {
   guard: ReferenceGuard;
   actor: string;
 };
-
-function toIso(value: Date | string): string {
-  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
-}
-
-function toIsoOrNull(value: Date | string | null): string | null {
-  return value === null ? null : toIso(value);
-}
 
 function toSummary(row: HarnessRootRow, tags: string[]): HarnessSummary {
   return {
@@ -61,30 +59,6 @@ function toDetail(row: HarnessRootRow, tags: string[]): HarnessDetail {
     description: row.description,
     createdAt: toIso(row.created_at),
   };
-}
-
-function ensureText(value: unknown, field: string, maxLength: number): string {
-  if (typeof value !== "string") throw new ValidationError(field, "必须是字符串");
-  const trimmed = value.trim();
-  if (trimmed.length === 0) throw new ValidationError(field, "不能为空");
-  if (trimmed.length > maxLength) {
-    throw new ValidationError(field, `长度不能超过 ${maxLength}`);
-  }
-  return trimmed;
-}
-
-function ensureOptionalText(value: unknown, field: string, maxLength: number): string {
-  if (value === undefined) return "";
-  if (typeof value !== "string") throw new ValidationError(field, "必须是字符串");
-  if (value.length > maxLength) throw new ValidationError(field, `长度不能超过 ${maxLength}`);
-  return value;
-}
-
-function ensureEnum<T extends string>(value: unknown, field: string, allowed: readonly T[]): T {
-  if (typeof value !== "string" || !allowed.includes(value as T)) {
-    throw new ValidationError(field, `必须是 ${allowed.join(" / ")} 之一`);
-  }
-  return value as T;
 }
 
 function ensureTags(value: unknown): string[] {
@@ -155,105 +129,144 @@ function normalizeEnabled(value: unknown): boolean | undefined {
   return value;
 }
 
+type HarnessServiceContext = {
+  db: Db;
+  clock: Clock;
+  ids: IdGenerator;
+  guard: ReferenceGuard;
+  actor: string;
+  store: HarnessStore;
+};
+
+async function createHarness(
+  ctx: HarnessServiceContext,
+  input: CreateHarness,
+  requestActor?: string,
+): Promise<{ id: string; revision: number }> {
+  const normalized = normalizeWrite(input);
+  const enabled = normalizeEnabled(input.enabled) ?? true;
+  const id = ctx.ids.next();
+  const now = ctx.clock.now();
+  const actorValue = requestActor ?? ctx.actor;
+  try {
+    await ctx.db.transaction(async (tx) => {
+      await ctx.store.insertRoot(tx, { ...normalized, enabled, id, now, actor: actorValue });
+      await ctx.store.replaceTags(tx, id, normalized.tags);
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) throw new NameConflictError(normalized.name);
+    throw error;
+  }
+  return { id, revision: 1 };
+}
+
+async function updateHarness(
+  ctx: HarnessServiceContext,
+  id: string,
+  revision: number,
+  input: UpdateHarness,
+  requestActor?: string,
+): Promise<{ id: string; revision: number }> {
+  const normalized = normalizeWrite(input);
+  const actorValue = requestActor ?? ctx.actor;
+  const now = ctx.clock.now();
+  try {
+    return await ctx.db.transaction(async (tx) => {
+      const current = await ctx.store.findRoot(tx, id, true);
+      if (current === null) throw new NotFoundError("Harness", id);
+      if (current.revision !== revision) {
+        throw new RevisionConflictError(current.revision);
+      }
+      const changed = await ctx.store.updateRoot(tx, {
+        ...normalized,
+        id,
+        revision,
+        now,
+        actor: actorValue,
+      });
+      if (changed === 0) {
+        const latest = await ctx.store.findRoot(tx, id);
+        throw new RevisionConflictError(latest?.revision ?? revision);
+      }
+      await ctx.store.replaceTags(tx, id, normalized.tags);
+      return { id, revision: revision + 1 };
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) throw new NameConflictError(normalized.name);
+    throw error;
+  }
+}
+
+async function setHarnessEnabled(
+  ctx: HarnessServiceContext,
+  id: string,
+  revision: number,
+  enabled: boolean,
+  requestActor?: string,
+): Promise<{ id: string; revision: number }> {
+  const now = ctx.clock.now();
+  return ctx.db.transaction(async (tx) => {
+    const changed = await ctx.store.setEnabled({
+      tx,
+      id,
+      revision,
+      enabled: ensureBoolean(enabled, "enabled"),
+      now,
+      actor: requestActor ?? ctx.actor,
+    });
+    if (changed === 0) {
+      const latest = await ctx.store.findRoot(tx, id);
+      if (latest === null) throw new NotFoundError("Harness", id);
+      throw new RevisionConflictError(latest.revision);
+    }
+    return { id, revision: revision + 1 };
+  });
+}
+
+async function deleteHarness(
+  ctx: HarnessServiceContext,
+  id: string,
+  revision: number,
+): Promise<void> {
+  const current = await ctx.store.findRoot(ctx.db, id);
+  if (current === null) throw new NotFoundError("Harness", id);
+  if (current.revision !== revision) throw new RevisionConflictError(current.revision);
+
+  const references = await ctx.guard.check("harness", id);
+  if (references.length > 0) {
+    throw new ReferencedError({ type: "harness", id, name: current.name }, references);
+  }
+  try {
+    await ctx.db.transaction(async (tx) => {
+      const changed = await ctx.store.deleteRoot(tx, id, revision);
+      if (changed === 0) {
+        const latest = await ctx.store.findRoot(tx, id);
+        if (latest === null) throw new NotFoundError("Harness", id);
+        throw new RevisionConflictError(latest.revision);
+      }
+    });
+  } catch (error) {
+    if (isForeignKeyViolation(error)) {
+      const latestReferences = await ctx.guard.check("harness", id);
+      throw new ReferencedError(
+        { type: "harness", id, name: current.name },
+        latestReferences,
+      );
+    }
+    throw error;
+  }
+}
+
 export function createHarnessService(deps: HarnessDeps): HarnessService {
-  const { db, clock, ids, guard, actor } = deps;
-  const store = createHarnessStore(db);
+  const ctx: HarnessServiceContext = { ...deps, store: createHarnessStore(deps.db) };
 
   return {
-    async create(input, requestActor) {
-      const normalized = normalizeWrite(input);
-      const enabled = normalizeEnabled(input.enabled) ?? true;
-      const id = ids.next();
-      const now = clock.now();
-      const actorValue = requestActor ?? actor;
-      try {
-        await db.transaction(async (tx) => {
-          await store.insertRoot(tx, { ...normalized, enabled, id, now, actor: actorValue });
-          await store.replaceTags(tx, id, normalized.tags);
-        });
-      } catch (error) {
-        if (isUniqueViolation(error)) throw new NameConflictError(normalized.name);
-        throw error;
-      }
-      return { id, revision: 1 };
-    },
-
-    async update(id, revision, input, requestActor) {
-      const normalized = normalizeWrite(input);
-      const actorValue = requestActor ?? actor;
-      const now = clock.now();
-      try {
-        return await db.transaction(async (tx) => {
-          const current = await store.findRoot(tx, id, true);
-          if (current === null) throw new NotFoundError("Harness", id);
-          if (current.revision !== revision) {
-            throw new RevisionConflictError(current.revision);
-          }
-          const changed = await store.updateRoot(tx, {
-            ...normalized,
-            id,
-            revision,
-            now,
-            actor: actorValue,
-          });
-          if (changed === 0) {
-            const latest = await store.findRoot(tx, id);
-            throw new RevisionConflictError(latest?.revision ?? revision);
-          }
-          await store.replaceTags(tx, id, normalized.tags);
-          return { id, revision: revision + 1 };
-        });
-      } catch (error) {
-        if (isUniqueViolation(error)) throw new NameConflictError(normalized.name);
-        throw error;
-      }
-    },
-
-    async setEnabled(id, revision, enabled, requestActor) {
-      if (typeof enabled !== "boolean") {
-        throw new ValidationError("enabled", "必须是布尔值");
-      }
-      const now = clock.now();
-      return db.transaction(async (tx) => {
-        const changed = await store.setEnabled(tx, id, revision, enabled, now, requestActor ?? actor);
-        if (changed === 0) {
-          const latest = await store.findRoot(tx, id);
-          if (latest === null) throw new NotFoundError("Harness", id);
-          throw new RevisionConflictError(latest.revision);
-        }
-        return { id, revision: revision + 1 };
-      });
-    },
-
-    async delete(id, revision) {
-      const current = await store.findRoot(db, id);
-      if (current === null) throw new NotFoundError("Harness", id);
-      if (current.revision !== revision) throw new RevisionConflictError(current.revision);
-
-      const references = await guard.check("harness", id);
-      if (references.length > 0) {
-        throw new ReferencedError({ type: "harness", id, name: current.name }, references);
-      }
-      try {
-        await db.transaction(async (tx) => {
-          const changed = await store.deleteRoot(tx, id, revision);
-          if (changed === 0) {
-            const latest = await store.findRoot(tx, id);
-            if (latest === null) throw new NotFoundError("Harness", id);
-            throw new RevisionConflictError(latest.revision);
-          }
-        });
-      } catch (error) {
-        if (isForeignKeyViolation(error)) {
-          const latestReferences = await guard.check("harness", id);
-          throw new ReferencedError(
-            { type: "harness", id, name: current.name },
-            latestReferences,
-          );
-        }
-        throw error;
-      }
-    },
+    create: (input, requestActor) => createHarness(ctx, input, requestActor),
+    update: (id, revision, input, requestActor) =>
+      updateHarness(ctx, id, revision, input, requestActor),
+    setEnabled: (id, revision, enabled, requestActor) =>
+      setHarnessEnabled(ctx, id, revision, enabled, requestActor),
+    delete: (id, revision) => deleteHarness(ctx, id, revision),
   };
 }
 

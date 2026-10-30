@@ -48,7 +48,7 @@ Skill 有两种消费方式：
 - 删除 Skill 前调用 `ReferenceGuard`；有专家引用则抛 `ReferencedError`；通过后删 brief、当前包与草稿。
 - 读列表不读 zip；详情只读 zip 中央目录与 `SKILL.md`，不读附件内容；文档与下载只读 zip。
 - 停用 Skill 仍可读、可下载、可建草稿；启停不改变包与 `SKILL.md`。
-- 数据结构按原地重建落成：重写 `0003_skill.sql`、删除 `0005_skill_description.sql`；重建后 13 张业务表、4 个迁移。
+- 数据结构按单基线落成：`db/migrations/0001_baseline.sql`；当前 16 张业务表、1 个迁移。
 
 ## 3 公共契约
 
@@ -233,7 +233,7 @@ type SkillQuery = {
 - 读：列表不读 zip；详情 `body` 与 `files` 顺序；文档与 `SKILL.md` 逐字一致；下载 zip 可解压、文件名合规；停用可读。
 - 持久化：原子写、fsync、包指针切换、旧包/草稿清理、GC 对账；包缺失/损坏返回 `package_unavailable`。
 - 删除：引用保护、包/草稿清理、GC。
-- 重建：重写 `0003`/删除 `0005` 后 13 张业务表、4 个迁移；种子 12 个 Skill 各有合法包与 23 条专家装配边。
+- 重建：单基线 `0001_baseline.sql` 后 16 张业务表、1 个迁移；种子 12 个 Skill 各有合法包与 23 条专家装配边。
 - 契约：对应 REST 端点 3 正 1 反在 `http-gateway` 规格中列明。
 
 ## 6 预算与运行

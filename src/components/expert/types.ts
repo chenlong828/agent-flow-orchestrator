@@ -1,4 +1,20 @@
-import type { Page, PageQuery } from "../../core/kernel/index.ts";
+import type {
+  Clock,
+  IdGenerator,
+  Page,
+  PageQuery,
+  ReferenceGuard,
+  RevisionedLifecycle,
+} from "../../core/kernel/index.ts";
+import type { Db } from "../../core/platform/index.ts";
+
+export type ExpertDeps = {
+  db: Db;
+  clock: Clock;
+  ids: IdGenerator;
+  actor: string;
+  guard: ReferenceGuard;
+};
 
 export type ExpertRefInput = {
   label: string;
@@ -6,10 +22,7 @@ export type ExpertRefInput = {
   path?: string;
 };
 
-export type CreateExpert = {
-  name: string;
-  color: string;
-  role: string;
+type ExpertCreatePatch = {
   enabled?: boolean;
   persona?: string[];
   duty?: string;
@@ -20,6 +33,12 @@ export type CreateExpert = {
   skillIds?: string[];
   toolIds?: string[];
 };
+
+export type CreateExpert = {
+  name: string;
+  color: string;
+  role: string;
+} & ExpertCreatePatch;
 
 export type UpdateExpert = Omit<CreateExpert, "enabled" | "skillIds" | "toolIds">;
 
@@ -85,13 +104,6 @@ export type ExpertService = {
     input: UpdateExpertAggregate,
     actor?: string,
   ): Promise<{ id: string; revision: number }>;
-  setEnabled(
-    id: string,
-    revision: number,
-    enabled: boolean,
-    actor?: string,
-  ): Promise<{ id: string; revision: number }>;
-  delete(id: string, revision: number): Promise<void>;
   setSkills(
     id: string,
     revision: number,
@@ -104,7 +116,7 @@ export type ExpertService = {
     toolIds: string[],
     actor?: string,
   ): Promise<{ revision: number }>;
-};
+} & RevisionedLifecycle;
 
 export type ExpertRead = {
   list(query: ExpertQuery): Promise<Page<ExpertSummary>>;

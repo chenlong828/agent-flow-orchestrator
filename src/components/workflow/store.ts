@@ -74,160 +74,174 @@ const ROOT_SELECT = `
   join workflow_definition d on d.workflow_id = w.id
 `;
 
-export type WorkflowStore = ReturnType<typeof createWorkflowStore>;
-
-export function createWorkflowStore(db: Db) {
-  return {
-    async insertRoot(tx: Db, input: WorkflowRootWrite): Promise<void> {
-      await tx.query(
-        `insert into workflow
+async function insertRoot(tx: Db, input: WorkflowRootWrite): Promise<void> {
+  await tx.query(
+    `insert into workflow
           (id, name, type, description, revision, created_at, updated_at, created_by, updated_by)
          values ($1, $2, $3, $4, 1, $5, $5, $6, $6)`,
-        [input.id, input.name, input.type, input.description, input.now, input.actor],
-      );
-    },
+    [input.id, input.name, input.type, input.description, input.now, input.actor],
+  );
+}
 
-    async insertDefinition(
-      tx: Db,
-      workflowId: string,
-      graph: WorkflowGraph,
-      now: Date,
-      actor: string | null,
-    ): Promise<void> {
-      await tx.query(
-        `insert into workflow_definition (workflow_id, graph, updated_at, updated_by)
+async function insertDefinition(
+  tx: Db,
+  workflowId: string,
+  graph: WorkflowGraph,
+  now: Date,
+  actor: string | null,
+): Promise<void> {
+  await tx.query(
+    `insert into workflow_definition (workflow_id, graph, updated_at, updated_by)
          values ($1, $2::text::jsonb, $3, $4)`,
-        [workflowId, JSON.stringify(graph), now, actor],
-      );
-    },
+    [workflowId, JSON.stringify(graph), now, actor],
+  );
+}
 
-    async updateRoot(
-      tx: Db,
-      id: string,
-      revision: number,
-      input: { name: string; type: string; description: string; now: Date; actor: string | null },
-    ): Promise<number | null> {
-      const row = await tx.one<{ revision: number }>(
-        `update workflow set
+async function updateRoot(
+  tx: Db,
+  id: string,
+  revision: number,
+  input: { name: string; type: string; description: string; now: Date; actor: string | null },
+): Promise<number | null> {
+  const row = await tx.one<{ revision: number }>(
+    `update workflow set
            name = $1, type = $2, description = $3, revision = revision + 1,
            updated_at = $4, updated_by = $5
          where id = $6 and revision = $7
          returning revision`,
-        [input.name, input.type, input.description, input.now, input.actor, id, revision],
-      );
-      return row?.revision ?? null;
-    },
+    [input.name, input.type, input.description, input.now, input.actor, id, revision],
+  );
+  return row?.revision ?? null;
+}
 
-    async bumpRevision(
-      tx: Db,
-      id: string,
-      revision: number,
-      now: Date,
-      actor: string | null,
-    ): Promise<number | null> {
-      const row = await tx.one<{ revision: number }>(
-        `update workflow set revision = revision + 1, updated_at = $1, updated_by = $2
+async function bumpRevision(
+  tx: Db,
+  id: string,
+  revision: number,
+  now: Date,
+  actor: string | null,
+): Promise<number | null> {
+  const row = await tx.one<{ revision: number }>(
+    `update workflow set revision = revision + 1, updated_at = $1, updated_by = $2
          where id = $3 and revision = $4
          returning revision`,
-        [now, actor, id, revision],
-      );
-      return row?.revision ?? null;
-    },
+    [now, actor, id, revision],
+  );
+  return row?.revision ?? null;
+}
 
-    async deleteRoot(tx: Db, id: string, revision: number): Promise<number> {
-      const rows = await tx.query<{ id: string }>(
-        "delete from workflow where id = $1 and revision = $2 returning id",
-        [id, revision],
-      );
-      return rows.length;
-    },
+async function deleteRoot(tx: Db, id: string, revision: number): Promise<number> {
+  const rows = await tx.query<{ id: string }>(
+    "delete from workflow where id = $1 and revision = $2 returning id",
+    [id, revision],
+  );
+  return rows.length;
+}
 
-    async findRoot(tx: Db, id: string, forUpdate = false): Promise<WorkflowRootRow | null> {
-      const suffix = forUpdate ? " for update of w" : "";
-      return tx.one<WorkflowRootRow>(`${ROOT_SELECT} where w.id = $1${suffix}`, [id]);
-    },
+async function findRoot(tx: Db, id: string, forUpdate = false): Promise<WorkflowRootRow | null> {
+  const suffix = forUpdate ? " for update of w" : "";
+  return tx.one<WorkflowRootRow>(`${ROOT_SELECT} where w.id = $1${suffix}`, [id]);
+}
 
-    async findDefinition(tx: Db, id: string): Promise<WorkflowDefinitionRow | null> {
-      return tx.one<WorkflowDefinitionRow>(
-        "select workflow_id, graph, updated_at, updated_by from workflow_definition where workflow_id = $1",
-        [id],
-      );
-    },
+async function findDefinition(tx: Db, id: string): Promise<WorkflowDefinitionRow | null> {
+  return tx.one<WorkflowDefinitionRow>(
+    "select workflow_id, graph, updated_at, updated_by from workflow_definition where workflow_id = $1",
+    [id],
+  );
+}
 
-    async listRoots(
-      tx: Db,
-      query: WorkflowQuery,
-    ): Promise<{ rows: WorkflowRootRow[]; total: number }> {
-      const { where, params } = buildFilters(query);
-      const countRow = await tx.one<{ total: number }>(
-        `select count(*)::int as total from workflow w ${where}`,
-        params,
-      );
-      const rows = await tx.query<WorkflowRootRow>(
-        `${ROOT_SELECT} ${where} ${orderBy(query.sort)}
+async function listRoots(
+  tx: Db,
+  query: WorkflowQuery,
+): Promise<{ rows: WorkflowRootRow[]; total: number }> {
+  const { where, params } = buildFilters(query);
+  const countRow = await tx.one<{ total: number }>(
+    `select count(*)::int as total from workflow w ${where}`,
+    params,
+  );
+  const rows = await tx.query<WorkflowRootRow>(
+    `${ROOT_SELECT} ${where} ${orderBy(query.sort)}
          limit $${params.length + 1} offset $${params.length + 2}`,
-        [...params, query.page.limit, query.page.offset],
-      );
-      return { rows, total: countRow?.total ?? 0 };
-    },
+    [...params, query.page.limit, query.page.offset],
+  );
+  return { rows, total: countRow?.total ?? 0 };
+}
 
-    async replaceGraph(
-      tx: Db,
-      id: string,
-      graph: WorkflowGraph,
-      now: Date,
-      actor: string | null,
-    ): Promise<void> {
-      await tx.query(
-        `update workflow_definition
+async function replaceGraph(
+  tx: Db,
+  id: string,
+  graph: WorkflowGraph,
+  now: Date,
+  actor: string | null,
+): Promise<void> {
+  await tx.query(
+    `update workflow_definition
          set graph = $2::text::jsonb, updated_at = $3, updated_by = $4
          where workflow_id = $1`,
-        [id, JSON.stringify(graph), now, actor],
-      );
-    },
+    [id, JSON.stringify(graph), now, actor],
+  );
+}
 
-    async replaceExpertRefs(tx: Db, id: string, graph: WorkflowGraph): Promise<void> {
-      await tx.query("delete from workflow_expert_ref where workflow_id = $1", [id]);
-      for (const node of graph.nodes) {
-        if (node.expertId === null) continue;
-        await tx.query(
-          `insert into workflow_expert_ref (workflow_id, node_id, expert_id)
+async function replaceExpertRefs(tx: Db, id: string, graph: WorkflowGraph): Promise<void> {
+  await tx.query("delete from workflow_expert_ref where workflow_id = $1", [id]);
+  for (const node of graph.nodes) {
+    if (node.expertId === null) continue;
+    await tx.query(
+      `insert into workflow_expert_ref (workflow_id, node_id, expert_id)
            values ($1, $2, $3)`,
-          [id, node.id, node.expertId],
-        );
-      }
-    },
+      [id, node.id, node.expertId],
+    );
+  }
+}
 
-    async nameExists(tx: Db, name: string): Promise<boolean> {
-      const row = await tx.one<{ found: number }>(
-        "select 1 as found from workflow where lower(name) = lower($1) limit 1",
-        [name],
-      );
-      return row !== null;
-    },
+async function nameExists(tx: Db, name: string): Promise<boolean> {
+  const row = await tx.one<{ found: number }>(
+    "select 1 as found from workflow where lower(name) = lower($1) limit 1",
+    [name],
+  );
+  return row !== null;
+}
 
-    async listByExpert(tx: Db, expertId: string): Promise<{ id: string; name: string }[]> {
-      return tx.query<{ id: string; name: string }>(
-        `select w.id, w.name
+async function listByExpert(tx: Db, expertId: string): Promise<{ id: string; name: string }[]> {
+  return tx.query<{ id: string; name: string }>(
+    `select w.id, w.name
          from workflow w
          join workflow_expert_ref r on r.workflow_id = w.id
          where r.expert_id = $1
          group by w.id, w.name
          order by max(w.updated_at) desc, w.id asc`,
-        [expertId],
-      );
-    },
+    [expertId],
+  );
+}
 
-    async countByExperts(tx: Db, expertIds: string[]): Promise<Record<string, number>> {
-      if (expertIds.length === 0) return {};
-      const rows = await tx.query<{ expert_id: string; ref_count: number }>(
-        `select expert_id, count(distinct workflow_id)::int as ref_count
+async function countByExperts(tx: Db, expertIds: string[]): Promise<Record<string, number>> {
+  if (expertIds.length === 0) return {};
+  const rows = await tx.query<{ expert_id: string; ref_count: number }>(
+    `select expert_id, count(distinct workflow_id)::int as ref_count
          from workflow_expert_ref
          where expert_id = any($1::uuid[])
          group by expert_id`,
-        [expertIds],
-      );
-      return Object.fromEntries(rows.map((row) => [row.expert_id, row.ref_count]));
-    },
+    [expertIds],
+  );
+  return Object.fromEntries(rows.map((row) => [row.expert_id, row.ref_count]));
+}
+
+export type WorkflowStore = ReturnType<typeof createWorkflowStore>;
+
+export function createWorkflowStore(db: Db) {
+  return {
+    insertRoot,
+    insertDefinition,
+    updateRoot,
+    bumpRevision,
+    deleteRoot,
+    findRoot,
+    findDefinition,
+    listRoots,
+    replaceGraph,
+    replaceExpertRefs,
+    nameExists,
+    listByExpert,
+    countByExperts,
   };
 }

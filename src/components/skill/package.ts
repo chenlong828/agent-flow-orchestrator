@@ -10,8 +10,8 @@ export const SKILL_MD_LIMIT_BYTES = 16_384;
 export const FILE_LIMIT_BYTES = 20 * 1024 * 1024;
 export const FILE_LIMIT_COUNT = 100;
 export const PACKAGE_LIMIT_BYTES = 100 * 1024 * 1024;
-export const PATH_LIMIT_BYTES = 512;
-export const PATH_SEGMENT_LIMIT_BYTES = 255;
+const PATH_LIMIT_BYTES = 512;
+const PATH_SEGMENT_LIMIT_BYTES = 255;
 
 export type SkillMarkdownInput = {
   name: string;
@@ -129,7 +129,9 @@ const CRC_TABLE = (() => {
 function crc32(data: Uint8Array): number {
   let crc = 0xffffffff;
   for (const byte of data) {
-    crc = CRC_TABLE[(crc ^ byte) & 0xff]! ^ (crc >>> 8);
+    const entry = CRC_TABLE[(crc ^ byte) & 0xff];
+    if (entry === undefined) throw new Error("CRC 表索引越界");
+    crc = entry ^ (crc >>> 8);
   }
   return (crc ^ 0xffffffff) >>> 0;
 }
@@ -288,6 +290,17 @@ function unyamlScalar(value: string): string {
     });
 }
 
+function requireFrontmatterValue(
+  values: Map<string, string>,
+  key: string,
+): string {
+  const value = values.get(key);
+  if (value === undefined) {
+    throw new ValidationError("frontmatter", `缺少 ${key}`);
+  }
+  return value;
+}
+
 export function parseSkillMarkdown(markdown: string): ParsedSkillMarkdown {
   const first = markdown.indexOf("\n");
   if (first === -1 || markdown.slice(0, first) !== "---") {
@@ -318,9 +331,9 @@ export function parseSkillMarkdown(markdown: string): ParsedSkillMarkdown {
   if (values.size !== 3) {
     throw new ValidationError("frontmatter", "必须包含 name/description/version");
   }
-  const name = values.get("name")!;
-  const description = values.get("description")!;
-  const version = values.get("version")!;
+  const name = requireFrontmatterValue(values, "name");
+  const description = requireFrontmatterValue(values, "description");
+  const version = requireFrontmatterValue(values, "version");
   if (!VERSION.test(version)) {
     throw new ValidationError("version", `版本号不合法：${version}`);
   }
@@ -398,7 +411,8 @@ export function readSkillPackage(data: Uint8Array): SkillPackageEntry[] {
     offset += 46 + nameLength + extraLength + commentLength;
   }
 
-  if (entries.length === 0 || entries[0]!.path !== SKILL_MD) {
+  const first = entries[0];
+  if (first === undefined || first.path !== SKILL_MD) {
     throw new ValidationError("zip", "SKILL.md 必须是包内首项");
   }
   return entries;

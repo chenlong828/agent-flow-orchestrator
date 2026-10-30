@@ -29,7 +29,7 @@ export async function handleTool(ctx: RouteContext): Promise<Response> {
     throw new NotFoundError("路径", path);
   }
 
-  const id = assertUuid(segments[1]!, "id");
+  const id = assertUuid(segments[1], "id");
 
   if (segments.length === 2) {
     if (request.method === "GET") return json(await catalog.getTool(id));

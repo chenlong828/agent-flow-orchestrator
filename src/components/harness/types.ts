@@ -1,21 +1,24 @@
-import type { Page, PageQuery } from "../../core/kernel/index.ts";
+import type { Page, PageQuery, RevisionedLifecycle } from "../../core/kernel/index.ts";
 
 export type HarnessKind = "container" | "server" | "desktop" | "laptop";
 export type HarnessAccessMode = "agent" | "ssh" | "container_registry";
 export type HarnessHealth = "unknown" | "online" | "offline" | "overloaded";
 export type QueuePolicy = "fifo" | "priority";
 
+type HarnessCreatePatch = {
+  description?: string;
+  tags?: string[];
+  enabled?: boolean;
+};
+
 export type CreateHarness = {
   name: string;
   kind: HarnessKind;
   address: string;
   accessMode: HarnessAccessMode;
-  description?: string;
   concurrencyMax: number;
   queuePolicy: QueuePolicy;
-  tags?: string[];
-  enabled?: boolean;
-};
+} & HarnessCreatePatch;
 
 export type UpdateHarness = Omit<CreateHarness, "enabled">;
 
@@ -57,14 +60,7 @@ export type HarnessService = {
     input: UpdateHarness,
     actor?: string,
   ): Promise<{ id: string; revision: number }>;
-  setEnabled(
-    id: string,
-    revision: number,
-    enabled: boolean,
-    actor?: string,
-  ): Promise<{ id: string; revision: number }>;
-  delete(id: string, revision: number): Promise<void>;
-};
+} & RevisionedLifecycle;
 
 export type HarnessRead = {
   list(query: HarnessQuery): Promise<Page<HarnessSummary>>;

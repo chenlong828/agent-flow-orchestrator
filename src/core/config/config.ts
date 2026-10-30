@@ -113,63 +113,75 @@ function parsePositiveIntegerHours(
   return hours;
 }
 
+function parseServer(
+  value: unknown,
+  source: string,
+): NonNullable<FileConfig["server"]> | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) {
+    fail("config_validation_error", source, "server", "server 必须是表");
+  }
+  assertKnownKeys(value, SERVER_KEYS, source, "server");
+  const server: NonNullable<FileConfig["server"]> = {};
+  if (value.host !== undefined) {
+    if (typeof value.host !== "string") {
+      fail("config_validation_error", source, "server.host", "server.host 必须是字符串");
+    }
+    server.host = nonEmpty(value.host, source, "server.host");
+  }
+  if (value.port !== undefined) {
+    if (typeof value.port !== "number") {
+      fail("config_validation_error", source, "server.port", "server.port 必须是整数");
+    }
+    server.port = parsePort(value.port, source, "server.port");
+  }
+  return server;
+}
+
+function parseApp(
+  value: unknown,
+  source: string,
+): NonNullable<FileConfig["app"]> | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) {
+    fail("config_validation_error", source, "app", "app 必须是表");
+  }
+  assertKnownKeys(value, APP_KEYS, source, "app");
+  if (value.actor === undefined) return undefined;
+  if (typeof value.actor !== "string") {
+    fail("config_validation_error", source, "app.actor", "app.actor 必须是字符串");
+  }
+  return { actor: nonEmpty(value.actor, source, "app.actor") };
+}
+
+function parseLog(
+  value: unknown,
+  source: string,
+): NonNullable<FileConfig["log"]> | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) {
+    fail("config_validation_error", source, "log", "log 必须是表");
+  }
+  assertKnownKeys(value, LOG_KEYS, source, "log");
+  if (value.level === undefined) return undefined;
+  if (typeof value.level !== "string") {
+    fail("config_validation_error", source, "log.level", "log.level 必须是字符串");
+  }
+  return { level: parseLogLevel(value.level, source, "log.level") };
+}
+
 function parseFile(raw: unknown, source: string): FileConfig {
   if (!isRecord(raw)) {
     fail("config_validation_error", source, undefined, "TOML 顶层必须是表");
   }
   assertKnownKeys(raw, TOP_LEVEL_KEYS, source, "");
-
   const config: FileConfig = {};
-
-  if (raw.server !== undefined) {
-    if (!isRecord(raw.server)) {
-      fail("config_validation_error", source, "server", "server 必须是表");
-    }
-    assertKnownKeys(raw.server, SERVER_KEYS, source, "server");
-    const server: NonNullable<FileConfig["server"]> = {};
-    if (raw.server.host !== undefined) {
-      if (typeof raw.server.host !== "string") {
-        fail("config_validation_error", source, "server.host", "server.host 必须是字符串");
-      }
-      server.host = nonEmpty(raw.server.host, source, "server.host");
-    }
-    if (raw.server.port !== undefined) {
-      if (typeof raw.server.port !== "number") {
-        fail("config_validation_error", source, "server.port", "server.port 必须是整数");
-      }
-      server.port = parsePort(raw.server.port, source, "server.port");
-    }
-    config.server = server;
-  }
-
-  if (raw.app !== undefined) {
-    if (!isRecord(raw.app)) {
-      fail("config_validation_error", source, "app", "app 必须是表");
-    }
-    assertKnownKeys(raw.app, APP_KEYS, source, "app");
-    if (raw.app.actor !== undefined) {
-      if (typeof raw.app.actor !== "string") {
-        fail("config_validation_error", source, "app.actor", "app.actor 必须是字符串");
-      }
-      config.app = { actor: nonEmpty(raw.app.actor, source, "app.actor") };
-    }
-  }
-
-  if (raw.log !== undefined) {
-    if (!isRecord(raw.log)) {
-      fail("config_validation_error", source, "log", "log 必须是表");
-    }
-    assertKnownKeys(raw.log, LOG_KEYS, source, "log");
-    if (raw.log.level !== undefined) {
-      if (typeof raw.log.level !== "string") {
-        fail("config_validation_error", source, "log.level", "log.level 必须是字符串");
-      }
-      config.log = {
-        level: parseLogLevel(raw.log.level, source, "log.level"),
-      };
-    }
-  }
-
+  const server = parseServer(raw.server, source);
+  if (server !== undefined) config.server = server;
+  const app = parseApp(raw.app, source);
+  if (app !== undefined) config.app = app;
+  const log = parseLog(raw.log, source);
+  if (log !== undefined) config.log = log;
   return config;
 }
 
@@ -213,73 +225,87 @@ function mergeFile(base: FileConfig, next: FileConfig): FileConfig {
  * 优先级：代码默认值 < default.toml < local.toml < process.env。
  * `.env` 由 Bun 在进入进程前加载到 process.env，这里不重复解析。
  */
+async function readConfigFile(
+  env: Record<string, string | undefined>,
+  configDir: string,
+): Promise<FileConfig> {
+  const explicitFile = envValue(env, "CONFIG_FILE");
+  if (explicitFile !== undefined) {
+    return readToml(resolve(process.cwd(), explicitFile), true);
+  }
+  const base = await readToml(join(configDir, "default.toml"), false);
+  const local = await readToml(join(configDir, "local.toml"), false);
+  return mergeFile(base, local);
+}
+
+function resolveServerConfig(
+  env: Record<string, string | undefined>,
+  file: FileConfig,
+): { host: string; port: number } {
+  const envHost = envValue(env, "HOST");
+  const envPort = envValue(env, "PORT");
+  return {
+    host: nonEmpty(
+      envHost ?? file.server?.host ?? DEFAULT_HOST,
+      envHost === undefined ? "default" : "env",
+      "HOST",
+    ),
+    port:
+      envPort === undefined
+        ? (file.server?.port ?? DEFAULT_PORT)
+        : parsePort(envPort, "env", "PORT"),
+  };
+}
+
+function resolveAppConfig(
+  env: Record<string, string | undefined>,
+  file: FileConfig,
+): Pick<Config, "actor" | "logLevel" | "skillStorageRoot" | "skillDraftTtlHours"> {
+  const envActor = envValue(env, "DEV_ACTOR");
+  const envLogLevel = envValue(env, "LOG_LEVEL");
+  const envSkillStorageRoot = envValue(env, "SKILL_STORAGE_ROOT");
+  const envSkillDraftTtlHours = envValue(env, "SKILL_DRAFT_TTL_HOURS");
+  return {
+    actor: nonEmpty(
+      envActor ?? file.app?.actor ?? DEFAULT_ACTOR,
+      envActor === undefined ? "default" : "env",
+      "DEV_ACTOR",
+    ),
+    logLevel:
+      envLogLevel === undefined
+        ? (file.log?.level ?? DEFAULT_LOG_LEVEL)
+        : parseLogLevel(envLogLevel, "env", "LOG_LEVEL"),
+    skillStorageRoot: nonEmpty(
+      envSkillStorageRoot ?? DEFAULT_SKILL_STORAGE_ROOT,
+      envSkillStorageRoot === undefined ? "default" : "env",
+      "SKILL_STORAGE_ROOT",
+    ),
+    skillDraftTtlHours:
+      envSkillDraftTtlHours === undefined
+        ? DEFAULT_SKILL_DRAFT_TTL_HOURS
+        : parsePositiveIntegerHours(envSkillDraftTtlHours, "env", "SKILL_DRAFT_TTL_HOURS"),
+  };
+}
+
+function resolveEnvConfig(
+  env: Record<string, string | undefined>,
+  file: FileConfig,
+): Omit<Config, "databaseUrl"> {
+  return { ...resolveServerConfig(env, file), ...resolveAppConfig(env, file) };
+}
+
 export async function loadConfig(
   options: LoadConfigOptions = {},
 ): Promise<Config> {
   const env = options.env ?? process.env;
   const configDir = resolve(options.configDir ?? join(process.cwd(), "config"));
-  const explicitFile = envValue(env, "CONFIG_FILE");
-
-  let file: FileConfig;
-  if (explicitFile !== undefined) {
-    file = await readToml(resolve(process.cwd(), explicitFile), true);
-  } else {
-    const base = await readToml(join(configDir, "default.toml"), false);
-    const local = await readToml(join(configDir, "local.toml"), false);
-    file = mergeFile(base, local);
-  }
-
-  const envHost = envValue(env, "HOST");
-  const envPort = envValue(env, "PORT");
-  const envActor = envValue(env, "DEV_ACTOR");
-  const envLogLevel = envValue(env, "LOG_LEVEL");
-  const envSkillStorageRoot = envValue(env, "SKILL_STORAGE_ROOT");
-  const envSkillDraftTtlHours = envValue(env, "SKILL_DRAFT_TTL_HOURS");
-
-  const host = nonEmpty(
-    envHost ?? file.server?.host ?? DEFAULT_HOST,
-    envHost === undefined ? "default" : "env",
-    "HOST",
-  );
-  const port =
-    envPort === undefined
-      ? (file.server?.port ?? DEFAULT_PORT)
-      : parsePort(envPort, "env", "PORT");
-  const actor = nonEmpty(
-    envActor ?? file.app?.actor ?? DEFAULT_ACTOR,
-    envActor === undefined ? "default" : "env",
-    "DEV_ACTOR",
-  );
-  const logLevel =
-    envLogLevel === undefined
-      ? (file.log?.level ?? DEFAULT_LOG_LEVEL)
-      : parseLogLevel(envLogLevel, "env", "LOG_LEVEL");
-  const databaseUrl = nonEmpty(
-    envValue(env, "DATABASE_URL") ?? DEFAULT_DATABASE_URL,
-    "env",
-    "DATABASE_URL",
-  );
-  const skillStorageRoot = nonEmpty(
-    envSkillStorageRoot ?? DEFAULT_SKILL_STORAGE_ROOT,
-    envSkillStorageRoot === undefined ? "default" : "env",
-    "SKILL_STORAGE_ROOT",
-  );
-  const skillDraftTtlHours =
-    envSkillDraftTtlHours === undefined
-      ? DEFAULT_SKILL_DRAFT_TTL_HOURS
-      : parsePositiveIntegerHours(
-          envSkillDraftTtlHours,
-          "env",
-          "SKILL_DRAFT_TTL_HOURS",
-        );
-
+  const file = await readConfigFile(env, configDir);
   return {
-    host,
-    port,
-    databaseUrl,
-    actor,
-    logLevel,
-    skillStorageRoot,
-    skillDraftTtlHours,
+    ...resolveEnvConfig(env, file),
+    databaseUrl: nonEmpty(
+      envValue(env, "DATABASE_URL") ?? DEFAULT_DATABASE_URL,
+      "env",
+      "DATABASE_URL",
+    ),
   };
 }

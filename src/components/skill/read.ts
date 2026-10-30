@@ -40,6 +40,11 @@ type PackageContents = {
   entries: SkillPackageEntry[];
 };
 
+type SkillReadContext = {
+  db: Db;
+  store: FileStore;
+};
+
 function toIso(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
@@ -117,126 +122,153 @@ async function readAll(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> 
 }
 
 export function createSkillRead(db: Db, store: FileStore): SkillRead {
-  async function findRow(id: string): Promise<SkillRow | null> {
-    return db.one<SkillRow>(
-      `select id, name, category_code, description, package_key, version,
-              enabled, revision, created_at, updated_at
-       from skill where id = $1`,
-      [id],
-    );
-  }
-
-  async function tagsFor(id: string): Promise<string[]> {
-    const rows = await db.query<{ tag: string }>(
-      "select tag from skill_tag where skill_id = $1 order by position asc",
-      [id],
-    );
-    return rows.map((row) => row.tag);
-  }
-
-  async function toSummary(row: SkillRow): Promise<SkillSummary> {
-    return {
-      id: row.id,
-      name: row.name,
-      categoryCode: row.category_code,
-      description: row.description,
-      version: row.version,
-      enabled: row.enabled,
-      tags: await tagsFor(row.id),
-      revision: row.revision,
-      updatedAt: toIso(row.updated_at),
-    };
-  }
-
-  async function readPackage(row: SkillRow): Promise<PackageContents> {
-    try {
-      const data = await readAll(await store.get(`packages/${row.package_key}`));
-      const entries = readSkillPackage(data);
-      return { row, data, entries };
-    } catch (error) {
-      throw new PackageUnavailableError(row.id, error);
-    }
-  }
-
-  async function requireRow(id: string): Promise<SkillRow> {
-    const row = await findRow(id);
-    if (row === null) throw new NotFoundError("Skill", id);
-    return row;
-  }
-
+  const ctx: SkillReadContext = { db, store };
   return {
-    async list(query: SkillQuery): Promise<Page<SkillSummary>> {
-      const { where, params } = buildFilters(query);
-      const countRow = await db.one<{ total: number }>(
-        `select count(*)::int as total from skill s ${where}`,
-        params,
-      );
-      const rows = await db.query<SkillRow>(
-        `select s.id, s.name, s.category_code, s.description, s.package_key,
-                s.version, s.enabled, s.revision, s.created_at, s.updated_at
-         from skill s ${where} ${orderBy(query.sort)}
-         limit $${params.length + 1} offset $${params.length + 2}`,
-        [...params, query.page.limit, query.page.offset],
-      );
-      return {
-        items: await Promise.all(rows.map((row) => toSummary(row))),
-        total: countRow?.total ?? 0,
-        limit: query.page.limit,
-        offset: query.page.offset,
-      };
-    },
-
-    async get(id: string): Promise<SkillDetail> {
-      const row = await requireRow(id);
-      const summary = await toSummary(row);
-      const contents = await readPackage(row);
-      let body: string;
-      try {
-        body = parseSkillMarkdown(
-          new TextDecoder("utf-8", { fatal: true }).decode(contents.entries[0]!.data),
-        ).body;
-      } catch (error) {
-        throw new PackageUnavailableError(row.id, error);
-      }
-      return {
-        ...summary,
-        body,
-        files: toFiles(contents.entries),
-        createdAt: toIso(row.created_at),
-      };
-    },
-
-    getSummary(id: string): Promise<SkillSummary> {
-      return requireRow(id).then((row) => toSummary(row));
-    },
-
-    async getDocument(id: string): Promise<SkillDocument> {
-      const row = await requireRow(id);
-      const contents = await readPackage(row);
-      let markdown: string;
-      try {
-        markdown = new TextDecoder("utf-8", { fatal: true }).decode(
-          contents.entries[0]!.data,
-        );
-      } catch (error) {
-        throw new PackageUnavailableError(row.id, error);
-      }
-      return { markdown, revision: row.revision };
-    },
-
-    async getPackage(id: string): Promise<SkillPackage> {
-      const row = await requireRow(id);
-      const contents = await readPackage(row);
-      return {
-        fileName: sanitizeFileName(row.name, row.version),
-        data: contents.data,
-      };
-    },
-
-    async listCategories(): Promise<SkillCategory[]> {
-      return db.query<SkillCategory>(
-        "select code, label, position from skill_category order by position asc",
-      );
-    },
+    list: (query) => listSkills(ctx, query),
+    get: (id) => getSkill(ctx, id),
+    getSummary: (id) => getSkillSummary(ctx, id),
+    getDocument: (id) => getSkillDocument(ctx, id),
+    getPackage: (id) => getSkillPackage(ctx, id),
+    listCategories: () => listCategories(ctx),
   };
+}
+
+async function findRow(ctx: SkillReadContext, id: string): Promise<SkillRow | null> {
+  return ctx.db.one<SkillRow>(
+    `select id, name, category_code, description, package_key, version,
+            enabled, revision, created_at, updated_at
+     from skill where id = $1`,
+    [id],
+  );
+}
+
+async function tagsFor(ctx: SkillReadContext, id: string): Promise<string[]> {
+  const rows = await ctx.db.query<{ tag: string }>(
+    "select tag from skill_tag where skill_id = $1 order by position asc",
+    [id],
+  );
+  return rows.map((row) => row.tag);
+}
+
+async function toSummary(ctx: SkillReadContext, row: SkillRow): Promise<SkillSummary> {
+  return {
+    id: row.id,
+    name: row.name,
+    categoryCode: row.category_code,
+    description: row.description,
+    version: row.version,
+    enabled: row.enabled,
+    tags: await tagsFor(ctx, row.id),
+    revision: row.revision,
+    updatedAt: toIso(row.updated_at),
+  };
+}
+
+async function readPackage(
+  ctx: SkillReadContext,
+  row: SkillRow,
+): Promise<PackageContents> {
+  try {
+    const data = await readAll(await ctx.store.get(`packages/${row.package_key}`));
+    const entries = readSkillPackage(data);
+    return { row, data, entries };
+  } catch (error) {
+    throw new PackageUnavailableError(row.id, error);
+  }
+}
+
+async function requireRow(ctx: SkillReadContext, id: string): Promise<SkillRow> {
+  const row = await findRow(ctx, id);
+  if (row === null) throw new NotFoundError("Skill", id);
+  return row;
+}
+
+async function listSkills(
+  ctx: SkillReadContext,
+  query: SkillQuery,
+): Promise<Page<SkillSummary>> {
+  const { where, params } = buildFilters(query);
+  const countRow = await ctx.db.one<{ total: number }>(
+    `select count(*)::int as total from skill s ${where}`,
+    params,
+  );
+  const rows = await ctx.db.query<SkillRow>(
+    `select s.id, s.name, s.category_code, s.description, s.package_key,
+            s.version, s.enabled, s.revision, s.created_at, s.updated_at
+     from skill s ${where} ${orderBy(query.sort)}
+     limit $${params.length + 1} offset $${params.length + 2}`,
+    [...params, query.page.limit, query.page.offset],
+  );
+  return {
+    items: await Promise.all(rows.map((row) => toSummary(ctx, row))),
+    total: countRow?.total ?? 0,
+    limit: query.page.limit,
+    offset: query.page.offset,
+  };
+}
+
+function decodeMarkdown(contents: PackageContents): string {
+  const entry = contents.entries[0];
+  if (entry === undefined) {
+    throw new PackageUnavailableError(contents.row.id, new Error("包内缺少 SKILL.md"));
+  }
+  return new TextDecoder("utf-8", { fatal: true }).decode(entry.data);
+}
+
+async function getSkill(ctx: SkillReadContext, id: string): Promise<SkillDetail> {
+  const row = await requireRow(ctx, id);
+  const summary = await toSummary(ctx, row);
+  const contents = await readPackage(ctx, row);
+  let body: string;
+  try {
+    body = parseSkillMarkdown(decodeMarkdown(contents)).body;
+  } catch (error) {
+    throw new PackageUnavailableError(row.id, error);
+  }
+  return {
+    ...summary,
+    body,
+    files: toFiles(contents.entries),
+    createdAt: toIso(row.created_at),
+  };
+}
+
+async function getSkillSummary(
+  ctx: SkillReadContext,
+  id: string,
+): Promise<SkillSummary> {
+  return toSummary(ctx, await requireRow(ctx, id));
+}
+
+async function getSkillDocument(
+  ctx: SkillReadContext,
+  id: string,
+): Promise<SkillDocument> {
+  const row = await requireRow(ctx, id);
+  const contents = await readPackage(ctx, row);
+  let markdown: string;
+  try {
+    markdown = decodeMarkdown(contents);
+  } catch (error) {
+    throw new PackageUnavailableError(row.id, error);
+  }
+  return { markdown, revision: row.revision };
+}
+
+async function getSkillPackage(
+  ctx: SkillReadContext,
+  id: string,
+): Promise<SkillPackage> {
+  const row = await requireRow(ctx, id);
+  const contents = await readPackage(ctx, row);
+  return {
+    fileName: sanitizeFileName(row.name, row.version),
+    data: contents.data,
+  };
+}
+
+async function listCategories(ctx: SkillReadContext): Promise<SkillCategory[]> {
+  return ctx.db.query<SkillCategory>(
+    "select code, label, position from skill_category order by position asc",
+  );
 }

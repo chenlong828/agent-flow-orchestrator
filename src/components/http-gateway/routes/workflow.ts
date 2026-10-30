@@ -26,114 +26,142 @@ import { toYaml } from "../yaml.ts";
 import type { RouteContext } from "./types.ts";
 
 export async function handleWorkflow(ctx: RouteContext): Promise<Response> {
-  const { request, url, path, segments, deps } = ctx;
-  const { catalog, workflowService, actor } = deps;
+  const { segments } = ctx;
+  if (segments.length === 1) return workflowCollection(ctx);
+  if (segments.length === 2 && segments[1] === "import") return importWorkflow(ctx);
+  const id = assertUuid(segments[1], "id");
+  if (segments.length === 2) return workflowById(ctx, id);
+  if (segments.length === 3) return workflowSubresource(ctx, id, segments[2]);
+  throw new NotFoundError("路径", ctx.path);
+}
 
-  if (segments.length === 1) {
-    if (request.method === "GET") {
-      const page = await catalog.listWorkflows(parseWorkflowListQuery(url));
-      return json(pagePayload(page));
-    }
-    if (request.method === "POST") {
-      const body = await readJsonObject(request, WORKFLOW_CREATE_FIELDS);
-      const created = await workflowService.create(
-        body as unknown as CreateWorkflow,
-        actorFrom(request, actor),
-      );
-      return json(created, 201, { Location: `/api/v1/workflows/${created.id}` });
-    }
-    throw new NotFoundError("路径", path);
-  }
-
-  if (segments.length === 2 && segments[1] === "import") {
-    if (request.method !== "POST") throw new NotFoundError("路径", path);
-    const body = await readJsonObject(request, WORKFLOW_IMPORT_FIELDS);
-    const imported = await workflowService.importDsl(
-      body as unknown as WorkflowDsl,
-      actorFrom(request, actor),
+async function workflowCollection(ctx: RouteContext): Promise<Response> {
+  if (ctx.request.method === "GET") {
+    const page = await ctx.deps.catalog.listWorkflows(
+      parseWorkflowListQuery(ctx.url),
     );
-    const detail = await catalog.getWorkflow(imported.id);
-    return json(
-      { workflow: detail, idMap: imported.idMap, warnings: imported.warnings },
-      201,
-      { Location: `/api/v1/workflows/${imported.id}` },
-    );
+    return json(pagePayload(page));
   }
+  if (ctx.request.method === "POST") return createWorkflow(ctx);
+  throw new NotFoundError("路径", ctx.path);
+}
 
-  const id = assertUuid(segments[1]!, "id");
+async function createWorkflow(ctx: RouteContext): Promise<Response> {
+  const body = await readJsonObject(ctx.request, WORKFLOW_CREATE_FIELDS);
+  const created = await ctx.deps.workflowService.create(
+    body as unknown as CreateWorkflow,
+    actorFrom(ctx.request, ctx.deps.actor),
+  );
+  return json(created, 201, { Location: `/api/v1/workflows/${created.id}` });
+}
 
-  if (segments.length === 2) {
-    if (request.method === "GET") return json(await catalog.getWorkflow(id));
-    if (request.method === "PUT") {
-      const revision = parseIfMatch(request);
-      const body = await readJsonObject(request, WORKFLOW_WRITE_FIELDS);
-      await workflowService.update(
-        id,
-        revision,
-        body as unknown as UpdateWorkflow,
-        actorFrom(request, actor),
-      );
-      return json(await catalog.getWorkflow(id));
-    }
-    if (request.method === "DELETE") {
-      await workflowService.delete(id, parseIfMatch(request));
-      return noContent();
-    }
-    throw new NotFoundError("路径", path);
+async function importWorkflow(ctx: RouteContext): Promise<Response> {
+  if (ctx.request.method !== "POST") throw new NotFoundError("路径", ctx.path);
+  const body = await readJsonObject(ctx.request, WORKFLOW_IMPORT_FIELDS);
+  const imported = await ctx.deps.workflowService.importDsl(
+    body as unknown as WorkflowDsl,
+    actorFrom(ctx.request, ctx.deps.actor),
+  );
+  const detail = await ctx.deps.catalog.getWorkflow(imported.id);
+  return json(
+    { workflow: detail, idMap: imported.idMap, warnings: imported.warnings },
+    201,
+    { Location: `/api/v1/workflows/${imported.id}` },
+  );
+}
+
+async function workflowById(ctx: RouteContext, id: string): Promise<Response> {
+  if (ctx.request.method === "GET") {
+    return json(await ctx.deps.catalog.getWorkflow(id));
   }
-
-  if (segments.length === 3) {
-    const subresource = segments[2]!;
-
-    if (subresource === "copy" && request.method === "POST") {
-      const body = await readOptionalJsonObject(request, WORKFLOW_COPY_FIELDS);
-      const copied = await workflowService.copy(
-        id,
-        body as unknown as CopyWorkflow,
-        actorFrom(request, actor),
-      );
-      return json(copied, 201, { Location: `/api/v1/workflows/${copied.id}` });
-    }
-
-    if (subresource === "definition" && request.method === "PUT") {
-      const revision = parseIfMatch(request);
-      const body = await readJsonObject(request, WORKFLOW_GRAPH_FIELDS);
-      const saved = await workflowService.saveDefinition(
-        id,
-        revision,
-        { graph: body.graph },
-        actorFrom(request, actor),
-      );
-      const detail = await catalog.getWorkflow(id);
-      return json({ workflow: detail, warnings: saved.warnings });
-    }
-
-    if (subresource === "validate" && request.method === "POST") {
-      await catalog.getWorkflow(id);
-      const body = await readJsonObject(request, WORKFLOW_GRAPH_FIELDS);
-      return json(await workflowService.validate(body.graph));
-    }
-
-    if (subresource === "dsl" && request.method === "GET") {
-      const format = queryValue(url, "format") ?? "json";
-      if (format !== "json" && format !== "yaml") {
-        throw new ValidationError("format", "必须是 json 或 yaml");
-      }
-      const dsl = await workflowService.exportDsl(id);
-      if (format === "json") {
-        return json(dsl as unknown as Record<string, unknown>, 200, {
-          "content-disposition": `attachment; filename="workflow-${id}.json"`,
-        });
-      }
-      return new Response(toYaml(dsl) + "\n", {
-        status: 200,
-        headers: {
-          "content-type": "application/yaml; charset=utf-8",
-          "content-disposition": `attachment; filename="workflow-${id}.yaml"`,
-        },
-      });
-    }
+  if (ctx.request.method === "PUT") return replaceWorkflow(ctx, id);
+  if (ctx.request.method === "DELETE") {
+    await ctx.deps.workflowService.delete(id, parseIfMatch(ctx.request));
+    return noContent();
   }
+  throw new NotFoundError("路径", ctx.path);
+}
 
-  throw new NotFoundError("路径", path);
+async function replaceWorkflow(ctx: RouteContext, id: string): Promise<Response> {
+  const revision = parseIfMatch(ctx.request);
+  const body = await readJsonObject(ctx.request, WORKFLOW_WRITE_FIELDS);
+  await ctx.deps.workflowService.update(
+    id,
+    revision,
+    body as unknown as UpdateWorkflow,
+    actorFrom(ctx.request, ctx.deps.actor),
+  );
+  return json(await ctx.deps.catalog.getWorkflow(id));
+}
+
+async function workflowSubresource(
+  ctx: RouteContext,
+  id: string,
+  subresource: string | undefined,
+): Promise<Response> {
+  switch (subresource) {
+    case "copy":
+      return copyWorkflow(ctx, id);
+    case "definition":
+      return saveDefinition(ctx, id);
+    case "validate":
+      return validateWorkflow(ctx, id);
+    case "dsl":
+      return exportWorkflowDsl(ctx, id);
+    default:
+      throw new NotFoundError("路径", ctx.path);
+  }
+}
+
+async function copyWorkflow(ctx: RouteContext, id: string): Promise<Response> {
+  if (ctx.request.method !== "POST") throw new NotFoundError("路径", ctx.path);
+  const body = await readOptionalJsonObject(ctx.request, WORKFLOW_COPY_FIELDS);
+  const copied = await ctx.deps.workflowService.copy(
+    id,
+    body as unknown as CopyWorkflow,
+    actorFrom(ctx.request, ctx.deps.actor),
+  );
+  return json(copied, 201, { Location: `/api/v1/workflows/${copied.id}` });
+}
+
+async function saveDefinition(ctx: RouteContext, id: string): Promise<Response> {
+  if (ctx.request.method !== "PUT") throw new NotFoundError("路径", ctx.path);
+  const revision = parseIfMatch(ctx.request);
+  const body = await readJsonObject(ctx.request, WORKFLOW_GRAPH_FIELDS);
+  const saved = await ctx.deps.workflowService.saveDefinition(
+    id,
+    revision,
+    { graph: body.graph },
+    actorFrom(ctx.request, ctx.deps.actor),
+  );
+  const detail = await ctx.deps.catalog.getWorkflow(id);
+  return json({ workflow: detail, warnings: saved.warnings });
+}
+
+async function validateWorkflow(ctx: RouteContext, id: string): Promise<Response> {
+  if (ctx.request.method !== "POST") throw new NotFoundError("路径", ctx.path);
+  await ctx.deps.catalog.getWorkflow(id);
+  const body = await readJsonObject(ctx.request, WORKFLOW_GRAPH_FIELDS);
+  return json(await ctx.deps.workflowService.validate(body.graph));
+}
+
+async function exportWorkflowDsl(ctx: RouteContext, id: string): Promise<Response> {
+  if (ctx.request.method !== "GET") throw new NotFoundError("路径", ctx.path);
+  const format = queryValue(ctx.url, "format") ?? "json";
+  if (format !== "json" && format !== "yaml") {
+    throw new ValidationError("format", "必须是 json 或 yaml");
+  }
+  const dsl = await ctx.deps.workflowService.exportDsl(id);
+  if (format === "json") {
+    return json(dsl as unknown as Record<string, unknown>, 200, {
+      "content-disposition": `attachment; filename="workflow-${id}.json"`,
+    });
+  }
+  return new Response(toYaml(dsl) + "\n", {
+    status: 200,
+    headers: {
+      "content-type": "application/yaml; charset=utf-8",
+      "content-disposition": `attachment; filename="workflow-${id}.yaml"`,
+    },
+  });
 }

@@ -13,5 +13,4 @@ export type {
 } from "./types.ts";
 export { createHarnessRead, createHarnessService } from "./service.ts";
 export type { HarnessDeps } from "./service.ts";
-export { createHarnessStore } from "./store.ts";
 export type { HarnessRootRow } from "./store.ts";
