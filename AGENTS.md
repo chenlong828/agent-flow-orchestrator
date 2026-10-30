@@ -14,14 +14,14 @@ AgentFlow 研发智能体工作流编排服务的编排侧：只提供 HTTP API�
 
 ## 技能（已安装于 `.agents/skills/`）
 
-来源：`~/skills/af-dev-skill` v0.1（2026-10-23 整目录复制）。技能正文不手改；升级 = 覆盖同名目录，并在 `docs/history/decisions/` 记一条。
+来源：`~/skills/af-dev-skill` v0.1（2026-10-23 整目录复制）。默认不手改正文，升级 = 覆盖同名目录，并在 `docs/history/decisions/` 记一条；2026-10-29 起本地试行「评审四档裁决」改动，与上游 v0.1 分叉，记录见 [`docs/history/decisions/2026-10-29-review-verdict-pilot.md`](docs/history/decisions/2026-10-29-review-verdict-pilot.md)，试点收口后决定回灌上游或回滚。
 
 | 技能 | 何时加载 |
 |---|---|
 | `req-scenario-spec` | 录需求、定场景、拆任务、多对话交接 |
 | `design-before-coding` | 任何写 / 改代码前的组件级设计 |
-| `arch-design-spec` | 动组件切分、公共契约、schema、数据所有权、分层依赖、热路径；定 P0–P3 与人工确认门 |
-| `dev-execution-spec` | 动手到交付：模糊先问、验收、提交、工作区卫生 |
+| `arch-design-spec` | 动组件切分、公共契约、schema、数据所有权、分层依赖、热路径；定 P0–P3 与人工确认门；评审裁决与冻结（四档） |
+| `dev-execution-spec` | 动手到交付：模糊先问、验收、提交、工作区卫生；交付前裁决与合并门 |
 | `doc-layout-spec` | 新建 / 移动 / 归档文档，核对文档树 |
 
 阅读顺序：req → design → arch → dev → doc。纯设计任务加载前三个；落代码加 dev；只写 / 改文档才加载 doc。

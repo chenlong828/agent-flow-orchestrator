@@ -60,6 +60,7 @@ description: 要新建或改动文档树内的任何文件（需求卡、组件�
 - `brief.md`（必须）：需求、背景、验收标准、任务表（ID/类型/组件/状态/装载清单）、领取的开放问题。
 - 过程文件自由命名，只准放本目录；代码产物归代码目录。
 - `result.md`（必须）：验收结果 + 结论落点表。
+- `review.md`（P1/P2 工序）：评审与四档裁决记录，格式与档位定义见 `arch-design-spec` 第 8 步；收口随目录归档。它是工作记忆不是现行真相，结论分别落 `history/decisions/` 与 `design/components/*/spec.md`。
 - 生命周期：立项 → 执行 → 收口 → 归档（整目录移入 `history/works/`，frontmatter 改 frozen）。收口是归档前置条件。
 
 ## history/：记忆
