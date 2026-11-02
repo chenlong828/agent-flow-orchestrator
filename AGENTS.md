@@ -26,6 +26,12 @@ AgentFlow 研发智能体工作流编排服务的编排侧：只提供 HTTP API�
 
 阅读顺序：req → design → arch → dev → doc。纯设计任务加载前三个；落代码加 dev；只写 / 改文档才加载 doc。
 
+## 本地工具链
+
+- Bun 随项目放在 `.local/bun/bun`（2026-11-03 实测 1.4.4，arm64）；`.local/` 已在 `.gitignore`，不入库。
+- 直接调用：`./.local/bun/bun --version`、`./.local/bun/bun run docs:check`。
+- `package.json` 脚本内部会再调 `bun`（如 `docs:check`、`quality:report`），需先 `export PATH="$PWD/.local/bun:$PATH"`，再执行 `bun run <script>`。
+
 ## 门禁与纪律
 
 - 改动级别与人工确认门按 `arch-design-spec` 的 P0–P3 执行；未达到对应级别的要求，停在设计与确认，不抢先动手。
