@@ -148,4 +148,4 @@ updated: 2026-10-27
 - 定级：**P1**。触发项：新增业务模块、核心 schema、数据所有权、公共契约与分层依赖。
 - B1 范围已确认；D01～D05 已完成。用户 2026-10-24 直接要求实现，D05 门据此通过；实现与验证结果见 [`result.md`](result.md)。
 - `T-B1-I02` 已先验证 `Bun.sql` 事务、动态 SQL 与错误映射；实现继续使用 `Bun.sql`，未更换驱动。
-- 已确认的既有决策：D0（Bun + PostgreSQL）；执行模型 D1–D11 见 `docs/works/2026-10-24-agentflow-execution-concept/concept-design.md`，本工序不重复裁定。
+- 已确认的既有决策：D0（Bun + PostgreSQL）；执行模型 D1–D11 见 `docs/history/works/2026-10-24-agentflow-execution-concept/concept-design.md`，本工序不重复裁定。

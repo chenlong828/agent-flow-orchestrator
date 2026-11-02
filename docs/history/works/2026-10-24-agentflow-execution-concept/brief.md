@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: global
-status: closed
-updated: 2026-10-24
+status: frozen
+updated: 2026-11-02
 ---
 
 # AgentFlow 执行概念设计（工作项目）
@@ -25,8 +25,8 @@ updated: 2026-10-24
 ## 来源
 
 - 本轮技术调研与 ACP 实测结论；
-- [`agent-flow-ui` 产品归纳](../../../../agent-flow-ui/docs/design/product.md)及其节点、实例、工作区设定；
-- [节点上下文隔离专利 03](../../../../agent-flow-ui/patents/03-交底书-以工作区为唯一信息通道的节点上下文隔离执行方法.md)。
+- [`agent-flow-ui` 产品归纳](../../../../../agent-flow-ui/docs/design/product.md)及其节点、实例、工作区设定；
+- [节点上下文隔离专利 03](../../../../../agent-flow-ui/.local-only/patents/03-交底书-以工作区为唯一信息通道的节点上下文隔离执行方法.md)。
 
 ## 产出
 
@@ -63,7 +63,7 @@ updated: 2026-10-24
 
 ## 关联
 
-- [`OQ-1`](../../plan/open-questions.md) / [`OQ-2`](../../plan/open-questions.md)：已于 2026-10-25 关闭归档；本工作只保留概念材料，不构成开放问题。
+- [`OQ-1`](../../../plan/open-questions.md) / [`OQ-2`](../../../plan/open-questions.md)：已于 2026-10-25 关闭归档；本工作只保留概念材料，不构成开放问题。
 
 ## 决策来源
 

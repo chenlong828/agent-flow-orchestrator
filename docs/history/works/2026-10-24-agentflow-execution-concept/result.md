@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: global
-status: closed
-updated: 2026-10-24
+status: frozen
+updated: 2026-11-02
 ---
 
 # AgentFlow 执行概念设计：结果
@@ -47,7 +47,8 @@ updated: 2026-10-24
 - 默认工作区模式、并发默认值、本地 PostgreSQL 开发方式、DSH/ACP 版本固定方式仍未定。
 - 具体状态机、评审字段/路径、工具目录/校验方式、Skill 分层等未定，不在本工序展开。
 - D0 可以先行，但本工序没有写业务代码、数据库表或工程骨架。
-- 本工序关闭，不归档；后续设计另立工序。
+- 本工序关闭；后续设计另立工序。
+- 2026-11-02 补记：本工序按 `doc-layout-spec` 生命周期整目录归档到 `history/works/`，frontmatter 改为 `frozen`。上文「作为后续设计启动的唯一主文档」与「不归档」两项表述自此失效；本目录只作历史证据，不作设计依据。
 
 ## 结论落点
 

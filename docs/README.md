@@ -41,8 +41,7 @@ docs/
 ├── playbook/                               ← 方法：同类问题怎么判断（项目本地，待技能合并）
 │   ├── backend-contract-boundaries.md
 │   └── code-health-rules.md
-├── works/                                  ← 执行：正在做什么（当前只剩未归档的概念工序）
-│   └── 2026-10-24-agentflow-execution-concept/
+├── works/                                  ← 执行：正在做什么（当前无在办工序）
 └── history/                                ← 记忆：怎么走到这里（冻结只读）
     ├── decisions/                          ← 整篇决策记录，按日期命名
     └── works/                              ← 已归档工序，按日期命名
