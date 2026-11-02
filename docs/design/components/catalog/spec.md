@@ -3,7 +3,7 @@ layer: design
 module: catalog
 status: current
 component: CMP-catalog
-updated: 2026-10-29
+updated: 2026-11-02
 ---
 
 # `CMP-catalog` 组件规格
@@ -262,7 +262,7 @@ type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
 
 - 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 10 KB。
 - 单独验证命令：`bun test tests/components/catalog`。
-- 当前状态：`current`；Skill 读投影已按 T-SKP-16 改为 `body`+`files` 并透传整包，验证记录见 [工序 result.md](../../../works/2026-10-28-skill-package/result.md)。
+- 当前状态：`current`；Skill 读投影已按 T-SKP-16 改为 `body`+`files` 并透传整包，历史验证记录见 [工序 result.md](../../../history/works/2026-10-28-skill-package/result.md)（归档件，仅作追溯）。
 
 ## 8 B1/B3 实现口径与剩余风险
 

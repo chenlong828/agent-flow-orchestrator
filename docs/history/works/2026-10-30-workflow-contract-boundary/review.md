@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: workflow
-status: closed
-updated: 2026-10-30
+status: frozen
+updated: 2026-11-02
 ---
 
 # 评审与裁决：工作流契约边界收敛
@@ -26,7 +26,7 @@ updated: 2026-10-30
 ### decision 1：`layout` / `viewport` 归前端
 
 - 决策：后端只要求 JSON 对象，不解释 `x/y/width/height/zoom`；REST OpenAPI 只声明透明对象，详细结构留在 `dsl.schema.json`。
-- 落点：[决策记录](../../history/decisions/2026-10-30-workflow-contract-boundary.md)、[workflow 规格](../../design/components/workflow/spec.md)、[HTTP 规格](../../design/components/http-gateway/spec.md)。
+- 落点：[决策记录](../../../history/decisions/2026-10-30-workflow-contract-boundary.md)、[workflow 规格](../../../design/components/workflow/spec.md)、[HTTP 规格](../../../design/components/http-gateway/spec.md)。
 - pinning test：`graph.test.ts` 透明布局/视口用例；`workflow.test.ts` 保存/回读/DSL/复制；`openapi.test.ts` 透明 schema 断言。
 
 ### decision 2：拓扑与绑定错误阻断写入

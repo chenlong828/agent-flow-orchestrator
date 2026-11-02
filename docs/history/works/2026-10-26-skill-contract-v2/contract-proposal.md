@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: global
-status: active
-updated: 2026-10-26
+status: frozen
+updated: 2026-11-02
 ---
 
 # Skill 契约 v2 提案：管理面字段 / 编排面文档
@@ -42,7 +42,7 @@ updated: 2026-10-26
 | 新增 | — | `GET /api/v1/skills/{id}/document` → `text/markdown` |
 | 数据 | `skill.summary`、`skill_trigger` 表 | `skill.description`；无 `skill_trigger` |
 
-破坏性：删两个响应字段、删一个请求字段、删一张表。带 `summary` / `triggers` 的请求按现有的未知字段规则返回 400（[validation.ts:18-26](../../../src/components/http-gateway/validation.ts#L18-L26)）。
+破坏性：删两个响应字段、删一个请求字段、删一张表。带 `summary` / `triggers` 的请求按现有的未知字段规则返回 400（[validation.ts:18-26](../../../../src/components/http-gateway/validation.ts#L18-L26)）。
 
 ## 4. 管理面（改后）
 
@@ -188,23 +188,23 @@ drop table skill_trigger;
 
 ### 6.3 回滚
 
-迁移器只支持向上（[db-migrate.ts](../../../scripts/db-migrate.ts) 只调 `up()`），回滚以补偿迁移 `0006` 为准；开发库也可用 `db:init` 重建。当前无生产数据。
+迁移器只支持向上（[db-migrate.ts](../../../../scripts/db-migrate.ts) 只调 `up()`），回滚以补偿迁移 `0006` 为准；开发库也可用 `db:init` 重建。当前无生产数据。
 
 ## 7. 影响面（本仓库）
 
 | 位置 | 改动 |
 |---|---|
 | `db/migrations/0005_skill_description.sql` | 新增 |
-| [`skill/spec.md`](../../design/components/skill/spec.md) | 数据表、不变量（`summary`→`description`）、文档合成规则、验证项 |
-| [`src/components/skill/types.ts`](../../../src/components/skill/types.ts) | `summary`/`triggers` → `description`；新增文档类型 |
-| [`src/components/skill/store.ts`](../../../src/components/skill/store.ts) | 根表字段、`q` 过滤、删 `triggersFor` 与 `replaceChildren` 里的触发词 |
-| [`src/components/skill/service.ts`](../../../src/components/skill/service.ts) | 校验、`toSummary`、合成文档（新函数） |
-| [`catalog/spec.md`](../../design/components/catalog/spec.md) + [`src/components/catalog/index.ts`](../../../src/components/catalog/index.ts) | `SkillListItem` / `SkillDetailView` 字段 |
-| [`http-gateway/spec.md`](../../design/components/http-gateway/spec.md) | 字段表、API-14～21 表、新增 `API-31`（文档端点；现有最大编号为 `API-30`） |
-| [`openapi.yaml`](../../../src/components/http-gateway/openapi.yaml) | `SkillCreate` / `SkillSummary` / `SkillDetail`、`/skills/{id}/document` |
+| [`skill/spec.md`](../../../design/components/skill/spec.md) | 数据表、不变量（`summary`→`description`）、文档合成规则、验证项 |
+| [`src/components/skill/types.ts`](../../../../src/components/skill/types.ts) | `summary`/`triggers` → `description`；新增文档类型 |
+| [`src/components/skill/store.ts`](../../../../src/components/skill/store.ts) | 根表字段、`q` 过滤、删 `triggersFor` 与 `replaceChildren` 里的触发词 |
+| [`src/components/skill/service.ts`](../../../../src/components/skill/service.ts) | 校验、`toSummary`、合成文档（新函数） |
+| [`catalog/spec.md`](../../../design/components/catalog/spec.md) + [`src/components/catalog/index.ts`](../../../../src/components/catalog/index.ts) | `SkillListItem` / `SkillDetailView` 字段 |
+| [`http-gateway/spec.md`](../../../design/components/http-gateway/spec.md) | 字段表、API-14～21 表、新增 `API-31`（文档端点；现有最大编号为 `API-30`） |
+| [`openapi.yaml`](../../../../src/components/http-gateway/openapi.yaml) | `SkillCreate` / `SkillSummary` / `SkillDetail`、`/skills/{id}/document` |
 | `src/components/http-gateway/*` | 路由 + markdown 响应 + ETag/304 |
-| [`tests/components/skill/service.test.ts`](../../../tests/components/skill/service.test.ts) | 字段断言、迁移后行为、文档合成 |
-| [`tests/components/http-gateway/skill.test.ts`](../../../tests/components/http-gateway/skill.test.ts) | 字段断言、`triggers` 400、`q` 命中 `description`、文档 3 正 1 反 |
+| [`tests/components/skill/service.test.ts`](../../../../tests/components/skill/service.test.ts) | 字段断言、迁移后行为、文档合成 |
+| [`tests/components/http-gateway/skill.test.ts`](../../../../tests/components/http-gateway/skill.test.ts) | 字段断言、`triggers` 400、`q` 命中 `description`、文档 3 正 1 反 |
 
 ## 8. 兼容与发布
 

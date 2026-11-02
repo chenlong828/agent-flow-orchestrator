@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: workflow
-status: closed
-updated: 2026-10-30
+status: frozen
+updated: 2026-11-02
 ---
 
 # 设计：工作流契约边界收敛

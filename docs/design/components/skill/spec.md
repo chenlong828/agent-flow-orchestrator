@@ -3,7 +3,7 @@ layer: design
 module: skill
 status: current
 component: CMP-skill
-updated: 2026-10-29
+updated: 2026-11-02
 ---
 
 # `CMP-skill` 组件规格
@@ -240,7 +240,7 @@ type SkillQuery = {
 
 - 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 15 KB。
 - 单独验证命令：`bun test tests/components/skill`。
-- 当前状态：`current`；契约 v1 已由 T-SKP-08～T-SKP-15 实现，验证记录见 [工序 result.md](../../../works/2026-10-28-skill-package/result.md)；历史实现见 [`result.md`](../../../history/works/2026-10-24-db-backend-infra/result.md)（归档件，仅作追溯）。
+- 当前状态：`current`；契约 v1 已由 T-SKP-08～T-SKP-15 实现，历史验证记录见 [工序 result.md](../../../history/works/2026-10-28-skill-package/result.md)（归档件，仅作追溯）；更早实现见 [`result.md`](../../../history/works/2026-10-24-db-backend-infra/result.md)（归档件，仅作追溯）。
 
 ## 7 B1 实现口径
 

@@ -1,23 +1,23 @@
 ---
-layer: works
+layer: history
 module: skill
-status: active
-updated: 2026-10-29
+status: frozen
+updated: 2026-11-02
 ---
 
 # 工序：Skill 包形态（B1）
 
 ## 需求与背景
 
-- 需求来源：`agent-flow-ui` 仓库的 Skill 包提案（[contract-proposal.md](../../../../agent-flow-ui/docs/works/2026-10-27-skill-package/contract-proposal.md)），经 2026-10-28 交互确认，收敛为“一个 zip + 数据库 brief”。
-- 现状：B1 的 Skill 是五章结构化子表 + 踩坑 + 引用；文档由 `composeDocument` 拼装；没有附件、包、草稿。见 [skill 规格](../../design/components/skill/spec.md) 与 [service.ts](../../../src/components/skill/service.ts)。
+- 需求来源：`agent-flow-ui` 仓库的 Skill 包提案（[contract-proposal.md](../../../../../agent-flow-ui/docs/works/2026-10-27-skill-package/contract-proposal.md)），经 2026-10-28 交互确认，收敛为“一个 zip + 数据库 brief”。
+- 现状：B1 的 Skill 是五章结构化子表 + 踩坑 + 引用；文档由 `composeDocument` 拼装；没有附件、包、草稿。见 [skill 规格](../../../design/components/skill/spec.md) 与 [service.ts](../../../../src/components/skill/service.ts)。
 - 本轮决定：
   - 最终形态是一个 zip：根 `SKILL.md`，下面 `scripts/`、`references/`，两个目录可为空，无其他根文件或目录。
   - zip 是内容唯一真相；数据库只存 brief（名称、描述、版本、分类、标签、启停、revision、更新时间）与当前包指针。
   - 编辑期服务端保留完整包副本作为草稿；保存时生成 `SKILL.md`、打包、原子替换；打包失败即保存失败。
   - `SKILL.md` 是入口，上限 16 KiB（含 frontmatter）；长内容放 `references/`。
   - 只提供整包下载；不提供单文件下载、不内联显示附件；草稿不提供下载预览。
-- B1 按旁路处理，不新建 `REQ` / `SCN`（依据 [roadmap.md](../../plan/roadmap.md)「B1 是基础设施工序，按旁路处理」）；本 brief 为锚点。
+- B1 按旁路处理，不新建 `REQ` / `SCN`（依据 [roadmap.md](../../../plan/roadmap.md)「B1 是基础设施工序，按旁路处理」）；本 brief 为锚点。
 
 ## 范围
 

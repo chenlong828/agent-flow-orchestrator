@@ -41,35 +41,11 @@ docs/
 ├── playbook/                               ← 方法：同类问题怎么判断（项目本地，待技能合并）
 │   ├── backend-contract-boundaries.md
 │   └── code-health-rules.md
-├── works/                                  ← 执行：正在做什么
-│   ├── 2026-10-24-agentflow-execution-concept/
-│   │   ├── brief.md
-│   │   ├── concept-design.md
-│   │   └── result.md
-│   ├── 2026-10-25-scenario-index-pilot/
-│   │   ├── brief.md
-│   │   └── result.md
-│   └── 2026-10-26-skill-contract-v2/
-│       ├── brief.md
-│       ├── contract-proposal.md
-│       ├── result.md
-│       ├── ui-brief.md
-│       └── ui-handoff.md
+├── works/                                  ← 执行：正在做什么（当前只剩未归档的概念工序）
+│   └── 2026-10-24-agentflow-execution-concept/
 └── history/                                ← 记忆：怎么走到这里（冻结只读）
-    ├── decisions/
-    │   ├── 2026-10-23-project-init.md
-    │   ├── 2026-10-24-component-boundary-and-naming.md
-    │   ├── 2026-10-25-config-component.md
-    │   ├── 2026-10-25-project-boundary-and-open-questions.md
-    │   └── 2026-10-25-playbook-method-layer.md
-    └── works/
-        ├── 2026-10-24-db-backend-infra/
-        ├── 2026-10-25-api-contract-tests/
-        ├── 2026-10-25-api-swagger/
-        ├── 2026-10-25-core-config/
-        ├── 2026-10-25-expert-aggregate-write/
-        ├── 2026-10-25-list-read-model/
-        └── 2026-10-25-runtime-openapi-export/
+    ├── decisions/                          ← 整篇决策记录，按日期命名
+    └── works/                              ← 已归档工序，按日期命名
 ```
 
 其余内容在诞生时创建，**不预建空目录、不预建索引行**：
@@ -87,7 +63,7 @@ docs/
 1. [`../README.md`](../README.md) —— 项目定位与当前阶段
 2. [`../AGENTS.md`](../AGENTS.md) —— 技能加载、门禁与文档纪律
 3. [`plan/roadmap.md`](plan/roadmap.md) —— 里程碑、工序与依赖
-4. [`plan/open-questions.md`](plan/open-questions.md) —— 开放问题登记；当前无开放问题，历史条目已关闭归档
+4. [`plan/open-questions.md`](plan/open-questions.md) —— 开放问题登记；当前有 6 项 hold（OQ-5～OQ-7、OQ-9～OQ-11），无阻塞项；历史条目已关闭归档
 5. [`design/architecture.md`](design/architecture.md) —— 现行组件边界、依赖与数据所有权
 6. [`design/scenarios/_index.md`](design/scenarios/_index.md) —— 业务域/价值流/场景的生成索引；先看场景再看组件
 7. [`design/scenarios/agent-capability-assets/expert-capability-definition-and-assembly/expert-definition-and-assembly-management/scenario.md`](design/scenarios/agent-capability-assets/expert-capability-definition-and-assembly/expert-definition-and-assembly-management/scenario.md) —— 首个试点场景：入口、运行序、外部引用与 3+1
@@ -100,7 +76,7 @@ docs/
 13. [`history/works/2026-10-24-db-backend-infra/result.md`](history/works/2026-10-24-db-backend-infra/result.md) —— B1 实现结果、验证命令与偏差（已归档，历史证据，不作设计依据）
 14. [`history/works/2026-10-25-api-swagger/result.md`](history/works/2026-10-25-api-swagger/result.md) —— Swagger UI、OpenAPI 端点与验证结果（已归档）
 15. [`history/works/2026-10-25-runtime-openapi-export/result.md`](history/works/2026-10-25-runtime-openapi-export/result.md) —— OpenAPI 资产移入 HTTP 组件，以及方法/字段说明补齐结果（已归档）
-16. [`works/2026-10-25-scenario-index-pilot/result.md`](works/2026-10-25-scenario-index-pilot/result.md) —— 首个场景索引试点、生成器与校验结果
+16. [`history/works/2026-10-25-scenario-index-pilot/result.md`](history/works/2026-10-25-scenario-index-pilot/result.md) —— 首个场景索引试点、生成器与校验结果（已归档）
 17. [`history/decisions/2026-10-23-project-init.md`](history/decisions/2026-10-23-project-init.md) —— 初始化时的取舍与被否决方案
 18. [`history/decisions/2026-10-25-project-boundary-and-open-questions.md`](history/decisions/2026-10-25-project-boundary-and-open-questions.md) —— 仅 HTTP API、无 CLI/库/产品 UI，以及早期开放问题归档
 19. [`history/decisions/2026-10-25-playbook-method-layer.md`](history/decisions/2026-10-25-playbook-method-layer.md) —— `playbook/` 方法层、首份 playbook 的范围与上游技能延迟合并

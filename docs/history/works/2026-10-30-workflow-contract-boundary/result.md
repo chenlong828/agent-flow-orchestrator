@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: workflow
-status: closed
-updated: 2026-10-30
+status: frozen
+updated: 2026-11-02
 ---
 
 # 结果：工作流契约边界收敛
@@ -38,11 +38,11 @@ T-WF-111 已完成。后端边界收敛为“结构、引用、拓扑、专家�
 |---|---|
 | 边界、操作矩阵、测试计划 | [design.md](design.md) |
 | 四档评审 | [review.md](review.md) |
-| 冻结决策 | [2026-10-30-workflow-contract-boundary.md](../../history/decisions/2026-10-30-workflow-contract-boundary.md) |
-| 工作流组件现行契约 | [workflow/spec.md](../../design/components/workflow/spec.md) |
-| HTTP 现行契约 | [http-gateway/spec.md](../../design/components/http-gateway/spec.md) |
-| 场景运行序与测试 | [SCN-0101](../../design/scenarios/workflow-orchestration/workflow-definition/workflow-portfolio-management/scenario.md)、[SCN-0102](../../design/scenarios/workflow-orchestration/workflow-definition/workflow-editing-and-publishing/scenario.md)、[SCN-0103](../../design/scenarios/workflow-orchestration/workflow-definition/workflow-definition-exchange/scenario.md) |
-| DSL 详细布局结构 | [dsl.schema.json](../../../src/components/workflow/dsl.schema.json) |
+| 冻结决策 | [2026-10-30-workflow-contract-boundary.md](../../../history/decisions/2026-10-30-workflow-contract-boundary.md) |
+| 工作流组件现行契约 | [workflow/spec.md](../../../design/components/workflow/spec.md) |
+| HTTP 现行契约 | [http-gateway/spec.md](../../../design/components/http-gateway/spec.md) |
+| 场景运行序与测试 | [SCN-0101](../../../design/scenarios/workflow-orchestration/workflow-definition/workflow-portfolio-management/scenario.md)、[SCN-0102](../../../design/scenarios/workflow-orchestration/workflow-definition/workflow-editing-and-publishing/scenario.md)、[SCN-0103](../../../design/scenarios/workflow-orchestration/workflow-definition/workflow-definition-exchange/scenario.md) |
+| DSL 详细布局结构 | [dsl.schema.json](../../../../src/components/workflow/dsl.schema.json) |
 
 ## 变更清单
 

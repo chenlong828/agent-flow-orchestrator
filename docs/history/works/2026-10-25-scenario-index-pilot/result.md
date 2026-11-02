@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: global
-status: closed
-updated: 2026-10-25
+status: frozen
+updated: 2026-11-02
 ---
 
 # 场景索引试点：智能体能力资产 / 专家定义与装配
@@ -21,11 +21,11 @@ updated: 2026-10-25
 
 | 文件 | 内容 |
 |---|---|
-| [`../../design/scenarios/agent-capability-assets/expert-capability-definition-and-assembly/expert-definition-and-assembly-management/scenario.md`](../../design/scenarios/agent-capability-assets/expert-capability-definition-and-assembly/expert-definition-and-assembly-management/scenario.md) | 场景卡：入口、运行序、外部引用、3+1 映射、覆盖边界 |
-| [`../../design/scenarios/_index.md`](../../design/scenarios/_index.md) | 生成索引，`generated: true`，不手改 |
-| [`../../../scripts/scenario-index.ts`](../../../scripts/scenario-index.ts) | 索引生成与校验脚本 |
-| [`../../../package.json`](../../../package.json) | `docs:index`、`docs:check` |
-| [`../../../tests/components/http-gateway/expert.test.ts`](../../../tests/components/http-gateway/expert.test.ts) | `TC-EXP-001`～`TC-EXP-004` 测试 ID 前缀，测试逻辑未改 |
+| [`../../design/scenarios/agent-capability-assets/expert-capability-definition-and-assembly/expert-definition-and-assembly-management/scenario.md`](../../../design/scenarios/agent-capability-assets/expert-capability-definition-and-assembly/expert-definition-and-assembly-management/scenario.md) | 场景卡：入口、运行序、外部引用、3+1 映射、覆盖边界 |
+| [`../../design/scenarios/_index.md`](../../../design/scenarios/_index.md) | 生成索引，`generated: true`，不手改 |
+| [`../../../scripts/scenario-index.ts`](../../../../scripts/scenario-index.ts) | 索引生成与校验脚本 |
+| [`../../../package.json`](../../../../package.json) | `docs:index`、`docs:check` |
+| [`../../../tests/components/http-gateway/expert.test.ts`](../../../../tests/components/http-gateway/expert.test.ts) | `TC-EXP-001`～`TC-EXP-004` 测试 ID 前缀，测试逻辑未改 |
 
 ## 实现口径
 

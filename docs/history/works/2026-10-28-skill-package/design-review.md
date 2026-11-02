@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: skill
-status: active
-updated: 2026-10-28
+status: frozen
+updated: 2026-11-02
 ---
 
 # Skill 包形态 · 整体设计审视
@@ -18,16 +18,16 @@ updated: 2026-10-28
 ## 1. 审视依据
 
 - [design.md](design.md)、[brief.md](brief.md)
-- 现有 schema：[0003_skill.sql](../../../db/migrations/0003_skill.sql)、[0005_skill_description.sql](../../../db/migrations/0005_skill_description.sql)、[0004_expert.sql](../../../db/migrations/0004_expert.sql)
-- 现有种子：[seed.ts](../../../scripts/seed.ts)
-- 测试夹具：[test-db.ts](../../../tests/helpers/test-db.ts)、[schema.test.ts](../../../tests/db/schema.test.ts)
-- 规格：[skill](../../design/components/skill/spec.md)、[catalog](../../design/components/catalog/spec.md)、[http-gateway](../../design/components/http-gateway/spec.md)、[platform](../../design/components/platform/spec.md)、[config](../../design/components/config/spec.md)、[architecture](../../design/architecture.md)
+- 现有 schema：[0003_skill.sql](../../../../db/migrations/0003_skill.sql)、[0005_skill_description.sql](../../../../db/migrations/0005_skill_description.sql)、[0004_expert.sql](../../../../db/migrations/0004_expert.sql)
+- 现有种子：[seed.ts](../../../../scripts/seed.ts)
+- 测试夹具：[test-db.ts](../../../../tests/helpers/test-db.ts)、[schema.test.ts](../../../../tests/db/schema.test.ts)
+- 规格：[skill](../../../design/components/skill/spec.md)、[catalog](../../../design/components/catalog/spec.md)、[http-gateway](../../../design/components/http-gateway/spec.md)、[platform](../../../design/components/platform/spec.md)、[config](../../../design/components/config/spec.md)、[architecture](../../../design/architecture.md)
 
 ## 2. 阻塞项
 
 ### B1 迁移/重建方案（已定）
 
-- 现状：`skill_section`、`skill_pitfall`、`skill_ref` 三张子表存正文；`skill` 行没有包指针；`expert_skill.skill_id` 是 `on delete restrict`（[0004_expert.sql](../../../db/migrations/0004_expert.sql)）。
+- 现状：`skill_section`、`skill_pitfall`、`skill_ref` 三张子表存正文；`skill` 行没有包指针；`expert_skill.skill_id` 是 `on delete restrict`（[0004_expert.sql](../../../../db/migrations/0004_expert.sql)）。
 - 决定（2026-10-28）：当前 Skill 都是演示数据，无生产使用；不做升级迁移、不回填、不保留旧数据；开发库原地重建。
 - 结论：不承担旧库升级，不处理 `expert_skill` restrict 的升级顺序；重写 `0003` 为新结构、删除 `0005`，迁移链变为 4 个，只服务空库。旧 `skill` 行、`expert_skill` 边、三张子表随重建消失。
 - 仍需：重建步骤（drop/recreate）、seed 重建 12 个 Skill 的包与装配边、测试表清单与迁移版本同步。当前测试期望 15 张业务表、5 个迁移；重建后 13 张业务表（删 3 张、加 `skill_draft`）、4 个迁移（`0001`/`0002`/`0003`/`0004`）。

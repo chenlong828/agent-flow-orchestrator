@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: skill
-status: active
-updated: 2026-10-28
+status: frozen
+updated: 2026-11-02
 ---
 
 # Skill 包形态 · 契约 v1（已冻结）

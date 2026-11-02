@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: global
-status: active
-updated: 2026-10-26
+status: frozen
+updated: 2026-11-02
 ---
 
 # 交接：Skill 契约 v2 对展示端的影响

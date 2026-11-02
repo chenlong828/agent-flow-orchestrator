@@ -42,5 +42,5 @@ updated: 2026-10-30
 
 ## 关联
 
-- [工序 brief](../../works/2026-10-30-workflow-contract-boundary/brief.md)
+- [工序 brief](../works/2026-10-30-workflow-contract-boundary/brief.md)
 - [2026-10-29 视口持久化决策](2026-10-29-workflow-viewport-persistence.md)

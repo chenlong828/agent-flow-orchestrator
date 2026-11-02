@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: workflow
-status: closed
-updated: 2026-10-29
+status: frozen
+updated: 2026-11-02
 ---
 
 # 影响规格：工作流视口持久化

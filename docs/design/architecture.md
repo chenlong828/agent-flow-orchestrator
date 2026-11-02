@@ -2,7 +2,7 @@
 layer: design
 module: global
 status: current
-updated: 2026-10-29
+updated: 2026-11-02
 ---
 
 # B1+B3 架构与契约边界
@@ -162,7 +162,7 @@ config
 
 ## 10 实施状态
 
-- 当前 10 个组件、16 张表、5 个只向前迁移（`0001`–`0005`）；REST 47 个业务端点 + `/healthz`。
+- 当前 10 个组件、16 张表、1 个只向前基线迁移（`0001_baseline.sql`）；REST 47 个业务端点 + `/healthz`。
 - B1 资产注册中心与 B3 工作流定义已实现并通过验证；B2 Key/工作区、B4 实例/看板、ACP 执行模型未实现。
 - Skill 包形态 v2 已落地：草稿/保存/下载与 `GET /skills/{id}/document`；不再提供 `POST /skills`、`PUT /skills/{id}`。
 - `ReferenceGuard` 按端口方案实现：端口在 `kernel`，由 `catalog` 实现，领域删除服务经组合根注入。

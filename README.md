@@ -13,14 +13,14 @@ AgentFlow 研发智能体工作流编排服务的编排侧工程：目标是把�
 控制面 **B1 资产注册中心**（Harness、工具、Skill、专家）与 **B3 工作流定义**已实现并通过验证：
 
 - Bun 1.4.4 + PostgreSQL 18.4；模块化单体，10 个组件。
-- 16 张表（含 `skill_category` 字典表）；5 个只向前迁移。
+- 16 张表（含 `skill_category` 字典表）；1 个只向前基线迁移（`0001_baseline.sql`）。
 - 47 个业务端点（B1 37 + B3 10）+ `/healthz`，契约见 [`http-gateway/spec.md`](docs/design/components/http-gateway/spec.md)；运行时 `/openapi.yaml` 与 Swagger UI `/docs` 由 HTTP 组件直接提供。
-- Skill 契约 v2：`summary` 与 `triggers` 合并为 `description`（1–400 字），新增 `GET /skills/{id}/document` 输出 markdown 全文；见 [`result.md`](docs/works/2026-10-26-skill-contract-v2/result.md)。
+- Skill 包形态：内容是一个 zip（根 `SKILL.md`，可选 `scripts/`、`references/`），数据库只存 brief 与包指针；创建/更新走草稿保存，15 个 Skill 端点，`GET /skills/{id}/document` 输出全文。见 [`result.md`](docs/history/works/2026-10-28-skill-package/result.md)。
 - 开发者 API 文档：`/docs`（Swagger UI）与 `/openapi.yaml`，Swagger UI 资源已 vendor 到仓库，可离线使用。
 - 演示种子：5 Harness / 10 工具 / 12 Skill / 8 专家，Skill 与工具装配边各 23 条。
 - 实现结果与验证记录：[`result.md`](docs/history/works/2026-10-24-db-backend-infra/result.md)。
 
-B2 Key/工作区、B4 实例/看板、ACP 执行模型未实现；B3 工作流已实现（2026-10-29）。后续运行形态按实际需求另立工序，见 [`docs/plan/roadmap.md`](docs/plan/roadmap.md)。早期开放问题已关闭，当前无开放问题，见 [`docs/plan/open-questions.md`](docs/plan/open-questions.md)。
+B2 Key/工作区、B4 实例/看板、ACP 执行模型未实现；B3 工作流已实现（2026-10-29）。后续运行形态按实际需求另立工序，见 [`docs/plan/roadmap.md`](docs/plan/roadmap.md)。早期开放问题已关闭；当前只有 6 项 hold，见 [`docs/plan/open-questions.md`](docs/plan/open-questions.md)。
 
 ## 运行
 
@@ -84,13 +84,13 @@ bun run typecheck              # 只跑 tsc --noEmit
 ├── package.json              ← 运行、测试、迁移、种子脚本
 ├── tsconfig.json
 ├── config/                   ← default.toml、local.example.toml；local.toml 不入库
-├── db/migrations/            ← 0001～0004 只向前迁移
+├── db/migrations/            ← 0001_baseline.sql；上线后只追加迁移
 ├── src/
 │   ├── main.ts               ← 组合根与 Bun.serve
 │   ├── core/kernel/          ← 错误、分页、ReferenceGuard、时钟/ID 端口
 │   ├── core/config/          ← TOML + 环境变量合并与校验
 │   ├── core/platform/        ← DB/事务、迁移、健康检查
-│   └── components/           ← harness / tool / skill / expert / catalog / http-gateway
+│   └── components/           ← harness / tool / skill / expert / workflow / catalog / http-gateway
 ├── scripts/                  ← PostgreSQL 启停、迁移、种子
 ├── tests/                    ← 组件、HTTP 契约、旅程、架构、种子测试
 └── docs/                     ← 五态文档树

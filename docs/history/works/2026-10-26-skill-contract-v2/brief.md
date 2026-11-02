@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: global
-status: active
-updated: 2026-10-26
+status: frozen
+updated: 2026-11-02
 ---
 
 # Skill 契约 v2：description 合并与全文文档输出
@@ -10,7 +10,7 @@ updated: 2026-10-26
 ## 需求与背景
 
 - 用户的判断：skill 的数据要分两个面——**给人看、方便管理**的，与**给 orchestrator 用、组装 skill** 的；现在两者混在同一份 DTO 里，而编排侧缺"一份完整 skill 文本"。
-- 现状：`summary`（≤200 字简介）与 `triggers`（有序关键词）各承担一半"何时用"；服务端 `q` 只搜 `name`（[store.ts:56-59](../../../src/components/skill/store.ts#L56-L59)）。正文拆在五章 + 踩坑 + 引用，没有任何端点输出完整文本，拼接顺序只写在代码常量 `SECTION_KINDS`（[service.ts:43](../../../src/components/skill/service.ts#L43)）。
+- 现状：`summary`（≤200 字简介）与 `triggers`（有序关键词）各承担一半"何时用"；服务端 `q` 只搜 `name`（[store.ts:56-59](../../../../src/components/skill/store.ts#L56-L59)）。正文拆在五章 + 踩坑 + 引用，没有任何端点输出完整文本，拼接顺序只写在代码常量 `SECTION_KINDS`（[service.ts:43](../../../../src/components/skill/service.ts#L43)）。
 - 决定：`summary` 与 `triggers` 二合一，以路由（trigger）语义为主；新增 skill 全文文档输出。
 
 ## 范围

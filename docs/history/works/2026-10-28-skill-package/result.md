@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: skill
-status: done
-updated: 2026-10-29
+status: frozen
+updated: 2026-11-02
 ---
 
 # 结果：Skill 包形态（B1）
@@ -47,6 +47,12 @@ updated: 2026-10-29
 
 ## 未做与遗留
 
-- 开发库 `.local/pgdata` 仍记录旧 `0003_skill.sql` 的 checksum；重写迁移后 `bun run db:migrate` 会报 checksum 不一致。按“无生产数据、原地重建”的决定，本工序没有自动清库；使用新库或测试库验收。若要重置开发库，应先取得确认后清空 `.local/pgdata` 并重新迁移、seed。
+- 开发库 `.local/pgdata` 曾记录旧 `0003_skill.sql` 的 checksum；2026-10-30 质量重构已把迁移历史拍扁为 `0001_baseline.sql` 并重置开发库，本条不再适用。
 - 不做版本历史、权限、病毒扫描、运行时执行、草稿预览、单文件下载。
-- `src/components/skill/service.ts`、`store.ts`、`types.ts` 保留为迁移期兼容入口，只做新模块导出，不再包含旧五章逻辑。
+- `src/components/skill/service.ts`、`store.ts`、`types.ts` 曾作为迁移期兼容入口保留；T-DEBT-02 已删除这些占位壳，当前入口为 `src/components/skill/index.ts`。
+
+## 收口补充（2026-11-02）
+
+- 2026-11-02 重跑 `bun run check`：typecheck 通过，273 pass / 0 fail / 2493 expect，`docs:check` 4 个场景索引最新。
+- 工序内 18 个任务全部完成，当前规格、OpenAPI 与测试均反映 zip 包 + 草稿保存契约；无未完成实现项。
+- 结论：本工序收口，随目录归档。

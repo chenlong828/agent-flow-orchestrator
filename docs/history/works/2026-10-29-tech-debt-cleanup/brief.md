@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: global
-status: closed
-updated: 2026-10-29
+status: frozen
+updated: 2026-11-02
 ---
 
 # 工序：技术债清理（护栏、死代码、网关）

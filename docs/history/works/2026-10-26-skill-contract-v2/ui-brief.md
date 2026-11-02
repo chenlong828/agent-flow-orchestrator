@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: global
-status: active
-updated: 2026-10-26
+status: frozen
+updated: 2026-11-02
 ---
 
 # 给展示端的背景说明（约 400 字）

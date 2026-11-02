@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: global
-status: closed
-updated: 2026-10-25
+status: frozen
+updated: 2026-11-02
 ---
 
 # 场景索引试点：智能体能力资产 / 专家定义与装配

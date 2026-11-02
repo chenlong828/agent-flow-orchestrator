@@ -1,8 +1,8 @@
 ---
-layer: works
+layer: history
 module: workflow
-status: closed
-updated: 2026-10-29
+status: frozen
+updated: 2026-11-02
 ---
 
 # 结果：工作流视口持久化
@@ -15,17 +15,17 @@ T-WF-110 完成。画布视口作为 `WorkflowGraph.viewport` 随当前定义存
 
 | 文件 | 变化 |
 |---|---|
-| [`src/components/workflow/graph.ts`](../../../src/components/workflow/graph.ts) | 新增 `Viewport`；`WorkflowGraph.viewport`；`collectGraph` 校验 |
-| [`src/components/workflow/service.ts`](../../../src/components/workflow/service.ts) | DSL `layout.viewport` 双向映射 |
-| [`src/components/workflow/types.ts`](../../../src/components/workflow/types.ts)、[`index.ts`](../../../src/components/workflow/index.ts) | 导出 `Viewport` |
-| [`src/components/http-gateway/openapi.yaml`](../../../src/components/http-gateway/openapi.yaml) | `WorkflowGraph.viewport` 复用 `WorkflowLayoutViewport` |
-| [`tests/components/workflow/graph.test.ts`](../../../tests/components/workflow/graph.test.ts) | 视口保留与非法值 |
-| [`tests/components/workflow/service.test.ts`](../../../tests/components/workflow/service.test.ts) | 保存/回读、DSL 往返、复制、导入非法视口 |
-| [`tests/components/http-gateway/workflow.test.ts`](../../../tests/components/http-gateway/workflow.test.ts) | HTTP 保存/回读、400、DSL 往返、复制 |
-| [`tests/components/http-gateway/workflow-scenarios.test.ts`](../../../tests/components/http-gateway/workflow-scenarios.test.ts) | `TC-WFE-001` 视口回读；`TC-WFE-002` 非法视口 400 |
-| [`docs/design/components/workflow/spec.md`](../../../docs/design/components/workflow/spec.md)、[`http-gateway/spec.md`](../../../docs/design/components/http-gateway/spec.md) | 现行契约同步 |
-| [`SCN-0102`](../../../docs/design/scenarios/workflow-orchestration/workflow-definition/workflow-editing-and-publishing/scenario.md) | 运行序与测试映射同步 |
-| [`2026-10-29-workflow-viewport-persistence.md`](../../../docs/history/decisions/2026-10-29-workflow-viewport-persistence.md) | 决策记录 |
+| [`src/components/workflow/graph.ts`](../../../../src/components/workflow/graph.ts) | 新增 `Viewport`；`WorkflowGraph.viewport`；`collectGraph` 校验 |
+| [`src/components/workflow/service.ts`](../../../../src/components/workflow/service.ts) | DSL `layout.viewport` 双向映射 |
+| [`src/components/workflow/types.ts`](../../../../src/components/workflow/types.ts)、[`index.ts`](../../../../src/components/workflow/index.ts) | 导出 `Viewport` |
+| [`src/components/http-gateway/openapi.yaml`](../../../../src/components/http-gateway/openapi.yaml) | `WorkflowGraph.viewport` 复用 `WorkflowLayoutViewport` |
+| [`tests/components/workflow/graph.test.ts`](../../../../tests/components/workflow/graph.test.ts) | 视口保留与非法值 |
+| [`tests/components/workflow/service.test.ts`](../../../../tests/components/workflow/service.test.ts) | 保存/回读、DSL 往返、复制、导入非法视口 |
+| [`tests/components/http-gateway/workflow.test.ts`](../../../../tests/components/http-gateway/workflow.test.ts) | HTTP 保存/回读、400、DSL 往返、复制 |
+| [`tests/components/http-gateway/workflow-scenarios.test.ts`](../../../../tests/components/http-gateway/workflow-scenarios.test.ts) | `TC-WFE-001` 视口回读；`TC-WFE-002` 非法视口 400 |
+| [`docs/design/components/workflow/spec.md`](../../../../docs/design/components/workflow/spec.md)、[`http-gateway/spec.md`](../../../../docs/design/components/http-gateway/spec.md) | 现行契约同步 |
+| [`SCN-0102`](../../../../docs/design/scenarios/workflow-orchestration/workflow-definition/workflow-editing-and-publishing/scenario.md) | 运行序与测试映射同步 |
+| [`2026-10-29-workflow-viewport-persistence.md`](../../../../docs/history/decisions/2026-10-29-workflow-viewport-persistence.md) | 决策记录 |
 
 ## 验收
 
