@@ -1,9 +1,8 @@
 import type { Page } from "../../core/kernel/index.ts";
 import type { ToolQuery, ToolSummary } from "../tool/index.ts";
-import type { CatalogContext } from "./context.ts";
-import type { ToolDetailView, ToolListItem } from "./types.ts";
+import type { CatalogDeps, ToolDetailView, ToolListItem } from "./types.ts";
 
-async function harnessNameFor(ctx: CatalogContext, harnessId: string): Promise<string> {
+async function harnessNameFor(ctx: CatalogDeps, harnessId: string): Promise<string> {
   const harness = await ctx.harnessRead.get(harnessId);
   return harness.name;
 }
@@ -32,7 +31,7 @@ function projectToolListItem(
 }
 
 export async function listTools(
-  ctx: CatalogContext,
+  ctx: CatalogDeps,
   query: ToolQuery,
 ): Promise<Page<ToolListItem>> {
   const page = await ctx.toolRead.list(query);
@@ -45,7 +44,7 @@ export async function listTools(
   return { ...page, items };
 }
 
-export async function getTool(ctx: CatalogContext, id: string): Promise<ToolDetailView> {
+export async function getTool(ctx: CatalogDeps, id: string): Promise<ToolDetailView> {
   const tool = await ctx.toolRead.get(id);
   const harnessName = await harnessNameFor(ctx, tool.harnessId);
   const usedBy = await ctx.expertRead.listExpertsUsingTool(id);

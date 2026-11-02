@@ -11,8 +11,7 @@ import {
   isUniqueViolation,
   type Db,
 } from "../../core/platform/index.ts";
-import { SkillNotFoundError } from "./skill-not-found-error.ts";
-import { ToolNotFoundError } from "./tool-not-found-error.ts";
+import { SkillNotFoundError, ToolNotFoundError } from "./errors.ts";
 import {
   enabledFrom,
   normalizeIds,

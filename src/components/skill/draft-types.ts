@@ -51,10 +51,6 @@ export type SkillDraftDeps = {
   guard: ReferenceGuard;
 };
 
-export function toIso(value: Date | string): string {
-  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
-}
-
 export function draftPrefix(id: string): string {
   return `drafts/${id}`;
 }

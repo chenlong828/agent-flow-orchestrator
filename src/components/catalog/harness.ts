@@ -1,10 +1,9 @@
 import type { Page } from "../../core/kernel/index.ts";
 import type { HarnessQuery } from "../harness/index.ts";
-import type { CatalogContext } from "./context.ts";
-import type { HarnessDetailView, HarnessListItem } from "./types.ts";
+import type { CatalogDeps, HarnessDetailView, HarnessListItem } from "./types.ts";
 
 export async function listHarnesses(
-  ctx: CatalogContext,
+  ctx: CatalogDeps,
   query: HarnessQuery,
 ): Promise<Page<HarnessListItem>> {
   const page = await ctx.harnessRead.list(query);
@@ -17,7 +16,7 @@ export async function listHarnesses(
 }
 
 export async function getHarness(
-  ctx: CatalogContext,
+  ctx: CatalogDeps,
   id: string,
 ): Promise<HarnessDetailView> {
   const harness = await ctx.harnessRead.get(id);

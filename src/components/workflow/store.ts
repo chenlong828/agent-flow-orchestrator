@@ -1,3 +1,4 @@
+import { buildWhere } from "../../core/kernel/index.ts";
 import type { Db } from "../../core/platform/index.ts";
 import type { WorkflowGraph, WorkflowQuery } from "./types.ts";
 
@@ -30,27 +31,6 @@ export type WorkflowDefinitionRow = {
   updated_at: Date | string;
   updated_by: string | null;
 };
-
-function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/g, (char) => `\\${char}`);
-}
-
-function buildFilters(query: WorkflowQuery): { where: string; params: unknown[] } {
-  const clauses: string[] = [];
-  const params: unknown[] = [];
-  if (query.q !== undefined && query.q !== "") {
-    params.push(`%${escapeLike(query.q)}%`);
-    clauses.push(`w.name ilike $${params.length} escape '\\'`);
-  }
-  if (query.type !== undefined && query.type !== "") {
-    params.push(query.type);
-    clauses.push(`w.type = $${params.length}`);
-  }
-  return {
-    where: clauses.length === 0 ? "" : `where ${clauses.join(" and ")}`,
-    params,
-  };
-}
 
 function orderBy(sort: WorkflowQuery["sort"]): string {
   switch (sort) {
@@ -154,7 +134,10 @@ async function listRoots(
   tx: Db,
   query: WorkflowQuery,
 ): Promise<{ rows: WorkflowRootRow[]; total: number }> {
-  const { where, params } = buildFilters(query);
+  const { where, params } = buildWhere(query, [
+    { key: "q", column: "w.name", like: true },
+    { key: "type", column: "w.type", skipEmpty: true },
+  ]);
   const countRow = await tx.one<{ total: number }>(
     `select count(*)::int as total from workflow w ${where}`,
     params,
@@ -228,7 +211,7 @@ async function countByExperts(tx: Db, expertIds: string[]): Promise<Record<strin
 
 export type WorkflowStore = ReturnType<typeof createWorkflowStore>;
 
-export function createWorkflowStore(db: Db) {
+export function createWorkflowStore() {
   return {
     insertRoot,
     insertDefinition,

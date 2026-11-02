@@ -14,7 +14,7 @@ import {
 } from "../../src/components/harness/index.ts";
 import { createToolRead, createToolService } from "../../src/components/tool/index.ts";
 import { createSkillRead } from "../../src/components/skill/read.ts";
-import { createSkillDraftService } from "../../src/components/skill/draft.ts";
+import { createSkillDraftService } from "../../src/components/skill/draft-service.ts";
 import { createExpertRead, createExpertService } from "../../src/components/expert/index.ts";
 import {
   createWorkflowRead,

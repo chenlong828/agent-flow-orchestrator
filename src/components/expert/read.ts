@@ -1,6 +1,6 @@
-import { NotFoundError, type Page } from "../../core/kernel/index.ts";
+import { NotFoundError, toIso, type Page } from "../../core/kernel/index.ts";
 import type { Db } from "../../core/platform/index.ts";
-import { createExpertStore, type ExpertRootRow } from "./store.ts";
+import { expertStore, type ExpertRootRow } from "./store.ts";
 import type {
   ExpertDetail,
   ExpertQuery,
@@ -9,10 +9,6 @@ import type {
   ExpertReference,
   ExpertSummary,
 } from "./types.ts";
-
-function toIso(value: Date | string): string {
-  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
-}
 
 function toSummary(row: ExpertRootRow, persona: string[], skillIds: string[]): ExpertSummary {
   return {
@@ -37,16 +33,15 @@ function toSummary(row: ExpertRootRow, persona: string[], skillIds: string[]): E
 
 export function createExpertRead(deps: { db: Db }): ExpertRead {
   const { db } = deps;
-  const store = createExpertStore(db);
 
   return {
     async list(query: ExpertQuery): Promise<Page<ExpertSummary>> {
-      const { rows, total } = await store.listRoots(db, query);
+      const { rows, total } = await expertStore.listRoots(db, query);
       const items: ExpertSummary[] = [];
       for (const row of rows) {
         const [persona, skillIds] = await Promise.all([
-          store.personaFor(db, row.id),
-          store.skillIdsFor(db, row.id),
+          expertStore.personaFor(db, row.id),
+          expertStore.skillIdsFor(db, row.id),
         ]);
         items.push(toSummary(row, persona, skillIds));
       }
@@ -55,11 +50,11 @@ export function createExpertRead(deps: { db: Db }): ExpertRead {
 
     async get(id): Promise<ExpertDetail> {
       const [row, persona, refs, skillIds, toolIds] = await Promise.all([
-        store.findRoot(db, id),
-        store.personaFor(db, id),
-        store.refsFor(db, id),
-        store.skillIdsFor(db, id),
-        store.toolIdsFor(db, id),
+        expertStore.findRoot(db, id),
+        expertStore.personaFor(db, id),
+        expertStore.refsFor(db, id),
+        expertStore.skillIdsFor(db, id),
+        expertStore.toolIdsFor(db, id),
       ]);
       if (row === null) throw new NotFoundError("专家", id);
       const refsInput: ExpertRefInput[] = refs.map((ref) => ({
@@ -76,15 +71,15 @@ export function createExpertRead(deps: { db: Db }): ExpertRead {
     },
 
     async listExpertsUsingSkill(skillId): Promise<ExpertReference[]> {
-      return store.listUsingSkill(db, skillId);
+      return expertStore.listUsingSkill(db, skillId);
     },
 
     async listExpertsUsingTool(toolId): Promise<ExpertReference[]> {
-      return store.listUsingTool(db, toolId);
+      return expertStore.listUsingTool(db, toolId);
     },
 
     async statuses(expertIds): Promise<Record<string, boolean>> {
-      return store.statuses(db, expertIds);
+      return expertStore.statuses(db, expertIds);
     },
   };
 }

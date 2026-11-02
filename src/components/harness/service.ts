@@ -258,7 +258,7 @@ async function deleteHarness(
 }
 
 export function createHarnessService(deps: HarnessDeps): HarnessService {
-  const ctx: HarnessServiceContext = { ...deps, store: createHarnessStore(deps.db) };
+  const ctx: HarnessServiceContext = { ...deps, store: createHarnessStore() };
 
   return {
     create: (input, requestActor) => createHarness(ctx, input, requestActor),
@@ -272,7 +272,7 @@ export function createHarnessService(deps: HarnessDeps): HarnessService {
 
 export function createHarnessRead(deps: { db: Db }): HarnessRead {
   const { db } = deps;
-  const store = createHarnessStore(db);
+  const store = createHarnessStore();
 
   return {
     async list(query): Promise<Page<HarnessSummary>> {

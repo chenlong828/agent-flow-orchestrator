@@ -1,9 +1,9 @@
 import {
   NotFoundError,
+  toIso,
   type Page,
 } from "../../core/kernel/index.ts";
 import type { Db } from "../../core/platform/index.ts";
-import { toIso } from "./format.ts";
 import { createWorkflowStore } from "./store.ts";
 import type {
   WorkflowDetail,
@@ -46,7 +46,7 @@ function toDetail(row: Parameters<typeof toSummary>[0], graph: WorkflowGraph): W
 
 export function createWorkflowRead(deps: { db: Db }): WorkflowRead {
   const { db } = deps;
-  const store = createWorkflowStore(db);
+  const store = createWorkflowStore();
 
   return {
     async list(query: WorkflowQuery): Promise<Page<WorkflowSummary>> {

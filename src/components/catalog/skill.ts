@@ -6,8 +6,8 @@ import type {
   SkillQuery,
   SkillSummary,
 } from "../skill/contract.ts";
-import type { CatalogContext } from "./context.ts";
 import type {
+  CatalogDeps,
   SkillCategoryView,
   SkillDetailView,
   SkillListItem,
@@ -44,7 +44,7 @@ function projectSkillSummary(
 }
 
 export async function listSkills(
-  ctx: CatalogContext,
+  ctx: CatalogDeps,
   query: SkillQuery,
 ): Promise<Page<SkillListItem>> {
   const [page, categories] = await Promise.all([
@@ -60,7 +60,7 @@ export async function listSkills(
   return { ...page, items };
 }
 
-export async function getSkill(ctx: CatalogContext, id: string): Promise<SkillDetailView> {
+export async function getSkill(ctx: CatalogDeps, id: string): Promise<SkillDetailView> {
   const [skill, categories, usedBy] = await Promise.all([
     ctx.skillRead.get(id),
     ctx.skillRead.listCategories(),
@@ -76,19 +76,19 @@ export async function getSkill(ctx: CatalogContext, id: string): Promise<SkillDe
 }
 
 export async function getSkillDocument(
-  ctx: CatalogContext,
+  ctx: CatalogDeps,
   id: string,
 ): Promise<SkillDocument> {
   return ctx.skillRead.getDocument(id);
 }
 
 export async function getSkillPackage(
-  ctx: CatalogContext,
+  ctx: CatalogDeps,
   id: string,
 ): Promise<SkillPackage> {
   return ctx.skillRead.getPackage(id);
 }
 
-export async function listSkillCategories(ctx: CatalogContext): Promise<SkillCategoryView[]> {
+export async function listSkillCategories(ctx: CatalogDeps): Promise<SkillCategoryView[]> {
   return ctx.skillRead.listCategories();
 }

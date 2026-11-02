@@ -1,6 +1,8 @@
 import {
   NotFoundError,
   PackageUnavailableError,
+  escapeLike,
+  toIso,
   type FileStore,
   type Page,
 } from "../../core/kernel/index.ts";
@@ -44,14 +46,6 @@ type SkillReadContext = {
   db: Db;
   store: FileStore;
 };
-
-function toIso(value: Date | string): string {
-  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
-}
-
-function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/g, (char) => `\\${char}`);
-}
 
 function buildFilters(query: SkillQuery): { where: string; params: unknown[] } {
   const clauses: string[] = [];

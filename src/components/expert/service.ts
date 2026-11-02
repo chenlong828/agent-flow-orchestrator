@@ -1,4 +1,4 @@
-import { createExpertStore } from "./store.ts";
+import { expertStore } from "./store.ts";
 import type { ExpertDeps, ExpertService } from "./types.ts";
 import {
   createExpert,
@@ -12,12 +12,11 @@ import {
 } from "./write.ts";
 
 export type { ExpertDeps } from "./types.ts";
-export { SkillNotFoundError } from "./skill-not-found-error.ts";
-export { ToolNotFoundError } from "./tool-not-found-error.ts";
+export { SkillNotFoundError, ToolNotFoundError } from "./errors.ts";
 export { createExpertRead } from "./read.ts";
 
 export function createExpertService(deps: ExpertDeps): ExpertService {
-  const ctx: ExpertServiceContext = { ...deps, store: createExpertStore(deps.db) };
+  const ctx: ExpertServiceContext = { ...deps, store: expertStore };
   return {
     create: (input, requestActor) => createExpert(ctx, input, requestActor),
     update: (id, revision, input, requestActor) =>

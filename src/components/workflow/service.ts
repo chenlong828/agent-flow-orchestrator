@@ -4,6 +4,7 @@ import {
   NotFoundError,
   RevisionConflictError,
   ValidationError,
+  ensureText,
   type Clock,
   type ExpertStatusReader,
   type IdGenerator,
@@ -17,8 +18,7 @@ import { collectGraph, parseGraph, type ValidationIssue, type WorkflowGraph } fr
 import { analyzeBindings, analyzeTopology } from "./graph-analysis.ts";
 import { createWorkflowStore } from "./store.ts";
 import { normalizeDsl } from "./dsl.ts";
-import { toIso } from "./format.ts";
-import { ensureDescription, ensureText, shapeToMultiField } from "./validation.ts";
+import { ensureDescription, shapeToMultiField } from "./validation.ts";
 import type {
   CopyWorkflow,
   CreateWorkflow,
@@ -92,7 +92,7 @@ type WorkflowContext = {
 };
 
 export function createWorkflowService(deps: WorkflowDeps): WorkflowService {
-  const ctx: WorkflowContext = { deps, store: createWorkflowStore(deps.db) };
+  const ctx: WorkflowContext = { deps, store: createWorkflowStore() };
   return {
     create: (input) => createWorkflow(ctx, input),
     update: (id, revision, input) => updateWorkflow(ctx, id, revision, input),

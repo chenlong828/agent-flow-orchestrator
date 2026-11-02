@@ -1,5 +1,4 @@
 import type { ReferenceGuard } from "../../core/kernel/index.ts";
-import type { CatalogContext } from "./context.ts";
 import { getHarness, listHarnesses } from "./harness.ts";
 import { getTool, listTools } from "./tool.ts";
 import {
@@ -46,7 +45,7 @@ export type {
 } from "./types.ts";
 
 export function createCatalog(deps: CatalogDeps): CatalogRead & ReferenceGuard {
-  const ctx: CatalogContext = deps;
+  const ctx: CatalogDeps = deps;
   return {
     check: (owner, id) => checkReferences(ctx, owner, id),
 

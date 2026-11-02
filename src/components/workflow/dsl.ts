@@ -1,7 +1,7 @@
-import { ValidationError } from "../../core/kernel/index.ts";
+import { ValidationError, ensureText } from "../../core/kernel/index.ts";
 import { collectGraph, type WorkflowGraph } from "./graph.ts";
 import type { WorkflowDsl } from "./types.ts";
-import { ensureDescription, ensureText, shapeToMultiField } from "./validation.ts";
+import { ensureDescription, shapeToMultiField } from "./validation.ts";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);

@@ -1,15 +1,14 @@
 import type { Reference, ReferenceOwner } from "../../core/kernel/index.ts";
 import { referencePage, toReferences } from "./context.ts";
-import type { CatalogContext } from "./context.ts";
 import {
   listExpertsUsingSkillReferences,
   listExpertsUsingToolReferences,
 } from "./expert.ts";
-import type { ReferencePage } from "./types.ts";
+import type { CatalogDeps, ReferencePage } from "./types.ts";
 import { listWorkflowsByExpertReferences } from "./workflow.ts";
 
 export async function listToolsByHarnessReferences(
-  ctx: CatalogContext,
+  ctx: CatalogDeps,
   harnessId: string,
 ): Promise<Reference[]> {
   const tools = await ctx.toolRead.listByHarness(harnessId);
@@ -17,7 +16,7 @@ export async function listToolsByHarnessReferences(
 }
 
 export async function checkReferences(
-  ctx: CatalogContext,
+  ctx: CatalogDeps,
   owner: ReferenceOwner,
   id: string,
 ): Promise<Reference[]> {
@@ -34,7 +33,7 @@ export async function checkReferences(
 }
 
 export async function referencesForHarness(
-  ctx: CatalogContext,
+  ctx: CatalogDeps,
   id: string,
 ): Promise<ReferencePage> {
   const harness = await ctx.harnessRead.get(id);
@@ -43,7 +42,7 @@ export async function referencesForHarness(
 }
 
 export async function referencesForTool(
-  ctx: CatalogContext,
+  ctx: CatalogDeps,
   id: string,
 ): Promise<ReferencePage> {
   const tool = await ctx.toolRead.get(id);
@@ -52,7 +51,7 @@ export async function referencesForTool(
 }
 
 export async function referencesForSkill(
-  ctx: CatalogContext,
+  ctx: CatalogDeps,
   id: string,
 ): Promise<ReferencePage> {
   const skill = await ctx.skillRead.getSummary(id);

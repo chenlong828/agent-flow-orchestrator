@@ -1,8 +1,8 @@
 import type { Page, Reference } from "../../core/kernel/index.ts";
 import type { ExpertQuery, ExpertSummary } from "../expert/index.ts";
 import { toReferences } from "./context.ts";
-import type { CatalogContext } from "./context.ts";
 import type {
+  CatalogDeps,
   ExpertDetailView,
   ExpertListItem,
   ExpertSkillPreviewView,
@@ -12,7 +12,7 @@ import type {
 import { categoryMap, requireCategoryLabel } from "./skill.ts";
 
 export async function listExpertsUsingSkillReferences(
-  ctx: CatalogContext,
+  ctx: CatalogDeps,
   skillId: string,
 ): Promise<Reference[]> {
   const experts = await ctx.expertRead.listExpertsUsingSkill(skillId);
@@ -20,7 +20,7 @@ export async function listExpertsUsingSkillReferences(
 }
 
 export async function listExpertsUsingToolReferences(
-  ctx: CatalogContext,
+  ctx: CatalogDeps,
   toolId: string,
 ): Promise<Reference[]> {
   const experts = await ctx.expertRead.listExpertsUsingTool(toolId);
@@ -42,7 +42,7 @@ function projectExpertCore(expert: ExpertSummary, refCount: number) {
 }
 
 async function skillPreviews(
-  ctx: CatalogContext,
+  ctx: CatalogDeps,
   skillIds: string[],
 ): Promise<ExpertSkillPreviewView[]> {
   const skills: ExpertSkillPreviewView[] = [];
@@ -54,7 +54,7 @@ async function skillPreviews(
 }
 
 async function skillSummaries(
-  ctx: CatalogContext,
+  ctx: CatalogDeps,
   labels: Map<string, string>,
   skillIds: string[],
 ): Promise<ExpertSkillSummaryView[]> {
@@ -73,7 +73,7 @@ async function skillSummaries(
 }
 
 async function toolSummaries(
-  ctx: CatalogContext,
+  ctx: CatalogDeps,
   toolIds: string[],
 ): Promise<ExpertToolSummaryView[]> {
   const tools: ExpertToolSummaryView[] = [];
@@ -85,7 +85,7 @@ async function toolSummaries(
 }
 
 export async function listExperts(
-  ctx: CatalogContext,
+  ctx: CatalogDeps,
   query: ExpertQuery,
 ): Promise<Page<ExpertListItem>> {
   const page = await ctx.expertRead.list(query);
@@ -103,7 +103,7 @@ export async function listExperts(
   return { ...page, items };
 }
 
-export async function getExpert(ctx: CatalogContext, id: string): Promise<ExpertDetailView> {
+export async function getExpert(ctx: CatalogDeps, id: string): Promise<ExpertDetailView> {
   const [expert, categories, counts] = await Promise.all([
     ctx.expertRead.get(id),
     ctx.skillRead.listCategories(),

@@ -39,6 +39,6 @@ export {
   ensureOptionalText,
   ensureText,
 } from "./validation.ts";
-export { buildWhere, type FilterField } from "./sql.ts";
+export { buildWhere, escapeLike, type FilterField } from "./sql.ts";
 export type { RevisionedLifecycle } from "./lifecycle.ts";
 export { toIso, toIsoOrNull } from "./time.ts";

@@ -5,24 +5,24 @@ import type {
   WorkflowSummary,
 } from "../workflow/index.ts";
 import { toReferences } from "./context.ts";
-import type { CatalogContext } from "./context.ts";
+import type { CatalogDeps } from "./types.ts";
 
 export async function listWorkflows(
-  ctx: CatalogContext,
+  ctx: CatalogDeps,
   query: WorkflowQuery,
 ): Promise<Page<WorkflowSummary>> {
   return ctx.workflowRead.list(query);
 }
 
 export async function getWorkflow(
-  ctx: CatalogContext,
+  ctx: CatalogDeps,
   id: string,
 ): Promise<WorkflowDetail> {
   return ctx.workflowRead.get(id);
 }
 
 export async function listWorkflowsByExpertReferences(
-  ctx: CatalogContext,
+  ctx: CatalogDeps,
   expertId: string,
 ): Promise<Reference[]> {
   const workflows = await ctx.workflowRead.listByExpert(expertId);

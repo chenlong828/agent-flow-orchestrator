@@ -267,7 +267,7 @@ async function deleteTool(
 }
 
 export function createToolService(deps: ToolDeps): ToolService {
-  const ctx: ToolServiceContext = { ...deps, store: createToolStore(deps.db) };
+  const ctx: ToolServiceContext = { ...deps, store: createToolStore() };
 
   return {
     create: (input, requestActor) => createTool(ctx, input, requestActor),
@@ -279,7 +279,7 @@ export function createToolService(deps: ToolDeps): ToolService {
 
 export function createToolRead(deps: { db: Db }): ToolRead {
   const { db } = deps;
-  const store = createToolStore(db);
+  const store = createToolStore();
 
   async function summaryFor(row: ToolRootRow): Promise<ToolSummary> {
     const params = await store.paramsFor(db, row.id);

@@ -20,7 +20,7 @@ import {
   ValidationError,
 } from "../../../src/core/kernel/index.ts";
 import type { FileStore, ReferenceGuard } from "../../../src/core/kernel/index.ts";
-import { createSkillDraftService } from "../../../src/components/skill/draft.ts";
+import { createSkillDraftService } from "../../../src/components/skill/draft-service.ts";
 import { readSkillPackage } from "../../../src/components/skill/package.ts";
 import { seedAll } from "../../../scripts/seed.ts";
 

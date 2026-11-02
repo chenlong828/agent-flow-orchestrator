@@ -183,7 +183,7 @@ async function tagsFor(tx: Db, harnessId: string): Promise<string[]> {
 
 export type HarnessStore = ReturnType<typeof createHarnessStore>;
 
-export function createHarnessStore(db: Db) {
+export function createHarnessStore() {
   return {
     insertRoot,
     updateRoot,

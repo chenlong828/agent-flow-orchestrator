@@ -161,7 +161,7 @@ async function listByHarness(tx: Db, harnessId: string): Promise<{ id: string; n
 
 export type ToolStore = ReturnType<typeof createToolStore>;
 
-export function createToolStore(db: Db) {
+export function createToolStore() {
   return {
     insertRoot,
     updateRoot,

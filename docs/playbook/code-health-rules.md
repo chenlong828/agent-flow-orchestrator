@@ -2,7 +2,7 @@
 layer: playbook
 module: global
 status: draft
-updated: 2026-10-30
+updated: 2026-11-02
 ---
 
 # 代码健康规则：用报告反馈收敛
@@ -32,8 +32,8 @@ updated: 2026-10-30
 
 | ID | 规则 | 工具 | 阈值 | 级别 | 说明 |
 |---|---|---|---|---|---|
-| Q-01 | 文件行数 | `oxlint` + 原始行数 | >600 行 | `HARD`（新文件/本次改动）；>500 为 `WARN` | 物理行，含注释和空行；当前只有 `skill/draft.ts` 623 行超过 600 |
-| Q-02 | 函数行数 | `oxlint` | >80 行 | `HARD`（新函数/本次改动） | 物理行；现有 19 个函数超限，先记基线，不要求一次清完 |
+| Q-01 | 文件行数 | `oxlint` + 原始行数 | >600 行 | `HARD`（新文件/本次改动）；>500 为 `WARN` | 物理行，含注释和空行；当前最大 419（`skill/package.ts`），无 >600 文件 |
+| Q-02 | 函数行数 | `oxlint` | >80 行 | `HARD`（新函数/本次改动） | 物理行；2026-10-30 拆分前 19 个函数超限，当前 0 |
 | Q-03 | 函数参数 | `oxlint` | >5 个 | `HARD` | 超过 5 个通常说明缺少参数对象或职责过多 |
 | Q-04 | 圈复杂度 | `oxlint` | >15 | `HARD`（新函数/本次改动） | 与函数行数同时看；复杂度 78 的 `analyzeTopology` 不是靠拆行能解决的 |
 | Q-05 | 嵌套深度 | `oxlint` | >4 层 | `WARN` | 当前 0 个超限；保留为回归护栏，不单独作为重构理由 |
@@ -43,21 +43,21 @@ updated: 2026-10-30
 | ID | 规则 | 工具 | 阈值 | 级别 | 说明 |
 |---|---|---|---|---|---|
 | Q-06 | 循环依赖 | `ts-morph` + `oxlint` | >0 个 SCC | `HARD` | 当前 0；新增即失败 |
-| Q-07 | 跨组件深导入 | `ts-morph` | >0 处 | `HARD`（本次改动） | 只算 `src/components` 内部，以及 `main.ts` 绕过组件 index；`contract.ts` 视为公共子路径；`main.ts` 是组合根，但装配仍必须经组件 barrel，因此不豁免深导入（与 Q-11 的扇出豁免不同）；当前 2 处，都是 `main.ts` 绕过 `skill/index.ts` |
-| Q-08 | 孤儿文件 | `ts-morph` + `knip` | >0 个 | `HARD`（新增文件） | 当前 1 个：`skill/index.ts`；它与 Q-07 是同一个问题 |
-| Q-09 | 孤儿运行时导出 | `knip` | >0 个 | `RATCHET` | 当前 8 个；修一个减一个，不要求一次清完 |
-| Q-10 | 孤儿类型 | `knip` | 仅报告 | `INFO` | 当前 85 个，多数是 barrel 的 `export type`；先区分公共契约和死类型，不直接删 |
+| Q-07 | 跨组件深导入 | `ts-morph` | >0 处 | `HARD`（本次改动） | 只算 `src/components` 内部，以及 `main.ts` 绕过组件 index；`contract.ts` 视为公共子路径；`main.ts` 是组合根，但装配仍必须经组件 barrel，因此不豁免深导入（与 Q-11 的扇出豁免不同）；当前 0 处 |
+| Q-08 | 孤儿文件 | `ts-morph` + `knip` | >0 个 | `HARD`（新增文件） | 当前 0 个 |
+| Q-09 | 孤儿运行时导出 | `knip` | >0 个 | `RATCHET` | 当前 0 个；新增即失败 |
+| Q-10 | 孤儿类型 | `knip` | 仅报告 | `INFO` | 当前 87 个，多数是 barrel 的 `export type`；先区分公共契约和死类型，不直接删 |
 | Q-11 | 组件扇出 | `ts-morph` | >8 个 | `WARN` | `main.ts` 是组合根，单独豁免；当前 `http-gateway/app.ts` 为 8，刚好在线上 |
 
 ### 3.3 复制与类型逃逸
 
 | ID | 规则 | 工具 | 阈值 | 级别 | 说明 |
 |---|---|---|---|---|---|
-| Q-12 | 克隆块 | `jscpd` | 新增块 >0；存量只减不增 | `HARD`（新增）/`RATCHET`（存量） | 当前 12 块、2.21%；最小检测 8 行/70 tokens |
-| Q-13 | 非空断言 `!` | `oxlint` | 新增 >0；存量只减不增 | `HARD`（新增）/`RATCHET`（存量） | 当前 17 处；先用局部变量或显式校验替代 |
+| Q-12 | 克隆块 | `jscpd` | 新增块 >0；存量只减不增 | `HARD`（新增）/`RATCHET`（存量） | 当前 0 块 / 0.00%；最小检测 8 行/70 tokens；2–4 行的 helper 副本是检测盲区 |
+| Q-13 | 非空断言 `!` | `oxlint` | 新增 >0；存量只减不增 | `HARD`（新增）/`RATCHET`（存量） | 当前 0 处；先用局部变量或显式校验替代 |
 | Q-14 | `any` / `ts-ignore` / `ts-expect-error` | `oxlint` | >0 | `HARD` | 当前均为 0；不能靠注释绕过类型检查 |
-| Q-15 | 重复字符串 | `ts-morph` | 仅报告 | `INFO` | 只统计跨 ≥3 个文件的字符串；当前 50 组，多为字段名和校验消息；不作为门禁 |
-| Q-16 | 可选字段比例 | `ts-morph` | >30% | `WARN` | 排除 `Update*`、`Patch*`、`*Query`；当前 `CreateExpert` 75%，需要语义判断 |
+| Q-15 | 重复字符串 | `ts-morph` | 仅报告 | `INFO` | 只统计跨 ≥3 个文件的字符串；当前 54 组，多为字段名和校验消息；不作为门禁 |
+| Q-16 | 可选字段比例 | `ts-morph` | >30% | `WARN` | 排除 `Update*`、`Patch*`、`*Query`；当前 `CreateTool` 28.6%，已回到阈值内 |
 
 ### 3.4 契约、数据与运行时边界
 
@@ -65,8 +65,8 @@ updated: 2026-10-30
 |---|---|---|---|---|---|
 | Q-17 | OpenAPI/DTO 字段一致 | 既有字段测试 | >0 fail | `HARD` | 当前 13 pass / 0 fail；契约变更必须跑 |
 | Q-18 | 表宽度 | `pgsql-ast-parser` | >20 列 | `WARN` | 当前 `harness` 16 列 |
-| Q-19 | 可空列比例 | `pgsql-ast-parser` | >50% | `WARN` | 当前 `skill_draft` 62.5%；草稿/JSON 表可能合理，逐列确认 |
-| Q-20 | 路由方法分支 | `ts-morph` | >12 | `HARD`（本次改动） | 按 `IfStatement` 计数，避免 `&&` 重复计数；当前 `routes/skill.ts` 14；应下沉到 handler/用例 |
+| Q-19 | 可空列比例 | `pgsql-ast-parser` | >50% | `WARN` | 当前 `skill_draft` 37.5%；草稿/JSON 表可能合理，逐列确认 |
+| Q-20 | 路由方法分支 | `ts-morph` | >12 | `HARD`（本次改动） | 按 `IfStatement` 计数，避免 `&&` 重复计数；当前 `routes/workflow.ts` 10（≤12）；应下沉到 handler/用例 |
 | Q-21 | 配置外 `process.env` | `ts-morph` | >0 | `HARD` | 当前 0；环境读取统一走 `core/config` |
 | Q-22 | Bun 文件/SQL API 越界 | `ts-morph` | >0 | `HARD` | 当前 0；只允许在批准的平台/配置/文档模块 |
 | Q-23 | 非入口 `console` | `ts-morph` | >0 | `HARD` | 当前 0；入口启动日志和错误边界 `console.error` 例外 |
@@ -77,9 +77,9 @@ updated: 2026-10-30
 
 | ID | 规则 | 工具 | 阈值 | 级别 | 说明 |
 |---|---|---|---|---|---|
-| Q-26 | 单文件直接导出 | `ts-morph` | >20 | `WARN` | 只数本文件直接声明，排除 re-export；含 `export type` 与默认导出；当前 18（`catalog/index.ts`） |
-| Q-27 | 单文件 import | `ts-morph` | >20 | `WARN` | 当前 17 |
-| Q-28 | 单文件函数数量 | `ts-morph` | >20 | `WARN` | 当前 18；`skill/package.ts` 是解析器，不构成上帝对象 |
+| Q-26 | 单文件直接导出 | `ts-morph` | >20 | `WARN` | 只数本文件直接声明，排除 re-export；含 `export type` 与默认导出；当前 17（`catalog/types.ts`） |
+| Q-27 | 单文件 import | `ts-morph` | >20 | `WARN` | 当前 18 |
+| Q-28 | 单文件函数数量 | `ts-morph` | >20 | `WARN` | 当前 20（`expert/store.ts`、`workflow/service.ts`）；`skill/package.ts` 是解析器，不构成上帝对象 |
 | Q-29 | 单类方法数 | `ts-morph` | >10 | `WARN` | 当前 6 |
 | Q-30 | git 热点 / fix churn / 多任务 churn | `git` | 仅报告 | `INFO` | 当前热点 0、fix 0、多任务 23；历史信号，不进入单次门禁 |
 
@@ -89,7 +89,7 @@ updated: 2026-10-30
 
 ### 文件行数
 
-当前物理行数分布：
+2026-10-30 拆分前行数分布（阈值选择依据）：
 
 ```text
 >300：8 个文件
@@ -100,11 +100,11 @@ updated: 2026-10-30
 
 - 取 **600 作为硬上限**：只卡住最大的一个，适合作为新文件的绝对上限，不会把现有中大型文件全部判死。
 - 取 **500 作为提醒线**：能覆盖 `expert/service.ts` 537、`workflow/graph.ts` 518、`catalog/index.ts` 513、`workflow/service.ts` 502；这四个文件不一定要马上拆，但不应继续长。
-- 如果按“非空非注释行”计，`skill/draft.ts` 只有 575 行，600 会直接放行。因此规则明确采用**物理行**，避免同一个文件在不同工具下得到相反结论。
+- 如果按“非空非注释行”计，历史上的 `skill/draft.ts` 以物理行计 600+，非空非注释行只有 575 行，600 会直接放行。因此规则明确采用**物理行**，避免同一个文件在不同工具下得到相反结论。
 
 ### 函数行数
 
-当前物理行数分布：
+2026-10-30 拆分前行数分布（阈值选择依据）：
 
 ```text
 >80：19 个函数
@@ -125,13 +125,15 @@ updated: 2026-10-30
 4. 重复跑同一命令，确认没有新增 WARN；报告是唯一事实来源，不在对话里另记一套数。
 5. 确实需要例外时，把原因写进本次工序的 `brief.md`/`result.md` 或规则允许列表；不要用无原因的 inline disable 把规则静音。
 
-## 6. 当前最该处理的三件事
+## 6. 2026-10-30 已处理的三件事
 
 不是 30 项一起改，而是按“规则反馈”收敛：
 
-1. `skill/draft.ts`：623 行 / `createSkillDraftService` 424 行；先拆工厂，再拆 `saveDraft`。
-2. `workflow/graph.ts`：`analyzeTopology` 复杂度 78；按拓扑阶段拆函数，不按行数硬切。
-3. `routes/skill.ts`：`handleSkill` 复杂度 57、14 个方法分支；把方法分发下沉到独立 handler。
+1. `skill/draft.ts`：已按 D1 拆成 `draft-service` + 内部模块；原 `draft.ts` 转发桩已于 2026-11-02 删除。
+2. `workflow/graph.ts`：`analyzeTopology` 已按拓扑阶段拆分，复杂度回到阈值内。
+3. `routes/skill.ts`：已拆为 `skills.ts` / `skill-drafts.ts`，路由方法分支回到阈值内。
+
+下一批以 `bun run quality:report` 的当前输出为准；helper 去重与 store 形状已按 2026-11-02 的跟进处理收口。
 
 ## 7. 工具与命令
 
