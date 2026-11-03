@@ -27,8 +27,13 @@ docs/
 │   └── scenarios/
 │       ├── _index.md
 │       ├── agent-capability-assets/
-│       │   └── expert-capability-definition-and-assembly/
-│       │       └── expert-definition-and-assembly-management/
+│       │   ├── expert-capability-definition-and-assembly/
+│       │   │   └── expert-definition-and-assembly-management/
+│       │   │       └── scenario.md
+│       │   └── skill-capability-definition-and-supply/
+│       │       ├── skill-draft-and-publishing/
+│       │       │   └── scenario.md
+│       │       └── skill-retrieval-and-supply/
 │       │           └── scenario.md
 │       └── workflow-orchestration/
 │           └── workflow-definition/
@@ -50,7 +55,7 @@ docs/
 其余内容在诞生时创建，**不预建空目录、不预建索引行**：
 
 - `requirements/`：一卡一文件 `REQ-0001-<slug>.md`，只回答「为什么做」；
-- `design/scenarios/`：`<领域>/<价值流>/<场景>/scenario.md`，业务功能树按需建立；首个试点与生成索引已存在；
+- `design/scenarios/`：`<领域>/<价值流>/<场景>/scenario.md`，业务功能树按需建立；专家、Skill 与工作流定义的场景与生成索引已存在；
 - `design/components/` 与 `design/scenarios/` 是**按文档类型分的兄弟目录**：前者是单组件规格，后者是跨组件运行序；`architecture.md` 是系统视图。三者不混放，也不因为“一切皆组件”而扁平化。
 - `works/`：一级只有工序目录 `YYYY-MM-DD-<短名>/`，含 `brief.md`，收口后补 `result.md` 再整目录归档。
 - `playbook/`：方法层，一份 playbook 对应一类可复用的设计判断；`status` 为 `draft / current / deprecated`，废弃后移入 `history/playbooks/`。不复制组件契约，强制规则应升级到技能。
@@ -66,7 +71,7 @@ docs/
 5. [`design/architecture.md`](design/architecture.md) —— 现行组件边界、依赖与数据所有权
 6. [`design/scenarios/_index.md`](design/scenarios/_index.md) —— 业务域/价值流/场景的生成索引；先看场景再看组件
 7. [`design/scenarios/agent-capability-assets/expert-capability-definition-and-assembly/expert-definition-and-assembly-management/scenario.md`](design/scenarios/agent-capability-assets/expert-capability-definition-and-assembly/expert-definition-and-assembly-management/scenario.md) —— 首个试点场景：入口、运行序、外部引用与 3+1
-    `design/scenarios/workflow-orchestration/` 下另有工作流定义三个 `verified` 场景：组合管理、编辑与校验、定义交换；覆盖 B3 定义侧，B4 运行与 UI 未做，以场景索引为准。
+    `design/scenarios/agent-capability-assets/skill-capability-definition-and-supply/` 下有 Skill 草稿与发布、检索与供给两个 `verified` 场景；`design/scenarios/workflow-orchestration/` 下另有工作流定义三个 `verified` 场景：组合管理、编辑与校验、定义交换；覆盖 B3 定义侧，B4 运行与 UI 未做，以场景索引为准。
 8. [`design/components/kernel/spec.md`](design/components/kernel/spec.md) 与 [`config/spec.md`](design/components/config/spec.md) —— 共享错误/分页/端口，以及 TOML 启动配置
 9. [`design/components/http-gateway/spec.md`](design/components/http-gateway/spec.md) —— 对外 REST 契约；运行时 `/openapi.yaml` 与 Swagger UI `/docs` 由 `CMP-http-gateway` 直接提供；外部项目若接入按此消费
 10. [`design/components/workflow/spec.md`](design/components/workflow/spec.md) —— `CMP-workflow` 的聚合、图保存/校验、DSL 与专家引用投影

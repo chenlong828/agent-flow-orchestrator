@@ -3,14 +3,14 @@ layer: design
 module: global
 status: current
 generated: true
-updated: 2026-10-30
+updated: 2026-11-04
 ---
 
 # 业务场景索引
 
 > 生成物，不手改。修改场景后运行 `bun run docs:index`；校验运行 `bun run docs:check`。
 
-共 4 个场景。
+共 6 个场景。
 
 ## 智能体能力资产
 
@@ -19,6 +19,13 @@ updated: 2026-10-30
 | 场景 | 状态 | 流程设计 | 代码入口 | 文档 | 测试 | 外部引用 |
 |---|---|---|---|---|---|---|
 | [SCN-0001 专家定义与装配管理](agent-capability-assets/expert-capability-definition-and-assembly/expert-definition-and-assembly-management/scenario.md) | designed | [scenario.md#3 运行序](agent-capability-assets/expert-capability-definition-and-assembly/expert-definition-and-assembly-management/scenario.md#3-运行序) | `CMP-http-gateway src/components/http-gateway/app.ts#createHttpApp`<br>`CMP-expert src/components/expert/service.ts#createExpertService`<br>`CMP-catalog src/components/catalog/index.ts#createCatalog` | [docs/design/components/expert/spec.md#3.2 方法契约](../components/expert/spec.md#32-方法契约)<br>[docs/design/components/http-gateway/spec.md#5.4 专家](../components/http-gateway/spec.md#54-专家)<br>[docs/design/components/catalog/spec.md#3.1 方法契约](../components/catalog/spec.md#31-方法契约) | `R1 TC-EXP-001` POST 可带有序装配，创建与装配一次返回<br>`R2 TC-EXP-002` GET 列表返回前 3 个 Skill 预览，按装配顺序<br>`R3 TC-EXP-003` PATCH 聚合更新只改提交字段并一次递增 revision；缺 If-Match 428、旧版本 409<br>`N1 TC-EXP-004` POST 装配目标不存在返回 400，专家根回滚 | `src/components/http-gateway/openapi.yaml#createExpert`<br>`src/components/http-gateway/openapi.yaml#listExperts`<br>`src/components/http-gateway/openapi.yaml#patchExpertAggregate` |
+
+### Skill 能力定义与供给
+
+| 场景 | 状态 | 流程设计 | 代码入口 | 文档 | 测试 | 外部引用 |
+|---|---|---|---|---|---|---|
+| [SCN-0002 Skill 草稿与发布](agent-capability-assets/skill-capability-definition-and-supply/skill-draft-and-publishing/scenario.md) | verified | [scenario.md#3 运行序](agent-capability-assets/skill-capability-definition-and-supply/skill-draft-and-publishing/scenario.md#3-运行序) | `CMP-http-gateway src/components/http-gateway/app.ts#createHttpApp`<br>`CMP-skill src/components/skill/draft-service.ts#createSkillDraftService`<br>`CMP-catalog src/components/catalog/index.ts#createCatalog` | [docs/design/components/skill/spec.md#3.2 方法契约](../components/skill/spec.md#32-方法契约)<br>[docs/design/components/http-gateway/spec.md#5.3 Skill](../components/http-gateway/spec.md#53-skill)<br>[docs/design/components/skill/spec.md#5 验证](../components/skill/spec.md#5-验证) | `R1 TC-SKL-001` 新建草稿上传附件后保存生成 v1.0 包，草稿被消费<br>`R2 TC-SKL-002` 已有 Skill 草稿复制整包，保存递增 minor 并更新文档与下载<br>`R3 TC-SKL-003` 保存失败保留草稿与旧 Skill，改名后可重试成功<br>`N1 TC-SKL-004` 更新保存缺 If-Match 返回 428、旧版本 409，失败保留草稿 | `src/components/http-gateway/openapi.yaml#createSkillDraft`<br>`src/components/http-gateway/openapi.yaml#getSkillDraft`<br>`src/components/http-gateway/openapi.yaml#uploadSkillDraftFile`<br>`src/components/http-gateway/openapi.yaml#renameSkillDraftFile`<br>`src/components/http-gateway/openapi.yaml#deleteSkillDraftFile`<br>`src/components/http-gateway/openapi.yaml#cancelSkillDraft`<br>`src/components/http-gateway/openapi.yaml#saveSkillDraft` |
+| [SCN-0003 Skill 检索与供给](agent-capability-assets/skill-capability-definition-and-supply/skill-retrieval-and-supply/scenario.md) | verified | [scenario.md#3 运行序](agent-capability-assets/skill-capability-definition-and-supply/skill-retrieval-and-supply/scenario.md#3-运行序) | `CMP-http-gateway src/components/http-gateway/app.ts#createHttpApp`<br>`CMP-skill src/components/skill/read.ts#createSkillRead`<br>`CMP-catalog src/components/catalog/index.ts#createCatalog` | [docs/design/components/skill/spec.md#3.2 方法契约](../components/skill/spec.md#32-方法契约)<br>[docs/design/components/http-gateway/spec.md#5.3 Skill](../components/http-gateway/spec.md#53-skill)<br>[docs/design/components/catalog/spec.md#3.1 方法契约](../components/catalog/spec.md#31-方法契约) | `R1 TC-SKR-001` 列表按检索、分类、标签与启停过滤，并返回分类与引用计数<br>`R2 TC-SKR-002` 详情返回正文与文件清单，文档原文可按 ETag 条件读取<br>`R3 TC-SKR-003` 下载 zip 含当前包内容且支持 304，停用后仍可读<br>`N1 TC-SKR-004` 未知 Skill 的详情、文档与下载返回 404，不返回 304 | `src/components/http-gateway/openapi.yaml#listSkills`<br>`src/components/http-gateway/openapi.yaml#getSkill`<br>`src/components/http-gateway/openapi.yaml#getSkillDocument`<br>`src/components/http-gateway/openapi.yaml#downloadSkillPackage`<br>`src/components/http-gateway/openapi.yaml#listSkillCategories` |
 
 ## 工作流编排
 
