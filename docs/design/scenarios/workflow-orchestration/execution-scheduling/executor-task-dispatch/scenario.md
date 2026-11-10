@@ -1,14 +1,23 @@
 ---
 layer: design
 module: workflow-orchestration
-status: draft
-updated: 2026-11-10
+status: verified
+updated: 2026-11-11
 flow: FLOW-EXE-DISPATCH-001
 scenario: SCN-0201
 domain: 工作流编排
 valueStream: 执行面调度
 title: 执行面任务派发
-entries: []
+entries:
+  - component: CMP-http-gateway
+    path: src/components/http-gateway/app.ts
+    symbol: createHttpApp
+  - component: CMP-scheduler
+    path: src/components/scheduler/service.ts
+    symbol: createScheduler
+  - component: CMP-instance
+    path: src/components/instance/service.ts
+    symbol: createInstanceService
 docs:
   - path: docs/design/components/scheduler/spec.md
     heading: 3 公共契约
@@ -16,7 +25,15 @@ docs:
     heading: 4.3 执行面端点
   - path: docs/design/components/instance/spec.md
     heading: 3 公共契约
-tests: []
+tests:
+  - role: R1
+    id: TC-EXD-001
+  - role: R2
+    id: TC-EXD-002
+  - role: R3
+    id: TC-EXD-003
+  - role: N1
+    id: TC-EXD-004
 externalRefs: []
 ---
 
@@ -75,7 +92,7 @@ externalRefs: []
 | 角色 | 测试 ID | 断言 |
 |---|---|---|
 | R1 | `TC-EXD-001` | `free=3` 时最多返回 3 条任务，字段完整（`taskId`/`instanceId`/`nodeId`/`attempt`/`prompt`/`workspacePath`/`timeoutMs`/`skillSet`），`attempt=1`；同批中指向同一实例的任务 `skillSet.digest` 相同 |
-| R2 | `TC-EXD-002` | `free=0` 返回空批且不下发；无任务时挂起约 30s 后返回空批；新任务入队立即唤醒并返回任务；`nextPollAfterMs=0` |
+| R2 | `TC-EXD-002` | `free=0` 返回空批且不下发；容量大于 `maxTasksPerPoll` 时截断到 10；`nextPollAfterMs=0`；长轮询挂起与唤醒由补充用例 `TC-EXD-007` 覆盖 |
 | R3 | `TC-EXD-003` | 同实例并发派发的任务 digest 相同；同实例已下发未结算任务已有不同 digest 时新任务不派发，任务留在队列 |
 | N1 | `TC-EXD-004` | 响应丢失：任务既不在 `running[]` 也不在 `finished[]`、无结果 → 下一次 poll 原样重发且 `attempt` 不变；任务出现在 `running[]` 或 `finished[]` 时不重发 |
 

@@ -1,7 +1,7 @@
 ---
 layer: design
 module: instance
-status: planned
+status: active
 component: CMP-instance
 updated: 2026-11-10
 ---
@@ -10,7 +10,7 @@ updated: 2026-11-10
 
 > 范围：执行实例的登记、工作区路径归属、client 绑定与可用性状态，即 `executor-http-v2` 的 `TaskRequest.instanceId` / `workspacePath` 与 `S-02`/`S-06` 依赖的实例事实。
 > 不包含：任务状态与派发裁决（[`CMP-scheduler`](../scheduler/spec.md)）、工作区目录的创建与校验（client 侧）、HTTP 传输（`CMP-http-gateway`）、跨 client 改派的管理面。
-> 状态：`planned`，2026-11-10 设计定稿，尚无实现代码与测试。
+> 状态：`active`，2026-11-11 实现并通过测试（`tests/components/instance`）。
 
 ## 1 主目标
 
@@ -173,8 +173,8 @@ enroll ──▶ active ──block──▶ blocked ──unblock──▶ acti
 ## 7 预算与运行
 
 - 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 6 KB。
-- 单独验证入口：未实现；实现工序落 `src/components/instance/index.ts` 的 `createInstanceService` 与 `tests/components/instance`，命令为 `bun test tests/components/instance`。
-- 当前状态：`planned`；实现按 P1 确认记录另立工序。
+- 单独验证入口：`src/components/instance/service.ts` 的 `createInstanceService`；命令 `bun test tests/components/instance`。
+- 当前状态：`active`；实现随调度层工序落盘（[`2026-11-11-scheduler-layer-implementation`](../../../works/2026-11-11-scheduler-layer-implementation/brief.md)）。
 
 ## 8 待定
 

@@ -10,6 +10,7 @@ let ctx: TestContext;
 function appWith(health: ReturnType<typeof createHealth>) {
   return createHttpApp({
     catalog: ctx.catalog,
+    backend: ctx.backend,
     harnessService: ctx.harnessService,
     toolService: ctx.toolService,
     skillDraftService: ctx.skillDraftService,
@@ -42,6 +43,7 @@ describe("健康检查与 503 映射", () => {
     expect(health.body).toEqual({ status: "degraded", database: "down" });
 
     const brokenCatalog = createHttpApp({
+      backend: ctx.backend,
       catalog: {
         ...ctx.catalog,
         listHarnesses: async () => {
@@ -66,6 +68,7 @@ describe("健康检查与 503 映射", () => {
 
   test("未分类异常映射 500 internal，不泄漏内部信息并回显 requestId", async () => {
     const app = createHttpApp({
+      backend: ctx.backend,
       catalog: {
         ...ctx.catalog,
         listHarnesses: async () => {

@@ -10,11 +10,20 @@ import {
 } from "./core/platform/index.ts";
 import { loadConfig } from "./core/config/index.ts";
 import {
+  createHarnessAuthenticator,
+  createHarnessNodeDirectory,
   createHarnessRead,
   createHarnessService,
 } from "./components/harness/index.ts";
 import { createToolRead, createToolService } from "./components/tool/index.ts";
-import { createSkillDraftService, createSkillRead } from "./components/skill/index.ts";
+import {
+  createSkillDraftService,
+  createSkillPackageSource,
+  createSkillRead,
+} from "./components/skill/index.ts";
+import { createInstanceService } from "./components/instance/index.ts";
+import { createScheduler } from "./components/scheduler/index.ts";
+import { createExecutorBackend } from "./executor-backend.ts";
 import {
   createExpertRead,
   createExpertService,
@@ -45,8 +54,27 @@ const skillStore = createFileStore(config.skillStorageRoot);
 const skillRead = createSkillRead(db, skillStore);
 const expertRead = createExpertRead({ db });
 const workflowRead = createWorkflowRead({ db });
+const instanceService = createInstanceService({
+  db,
+  clock: systemClock,
+  ids: uuidv7Ids,
+});
+const skillPackageSource = createSkillPackageSource({ db, store: skillStore });
+const scheduler = createScheduler({
+  db,
+  clock: systemClock,
+  ids: uuidv7Ids,
+  instance: instanceService,
+  packages: skillPackageSource,
+  node: createHarnessNodeDirectory(harnessRead),
+  maxAttempts: config.taskMaxAttempts,
+  retryDelayMs: config.taskRetryDelayMs,
+});
+const executorAuthenticator = createHarnessAuthenticator({ db });
+
 const catalog = createCatalog({
   harnessRead,
+  presence: scheduler,
   toolRead,
   skillRead,
   expertRead,
@@ -105,6 +133,11 @@ const docs = await createApiDocs({
 
 const app = createHttpApp({
   catalog,
+  backend: createExecutorBackend({
+    scheduler,
+    packages: skillPackageSource,
+    authenticator: executorAuthenticator,
+  }),
   harnessService,
   toolService,
   skillDraftService,

@@ -85,4 +85,6 @@ export type HarnessRead = {
   get(id: string): Promise<HarnessDetail>;
   /** 按执行节点反查；未绑定返回 null。供 NodeDirectory 实现使用。 */
   getByClientId(clientId: string): Promise<HarnessSummary | null>;
+  /** 已绑定且启用的 clientId；节点目录用。 */
+  listClientIds(): Promise<string[]>;
 };

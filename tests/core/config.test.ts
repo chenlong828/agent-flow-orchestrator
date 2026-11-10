@@ -47,6 +47,8 @@ describe("CMP-config 默认值与文件覆盖", () => {
       logLevel: "info",
       skillStorageRoot: ".local/skills",
       skillDraftTtlHours: 24,
+      taskMaxAttempts: 3,
+      taskRetryDelayMs: 5000,
     });
   });
 
@@ -74,6 +76,8 @@ describe("CMP-config 默认值与文件覆盖", () => {
       logLevel: "warn",
       skillStorageRoot: ".local/skills",
       skillDraftTtlHours: 24,
+      taskMaxAttempts: 3,
+      taskRetryDelayMs: 5000,
     });
   });
 
@@ -102,6 +106,8 @@ describe("CMP-config 默认值与文件覆盖", () => {
       logLevel: "debug",
       skillStorageRoot: "/srv/skills",
       skillDraftTtlHours: 48,
+      taskMaxAttempts: 3,
+      taskRetryDelayMs: 5000,
     });
 
     expect(
@@ -123,6 +129,8 @@ describe("CMP-config 默认值与文件覆盖", () => {
       logLevel: "info",
       skillStorageRoot: ".local/skills",
       skillDraftTtlHours: 24,
+      taskMaxAttempts: 3,
+      taskRetryDelayMs: 5000,
     });
   });
 

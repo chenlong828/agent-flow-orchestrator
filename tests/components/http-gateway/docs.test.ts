@@ -132,6 +132,7 @@ describe("Swagger 文档端点", () => {
   test("网关委托文档路由；未注入 docs 时保持原有 404", async () => {
     const docsApp = createHttpApp({
       catalog: ctx.catalog,
+      backend: ctx.backend,
       harnessService: ctx.harnessService,
       toolService: ctx.toolService,
       skillDraftService: ctx.skillDraftService,

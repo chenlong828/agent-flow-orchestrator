@@ -4,6 +4,7 @@ import { loadConfig } from "../src/core/config/index.ts";
 import type { Db } from "../src/core/platform/index.ts";
 import type { FileStore } from "../src/core/kernel/index.ts";
 import { buildSkillPackage } from "../src/components/skill/package.ts";
+import { sha256Hex } from "../src/components/skill/digest.ts";
 
 type LegacyHarness = {
   id: string;
@@ -302,15 +303,17 @@ export async function seedAll(db: Db, store: FileStore): Promise<SeedResult> {
         body: skillPackageBody(skill),
         files: skillPackageFiles(skill),
       });
+      const packageDigest = sha256Hex(packageBytes);
       await store.put(`packages/${packageKey}`, packageBytes);
       await tx.query(
         `insert into skill
-          (id, name, category_code, description, package_key, version, enabled,
-           revision, created_at, updated_at, created_by, updated_by)
-         values ($1, $2, $3, $4, $5, $6, $7, 1, $8, $8, 'seed', 'seed')
+          (id, name, category_code, description, package_key, package_digest, package_size,
+           version, enabled, revision, created_at, updated_at, created_by, updated_by)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 1, $10, $10, 'seed', 'seed')
          on conflict (id) do update set
            name = excluded.name, category_code = excluded.category_code,
            description = excluded.description, package_key = excluded.package_key,
+           package_digest = excluded.package_digest, package_size = excluded.package_size,
            version = excluded.version, enabled = excluded.enabled,
            updated_at = excluded.updated_at, updated_by = 'seed'`,
         [
@@ -319,6 +322,8 @@ export async function seedAll(db: Db, store: FileStore): Promise<SeedResult> {
           CATEGORY[skill.category]!,
           skill.description,
           packageKey,
+          packageDigest,
+          packageBytes.byteLength,
           skill.version,
           skill.enabled,
           updatedAt,

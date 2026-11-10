@@ -1,14 +1,23 @@
 ---
 layer: design
 module: workflow-orchestration
-status: draft
-updated: 2026-11-10
+status: verified
+updated: 2026-11-11
 flow: FLOW-EXE-CONTROL-001
 scenario: SCN-0204
 domain: 工作流编排
 valueStream: 执行面调度
 title: 执行面停止与取消
-entries: []
+entries:
+  - component: CMP-http-gateway
+    path: src/components/http-gateway/app.ts
+    symbol: createHttpApp
+  - component: CMP-scheduler
+    path: src/components/scheduler/service.ts
+    symbol: createScheduler
+  - component: CMP-instance
+    path: src/components/instance/service.ts
+    symbol: createInstanceService
 docs:
   - path: docs/design/components/scheduler/spec.md
     heading: 4 状态机与不变量
@@ -16,7 +25,15 @@ docs:
     heading: 4.3 执行面端点
   - path: docs/design/components/instance/spec.md
     heading: 4 状态机与不变量
-tests: []
+tests:
+  - role: R1
+    id: TC-EXC-001
+  - role: R2
+    id: TC-EXC-002
+  - role: R3
+    id: TC-EXC-003
+  - role: N1
+    id: TC-EXC-004
 externalRefs: []
 ---
 

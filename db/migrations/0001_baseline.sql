@@ -110,6 +110,8 @@ create table skill (
   category_code text not null references skill_category (code) on delete restrict,
   description text not null check (char_length(description) between 1 and 400),
   package_key text not null unique,
+  package_digest text not null default '' check (package_digest ~ '^([0-9a-f]{64})?$'),
+  package_size integer not null default 0 check (package_size >= 0),
   version text not null check (version ~ '^v[0-9]+\.[0-9]+$'),
   enabled boolean not null default true,
   revision integer not null default 1 check (revision >= 1),
@@ -258,3 +260,62 @@ create table workflow_expert_ref (
 
 create index workflow_expert_ref_expert_idx
   on workflow_expert_ref (expert_id);
+
+-- 执行面：实例（工作区 + 归属 client）、任务列表与下发事实。
+
+create table instance (
+  id uuid primary key,
+  client_id text not null check (
+    char_length(client_id) between 1 and 64 and client_id !~ '\s'
+  ),
+  workspace_path text not null check (
+    char_length(workspace_path) between 1 and 1024 and left(workspace_path, 1) = '/'
+  ),
+  state text not null default 'active'
+    check (state in ('active', 'blocked', 'retired')),
+  block_reason text check (block_reason is null or block_reason in ('workspace_failure', 'operator')),
+  enrolled_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (client_id, workspace_path),
+  check (state <> 'blocked' or block_reason is not null)
+);
+
+create index instance_client_id_idx on instance (client_id);
+create index instance_state_idx on instance (state);
+
+create table task (
+  id uuid primary key,
+  instance_id uuid not null references instance (id) on delete restrict,
+  node_id text not null check (char_length(node_id) between 1 and 200),
+  attempt integer not null default 1 check (attempt between 1 and 100),
+  state text not null default 'queued' check (state in ('queued', 'dispatched', 'done')),
+  prompt text not null check (char_length(prompt) between 1 and 1048576),
+  workspace_path text not null,
+  timeout_ms integer not null check (timeout_ms > 0),
+  skill_set jsonb not null,
+  skill_set_digest text not null check (char_length(skill_set_digest) > 0),
+  outcome text check (outcome is null or outcome in ('succeeded', 'failed', 'cancelled', 'timeout')),
+  error jsonb,
+  not_before timestamptz not null default now(),
+  dispatched_at timestamptz,
+  cancel_requested_at timestamptz,
+  finished_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (state <> 'done' or outcome is not null),
+  check (state <> 'dispatched' or dispatched_at is not null)
+);
+
+create index task_queue_idx on task (state, not_before, created_at);
+create index task_instance_state_idx on task (instance_id, state);
+create index task_dispatched_at_idx on task (dispatched_at) where state = 'dispatched';
+
+create table task_attempt (
+  task_id uuid not null references task (id) on delete cascade,
+  attempt integer not null check (attempt between 1 and 100),
+  client_id text not null,
+  dispatched_at timestamptz not null,
+  settled_at timestamptz,
+  outcome text check (outcome is null or outcome in ('succeeded', 'failed', 'cancelled', 'timeout')),
+  primary key (task_id, attempt)
+);

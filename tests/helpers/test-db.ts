@@ -47,6 +47,9 @@ export async function closeTestDb(): Promise<void> {
 }
 
 const BUSINESS_TABLES = [
+  "task_attempt",
+  "task",
+  "instance",
   "workflow_expert_ref",
   "workflow_definition",
   "workflow",

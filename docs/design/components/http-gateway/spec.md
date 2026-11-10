@@ -737,7 +737,7 @@ B1/B3 不提供的页面动作：Harness 连接测试/心跳刷新、工具调�
 - 文档入口：启动后访问 `/docs`；机器可读契约：`/openapi.yaml`。OpenAPI 资产随组件发布，覆盖 49 个业务 operation 与 Skill 包/草稿、工作流定义 DTO。
 - `API-41`（Harness 节点登记）、`clientId`/`clientToken` 字段已实现，直接改基线表结构、未做数据迁移（演示数据可丢弃）。
 - 执行端三端点（§4.3）与 Harness 派生态 `health`/`lastHeartbeatAt` 仍未实现：前者随 `CMP-scheduler` 落地，后者依赖调度器 `presence` 读（`harness` §3.3），在此之前 `health` 仍返回列内历史值。
-- 执行面 3 个端点（`EXE-01`–`EXE-03`）为 2026-11-10 调度层设计新增，**尚未实现**；实现工序随 `CMP-scheduler`/`CMP-instance` 落地，落地前执行面路由不存在、产品端点行为不变。
+- 执行面 3 个端点（`EXE-01`–`EXE-03`）已实现（2026-11-11，`src/components/http-gateway/routes/executor.ts`）；实现工序随 `CMP-scheduler`/`CMP-instance` 落地，落地前执行面路由不存在、产品端点行为不变。
 - 当前状态：`current`；B1 资产端点与 B3 工作流定义端点均已实现，运行时 OpenAPI 为 32 个 path、49 个 operation（含 `/healthz`）；B3 验证记录见 [工作流工序 result.md](../../../history/works/2026-10-28-workflow-definition/result.md)。
 
 ## 10 B1/B3 实现口径与剩余问题

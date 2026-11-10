@@ -5,8 +5,12 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 const SRC = join(import.meta.dir, "../src");
 const COMPONENTS = join(SRC, "components");
 const KERNEL = join(SRC, "core", "kernel");
-const DOMAIN_COMPONENTS = ["harness", "tool", "skill", "expert", "workflow"] as const;
+const DOMAIN_COMPONENTS = ["harness", "tool", "skill", "expert", "workflow", "instance", "scheduler"] as const;
 const ALLOWED_DOMAIN_TARGETS = new Set(["core/kernel", "core/platform"]);
+/** 组合层组件的额外允许依赖：scheduler 编排实例（只读），其余仍只允许 kernel/platform。 */
+const EXTRA_ALLOWED_TARGETS: Record<string, ReadonlySet<string>> = {
+  scheduler: new Set(["instance"]),
+};
 
 function walk(directory: string): string[] {
   return readdirSync(directory).flatMap((name) => {
@@ -68,6 +72,7 @@ function domainImportViolations(entries: { file: string; specifier: string }[]):
     if (imported === null) continue;
     const target = unitOf(imported);
     if (target === null || target === owner || ALLOWED_DOMAIN_TARGETS.has(target)) continue;
+    if (EXTRA_ALLOWED_TARGETS[owner]?.has(target) === true) continue;
     violations.push(`${toPosix(relative(SRC, file))} -> ${specifier} (${target})`);
   }
   return violations;

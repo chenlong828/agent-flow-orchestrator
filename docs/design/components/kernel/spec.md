@@ -263,7 +263,7 @@ type ExecutorAuthenticator = {
 - 允许依赖：仅 TypeScript 标准库与纯类型工具。
 - 禁止依赖：`platform`、任何领域组件、`catalog`、`http-gateway`、Bun/PostgreSQL 驱动。
 - 本组件不拥有数据表；`schema_migrations` 属于 `platform`。
-- **实现状态**：`binding_conflict`、`BindingConflictError`、`NodeDirectory` 与 `ExecutorAuthenticator` 已实现；`task_not_found`、`unsupported_protocol`、`TaskNotFoundError`、`UnsupportedProtocolError` 与 `SkillPackageSource` 端口是 2026-11-10 调度层设计新增，尚未实现；其余错误类型与端口不变。
+- **实现状态**：`binding_conflict`、`NodeDirectory`、`ExecutorAuthenticator` 已实现（节点目录）；`task_not_found`、`package_not_found`、`unsupported_protocol`、`unauthorized` 与 `SkillPackageSource` 端口已随调度层实现（2026-11-11）；其余错误类型与端口不变。
 - 所有公开类型不得包含 HTTP 状态码、SQL 行类型或框架类型。
 
 ## 5. 单独验证

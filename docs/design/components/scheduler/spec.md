@@ -1,7 +1,7 @@
 ---
 layer: design
 module: scheduler
-status: planned
+status: active
 component: CMP-scheduler
 updated: 2026-11-10
 ---
@@ -10,7 +10,7 @@ updated: 2026-11-10
 
 > 范围：执行面任务列表与派发裁决，即 [`executor-http-v2`](../../contracts/executor-http-v2.md) 的 `S-01`–`S-08` 在调度器侧的落点。
 > 不包含：任务来源与 prompt 组成（上游编排，后续工序）、HTTP 传输（`CMP-http-gateway`）、实例登记与可用性（`CMP-instance`）、技能包字节与摘要计算（`CMP-skill`）。
-> 状态：`planned`，2026-11-10 设计定稿，尚无实现代码与测试。
+> 状态：`active`，2026-11-11 实现并通过测试（`tests/components/scheduler`、执行面场景测试）。
 
 ## 1 主目标
 
@@ -340,8 +340,8 @@ type SkillSet = { digest: string; packages: SkillPackageRef[] };
 ## 7 预算与运行
 
 - 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 12 KB。
-- 单独验证入口：未实现；实现工序落 `src/components/scheduler/index.ts` 的 `createScheduler` 与 `tests/components/scheduler`，命令为 `bun test tests/components/scheduler`。
-- 当前状态：`planned`。契约冻结在前（[`executor-http-v2`](../../contracts/executor-http-v2.md)），本规格只定调度器侧落点；实现按 P1 确认记录另立工序。
+- 单独验证入口：`src/components/scheduler/service.ts` 的 `createScheduler`；命令 `bun test tests/components/scheduler`。
+- 当前状态：`active`。契约冻结在前（[`executor-http-v2`](../../contracts/executor-http-v2.md)）；实现在 [`2026-11-11-scheduler-layer-implementation`](../../../works/2026-11-11-scheduler-layer-implementation/brief.md) 落盘，失败结果不自动重派按 2026-11-11 裁决。
 
 ## 8 待定
 

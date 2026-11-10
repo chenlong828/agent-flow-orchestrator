@@ -10,6 +10,7 @@ import type {
   SkillRead,
 } from "../skill/contract.ts";
 import type { ExpertQuery, ExpertRead } from "../expert/index.ts";
+import type { SchedulerPresenceRead } from "../scheduler/index.ts";
 import type {
   WorkflowDetail,
   WorkflowQuery,
@@ -178,6 +179,8 @@ export type CatalogRead = {
 
 export type CatalogDeps = {
   harnessRead: HarnessRead;
+  /** 执行面节点观测读；用于派生 Harness 在线状态（harness §3.3）。 */
+  presence: SchedulerPresenceRead;
   toolRead: ToolRead;
   skillRead: SkillRead;
   expertRead: ExpertRead;

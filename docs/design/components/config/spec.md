@@ -137,4 +137,4 @@ retry_delay_ms = 5000
 - `.env` 不进入 TOML，也不由本组件解析。
 - `SKILL_STORAGE_ROOT` 默认 `.local/skills`；`SKILL_DRAFT_TTL_HOURS` 默认 24；两者只从环境变量覆盖。
 - 执行面凭据按 [`2026-11-10-executor-client-token.md`](../../../history/decisions/2026-11-10-executor-client-token.md) 落 Harness 表，不再有 `EXECUTOR_CLIENTS`；`[executor]` 分节只放重试次数与退避。
-- **实现状态**：`TASK_MAX_ATTEMPTS`、`TASK_RETRY_DELAY_MS` 与 `[executor]` 分节是 2026-11-10 调度层设计新增，尚未实现；实现工序随 `CMP-scheduler` 落地，落地前这些键不存在，启动配置行为保持不变。
+- **实现状态**：`TASK_MAX_ATTEMPTS`、`TASK_RETRY_DELAY_MS` 与 `[executor]` 分节已随调度层实现（2026-11-11）；执行面凭据永久保存在 `harness.client_token`，配置不持有任何 token。

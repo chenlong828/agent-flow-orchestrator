@@ -18,6 +18,13 @@ export {
 } from "./errors.ts";
 export type { ErrorCode, ErrorDetails } from "./errors.ts";
 export {
+  PackageNotFoundError,
+  TaskNotFoundError,
+  UnauthorizedError,
+  UnsupportedProtocolError,
+} from "./errors-executor.ts";
+export * from "./executor.ts";
+export {
   DEFAULT_PAGE_LIMIT,
   MAX_PAGE_LIMIT,
   normalizePageQuery,
@@ -35,6 +42,8 @@ export type {
   Reference,
   ReferenceGuard,
   ReferenceOwner,
+  SkillPackageRef,
+  SkillPackageSource,
 } from "./ports.ts";
 export {
   ensureBoolean,

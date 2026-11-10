@@ -1,14 +1,23 @@
 ---
 layer: design
 module: workflow-orchestration
-status: draft
-updated: 2026-11-10
+status: verified
+updated: 2026-11-11
 flow: FLOW-EXE-SETTLE-001
 scenario: SCN-0202
 domain: 工作流编排
 valueStream: 执行面调度
 title: 执行面结果回收与未回报重派
-entries: []
+entries:
+  - component: CMP-http-gateway
+    path: src/components/http-gateway/app.ts
+    symbol: createHttpApp
+  - component: CMP-scheduler
+    path: src/components/scheduler/service.ts
+    symbol: createScheduler
+  - component: CMP-instance
+    path: src/components/instance/service.ts
+    symbol: createInstanceService
 docs:
   - path: docs/design/components/scheduler/spec.md
     heading: 4 状态机与不变量
@@ -16,7 +25,15 @@ docs:
     heading: 4.3 执行面端点
   - path: docs/design/components/scheduler/spec.md
     heading: 6 验证计划
-tests: []
+tests:
+  - role: R1
+    id: TC-EXR-001
+  - role: R2
+    id: TC-EXR-002
+  - role: R3
+    id: TC-EXR-003
+  - role: N1
+    id: TC-EXR-004
 externalRefs: []
 ---
 
@@ -65,7 +82,7 @@ client 执行完任务后回报结果；调度器以第一份被接受的结果�
 |---|---|---|
 | R1 | `TC-EXR-001` | 首份 `succeeded` 结果 `accepted=true`，任务 `done(succeeded)`；重复上报 `accepted=false` 且结果不被覆盖；未知 `taskId` 返回 404 `task_not_found` |
 | R2 | `TC-EXR-002` | 失败/超时结果一律直接 `done(failed)`、不再派发：`timeout` + `idle_timeout`、`timeout` + `prompt_timeout`、`failed(runtime)`、`failed(asset)`、`failed(scheduler)` 各一例；重复上报只回 `accepted=false` |
-| R3 | `TC-EXR-003` | 未回报才回队：client 静默超过 `clientSilentMs`、任务超过 `timeoutMs + resultGraceMs` 均回队、`attempt+1`、快照字段（`prompt`/`workspacePath`/`timeoutMs`/`skillSet`）不变；`attempt` 用尽后 `done(failed)`；退避期内不派发 |
+| R3 | `TC-EXR-003` | 未回报才回队：任务超过 `timeoutMs + resultGraceMs` 回队、`attempt+1`、快照字段不变；`attempt` 用尽后 `done(failed)`；退避期内不派发；静默回队与旧副本结果由补充用例 `TC-EXR-005` 覆盖 |
 | N1 | `TC-EXR-004` | `failed(workspace)` 使实例 `blocked`，同实例其余 `queued`/`dispatched` 任务结算失败且不再派发；重派后旧副本先交结果仍被接受（首份为准） |
 
 ## 6 覆盖边界

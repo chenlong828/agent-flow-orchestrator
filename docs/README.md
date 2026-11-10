@@ -65,7 +65,7 @@ docs/
 其余内容在诞生时创建，**不预建空目录、不预建索引行**：
 
 - `requirements/`：一卡一文件 `REQ-0001-<slug>.md`，只回答「为什么做」；
-- `design/scenarios/`：`<领域>/<价值流>/<场景>/scenario.md`，业务功能树按需建立；专家、Skill、工作流定义与执行面调度的场景与生成索引已存在（执行面 6 张为 `draft`，待实现工序补测试与入口后转 `designed`）；
+- `design/scenarios/`：`<领域>/<价值流>/<场景>/scenario.md`，业务功能树按需建立；专家、Skill、工作流定义与执行面调度的场景与生成索引已存在（执行面 6 张已 `verified`）；
 - `design/components/` 与 `design/scenarios/` 是**按文档类型分的兄弟目录**：前者是单组件规格，后者是跨组件运行序；`architecture.md` 是系统视图。三者不混放，也不因为“一切皆组件”而扁平化。
 - `design/contracts/`：跨项目 REST 契约（`executor-http-v2`）。放在 design 而不是 works，是因为契约是现行真相、会被另一个项目引用；client 仓库保留同构副本，冲突时以本仓库为准。这是 `doc-layout-spec` 的项目本地扩展，上游合并前以本段为准。
 - `works/`：一级只有工序目录 `YYYY-MM-DD-<短名>/`，含 `brief.md`，收口后补 `result.md` 再整目录归档。
@@ -83,7 +83,7 @@ docs/
 6. [`design/scenarios/_index.md`](design/scenarios/_index.md) —— 业务域/价值流/场景的生成索引；先看场景再看组件
 7. [`design/scenarios/agent-capability-assets/expert-capability-definition-and-assembly/expert-definition-and-assembly-management/scenario.md`](design/scenarios/agent-capability-assets/expert-capability-definition-and-assembly/expert-definition-and-assembly-management/scenario.md) —— 首个试点场景：入口、运行序、外部引用与 3+1
     `design/scenarios/agent-capability-assets/skill-capability-definition-and-supply/` 下有 Skill 草稿与发布、检索与供给两个 `verified` 场景；`design/scenarios/workflow-orchestration/` 下另有工作流定义三个 `verified` 场景：组合管理、编辑与校验、定义交换；覆盖 B3 定义侧，B4 运行与 UI 未做，以场景索引为准。
-    执行面调度在 `design/scenarios/workflow-orchestration/execution-scheduling/` 下：任务派发、结果回收与重派、技能包供给、停止与取消、协议版本与凭据、节点登记与派发门禁，共 6 张 `draft` 场景，运行序/引用/测试方案已按 `designed` 判据写齐，待实现工序补测试 ID 与入口后转档。
+    执行面调度在 `design/scenarios/workflow-orchestration/execution-scheduling/` 下：任务派发、结果回收与重派、技能包供给、停止与取消、协议版本与凭据、节点登记与派发门禁，共 6 张 `verified` 场景，运行序、入口与 3 正 1 反测试已落地。
 8. [`design/components/kernel/spec.md`](design/components/kernel/spec.md) 与 [`config/spec.md`](design/components/config/spec.md) —— 共享错误/分页/端口，以及 TOML 启动配置
 9. [`design/components/http-gateway/spec.md`](design/components/http-gateway/spec.md) —— 对外 REST 契约；运行时 `/openapi.yaml` 与 Swagger UI `/docs` 由 `CMP-http-gateway` 直接提供；外部项目若接入按此消费
 10. [`design/components/workflow/spec.md`](design/components/workflow/spec.md) —— `CMP-workflow` 的聚合、图保存/校验、DSL 与专家引用投影

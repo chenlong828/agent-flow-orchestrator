@@ -407,15 +407,24 @@ export function createHarnessRead(deps: { db: Db }): HarnessRead {
       const tags = await store.tagsFor(db, row.id);
       return toSummary(row, tags);
     },
+
+    async listClientIds(): Promise<string[]> {
+      const rows = await store.listDispatchableClientIds(db);
+      return rows;
+    },
   };
 }
 
 /** 节点目录端口实现；组合根注入 scheduler。 */
-export function createHarnessNodeDirectory(deps: { db: Db }): NodeDirectory {
-  const store = createHarnessStore();
+export function createHarnessNodeDirectory(read: HarnessRead): NodeDirectory {
   return {
-    isDispatchable: (clientId) => store.isDispatchable(deps.db, clientId),
-    listClientIds: () => store.listDispatchableClientIds(deps.db),
+    async isDispatchable(clientId) {
+      const harness = await read.getByClientId(clientId);
+      return harness !== null && harness.enabled;
+    },
+    async listClientIds() {
+      return read.listClientIds();
+    },
   };
 }
 

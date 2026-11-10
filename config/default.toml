@@ -10,3 +10,7 @@ actor = "local"
 
 [log]
 level = "info"
+
+[executor]
+max_attempts = 3
+retry_delay_ms = 5000

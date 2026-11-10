@@ -399,7 +399,7 @@ describe("Harness 执行节点登记", () => {
 
   test("节点目录端口：启用且已绑定才可派发，停用与解绑后不可派发", async () => {
     const db = await getTestDb();
-    const directory = createHarnessNodeDirectory({ db });
+    const directory = createHarnessNodeDirectory(read);
     const created = await service.create(createInput("build-01"));
     expect(await directory.isDispatchable("node-a")).toBe(false);
 

@@ -34,6 +34,29 @@ export type ExecutorAuthenticator = {
   resolveClientId(token: string): Promise<string | null>;
 };
 
+/** 不可变技能包引用；`packageId` 与内容一一对应，由 CMP-skill 发放。 */
+export type SkillPackageRef = {
+  packageId: string;
+  skillId: string;
+  name: string;
+  version: string;
+  /** 包字节的 sha256 十六进制（不带前缀）。 */
+  digest: string;
+  sizeBytes: number;
+  /** HTTP ETag 值，含引号。 */
+  etag: string;
+};
+
+/** 执行面制品端口：由 CMP-skill 实现，组合根注入 scheduler 与 http-gateway。 */
+export type SkillPackageSource = {
+  /** 入队冻结：取 Skill 当前包的不可变引用。 */
+  currentForSkill(skillId: string): Promise<SkillPackageRef>;
+  /** P-03 解析：未知或已下架返回 null。 */
+  describe(packageId: string): Promise<SkillPackageRef | null>;
+  /** P-03 取流：包缺失/损坏抛 PackageUnavailableError。 */
+  open(packageId: string): Promise<{ ref: SkillPackageRef; data: Uint8Array }>;
+};
+
 /** 引用检查端口，由 catalog 实现，组合根注入领域删除服务。 */
 export type ReferenceGuard = {
   check(owner: ReferenceOwner, id: string): Promise<Reference[]>;

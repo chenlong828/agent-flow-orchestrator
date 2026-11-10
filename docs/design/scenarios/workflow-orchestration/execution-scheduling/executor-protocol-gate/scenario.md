@@ -1,14 +1,20 @@
 ---
 layer: design
 module: workflow-orchestration
-status: draft
-updated: 2026-11-10
+status: verified
+updated: 2026-11-11
 flow: FLOW-EXE-PROTOCOL-001
 scenario: SCN-0205
 domain: 工作流编排
 valueStream: 执行面调度
 title: 执行面协议版本与凭据闸门
-entries: []
+entries:
+  - component: CMP-http-gateway
+    path: src/components/http-gateway/app.ts
+    symbol: createHttpApp
+  - component: CMP-scheduler
+    path: src/components/scheduler/service.ts
+    symbol: createScheduler
 docs:
   - path: docs/design/components/http-gateway/spec.md
     heading: 4.3 执行面端点
@@ -16,7 +22,15 @@ docs:
     heading: 3.3 错误体
   - path: docs/design/components/kernel/spec.md
     heading: 3.1 错误
-tests: []
+tests:
+  - role: R1
+    id: TC-EXV-001
+  - role: R2
+    id: TC-EXV-002
+  - role: R3
+    id: TC-EXV-003
+  - role: N1
+    id: TC-EXV-004
 externalRefs: []
 ---
 

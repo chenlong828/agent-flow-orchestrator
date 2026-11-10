@@ -26,6 +26,7 @@ updated: 2026-11-11
 | 工序 | 级别 | 范围 | 状态 |
 |---|---|---|---|
 | [`2026-11-10-node-registry-implementation`](../works/2026-11-10-node-registry-implementation/brief.md) | P2 | 落 `harness.client_id`/`client_token`、`API-41`、`NodeDirectory`/`ExecutorAuthenticator`、凭据落库与测试；派生状态与调度器不在此列 | 实现完成，待用户验收 |
+| [`2026-11-11-scheduler-layer-implementation`](../works/2026-11-11-scheduler-layer-implementation/brief.md) | P1 | 落 `instance`/`task`/`task_attempt`、`CMP-scheduler`、`CMP-instance`、执行面三端点、制品供给与派生状态 | 实现完成，待 P1 验收（`bun run check` 334 pass、`quality:gate` 0 违规） |
 | [`2026-11-11-executor-joint-debug`](../works/2026-11-11-executor-joint-debug/brief.md) | P2 | 与 `agent-flow-client` 联调：连通性基线（现在可做）→ 执行面三端点（阻塞于调度层实现）→ 真实执行联调 | 计划已出（2026-11-11）；`T-JD-01` 可开始，`T-JD-02` 阻塞 |
 - M2 只产出裁定与规格，不写实现代码；M2 是 P1，人参与切分与契约评审后才可编码。
 - 无用户旅程的技术债 / 文档活走旁路，不进 `requirements/`。

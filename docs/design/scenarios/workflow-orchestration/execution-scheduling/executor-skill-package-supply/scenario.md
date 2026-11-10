@@ -1,14 +1,23 @@
 ---
 layer: design
 module: workflow-orchestration
-status: draft
-updated: 2026-11-10
+status: verified
+updated: 2026-11-11
 flow: FLOW-EXE-PACKAGE-001
 scenario: SCN-0203
 domain: 工作流编排
 valueStream: 执行面调度
 title: 执行面技能包供给
-entries: []
+entries:
+  - component: CMP-http-gateway
+    path: src/components/http-gateway/app.ts
+    symbol: createHttpApp
+  - component: CMP-skill
+    path: src/components/skill/package-source.ts
+    symbol: createSkillPackageSource
+  - component: CMP-scheduler
+    path: src/components/scheduler/service.ts
+    symbol: createScheduler
 docs:
   - path: docs/design/components/http-gateway/spec.md
     heading: 4.3 执行面端点
@@ -16,7 +25,15 @@ docs:
     heading: 3.3 编排面制品供给
   - path: docs/design/components/kernel/spec.md
     heading: 3.6 执行面制品端口
-tests: []
+tests:
+  - role: R1
+    id: TC-EXK-001
+  - role: R2
+    id: TC-EXK-002
+  - role: R3
+    id: TC-EXK-003
+  - role: N1
+    id: TC-EXK-004
 externalRefs: []
 ---
 

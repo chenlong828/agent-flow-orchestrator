@@ -1,14 +1,23 @@
 ---
 layer: design
 module: workflow-orchestration
-status: draft
-updated: 2026-11-10
+status: verified
+updated: 2026-11-11
 flow: FLOW-EXE-NODE-001
 scenario: SCN-0206
 domain: 工作流编排
 valueStream: 执行面调度
 title: 执行节点登记与派发门禁
-entries: []
+entries:
+  - component: CMP-http-gateway
+    path: src/components/http-gateway/app.ts
+    symbol: createHttpApp
+  - component: CMP-catalog
+    path: src/components/catalog/index.ts
+    symbol: createCatalog
+  - component: CMP-scheduler
+    path: src/components/scheduler/service.ts
+    symbol: createScheduler
 docs:
   - path: docs/design/components/harness/spec.md
     heading: 3.3 节点目录与在线状态口径
@@ -16,7 +25,15 @@ docs:
     heading: 4.1 业务端点
   - path: docs/design/components/scheduler/spec.md
     heading: 4.8 节点可用性与派发门禁
-tests: []
+tests:
+  - role: R1
+    id: TC-EXN-001
+  - role: R2
+    id: TC-EXN-002
+  - role: R3
+    id: TC-EXN-003
+  - role: N1
+    id: TC-EXN-004
 externalRefs: []
 ---
 

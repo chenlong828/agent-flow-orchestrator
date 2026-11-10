@@ -1,6 +1,7 @@
 import { NotFoundError } from "../../core/kernel/index.ts";
 import type { Health } from "../../core/platform/index.ts";
 import type { CatalogRead } from "../catalog/index.ts";
+
 import type { ExpertService } from "../expert/index.ts";
 import type { HarnessService } from "../harness/index.ts";
 import type { SkillDraftService } from "../skill/contract.ts";
@@ -9,6 +10,7 @@ import type { WorkflowService } from "../workflow/index.ts";
 import type { ApiDocs } from "./docs.ts";
 import { errorResponse, json } from "./respond.ts";
 import { assertUuid } from "./validation.ts";
+import { handleExecutor, type ExecutorDeps } from "./routes/executor.ts";
 import { handleExpert } from "./routes/expert.ts";
 import { handleHarness } from "./routes/harness.ts";
 import { handleSkillDrafts } from "./routes/skill-drafts.ts";
@@ -19,6 +21,9 @@ import { handleWorkflow } from "./routes/workflow.ts";
 
 export type HttpDeps = {
   catalog: CatalogRead;
+  backend: ExecutorDeps["backend"];
+  /** 测试可注入更短的执行面挂起周期；缺省 30000。 */
+  executorPollHoldMs?: number;
   harnessService: HarnessService;
   toolService: ToolService;
   skillDraftService: SkillDraftService;
@@ -32,10 +37,15 @@ export type HttpDeps = {
 type Runtime = {
   deps: HttpDeps;
   routeDeps: RouteDeps;
+  executor: ExecutorDeps;
 };
 
 export function createHttpApp(deps: HttpDeps): (request: Request) => Promise<Response> {
-  const runtime: Runtime = { deps, routeDeps: toRouteDeps(deps) };
+  const runtime: Runtime = {
+    deps,
+    routeDeps: toRouteDeps(deps),
+    executor: { backend: deps.backend, pollHoldMs: deps.executorPollHoldMs },
+  };
   return async function handle(request: Request): Promise<Response> {
     return handleRequest(request, runtime);
   };
@@ -81,6 +91,8 @@ async function routeRequest(
   if (!isApiPath(path)) throw new NotFoundError("路径", path);
 
   const segments = parseSegments(path);
+  const executorResponse = await handleExecutor(request, segments, runtime.executor);
+  if (executorResponse !== null) return executorResponse;
   if (isSkillCategories(segments)) {
     return handleSkillCategories(request, path, runtime.deps.catalog);
   }

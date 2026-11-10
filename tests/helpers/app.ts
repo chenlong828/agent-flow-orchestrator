@@ -9,12 +9,18 @@ import {
   uuidv7Ids,
 } from "../../src/core/platform/index.ts";
 import {
+  createHarnessAuthenticator,
+  createHarnessNodeDirectory,
   createHarnessRead,
   createHarnessService,
 } from "../../src/components/harness/index.ts";
 import { createToolRead, createToolService } from "../../src/components/tool/index.ts";
 import { createSkillRead } from "../../src/components/skill/read.ts";
 import { createSkillDraftService } from "../../src/components/skill/draft-service.ts";
+import { createSkillPackageSource } from "../../src/components/skill/package-source.ts";
+import { createInstanceService } from "../../src/components/instance/index.ts";
+import { createScheduler } from "../../src/components/scheduler/index.ts";
+import { createExecutorBackend } from "../../src/executor-backend.ts";
 import { createExpertRead, createExpertService } from "../../src/components/expert/index.ts";
 import {
   createWorkflowRead,
@@ -31,6 +37,7 @@ export type TestContext = {
   harnessRead: ReturnType<typeof createHarnessRead>;
   toolRead: ReturnType<typeof createToolRead>;
   skillDraftService: ReturnType<typeof createSkillDraftService>;
+  skillRead: ReturnType<typeof createSkillRead>;
   expertRead: ReturnType<typeof createExpertRead>;
   harnessService: ReturnType<typeof createHarnessService>;
   toolService: ReturnType<typeof createToolService>;
@@ -38,6 +45,11 @@ export type TestContext = {
   expertService: ReturnType<typeof createExpertService>;
   workflowRead: ReturnType<typeof createWorkflowRead>;
   workflowService: ReturnType<typeof createWorkflowService>;
+  instanceService: ReturnType<typeof createInstanceService>;
+  packages: ReturnType<typeof createSkillPackageSource>;
+  scheduler: ReturnType<typeof createScheduler>;
+  authenticator: ReturnType<typeof createHarnessAuthenticator>;
+  backend: ReturnType<typeof createExecutorBackend>;
 };
 
 export async function createTestContext(): Promise<TestContext> {
@@ -50,8 +62,26 @@ export async function createTestContext(): Promise<TestContext> {
   const catalogSkillRead = createSkillRead(db, skillStore);
   const expertRead = createExpertRead({ db });
   const workflowRead = createWorkflowRead({ db });
+  const instanceService = createInstanceService({
+    db,
+    clock: systemClock,
+    ids: uuidv7Ids,
+  });
+  const packages = createSkillPackageSource({ db, store: skillStore });
+  const scheduler = createScheduler({
+    db,
+    clock: systemClock,
+    ids: uuidv7Ids,
+    instance: instanceService,
+    packages,
+    node: createHarnessNodeDirectory(harnessRead),
+    maxAttempts: 3,
+    retryDelayMs: 0,
+  });
+  const authenticator = createHarnessAuthenticator({ db });
   const catalog = createCatalog({
     harnessRead,
+    presence: scheduler,
     toolRead,
     skillRead: catalogSkillRead,
     expertRead,
@@ -118,8 +148,11 @@ export async function createTestContext(): Promise<TestContext> {
     expertStatus: expertRead,
   });
 
+  const backend = createExecutorBackend({ scheduler, packages, authenticator });
   const app = createHttpApp({
     catalog,
+    backend,
+    executorPollHoldMs: 20,
     harnessService,
     toolService,
     skillDraftService,
@@ -140,9 +173,15 @@ export async function createTestContext(): Promise<TestContext> {
     toolService,
     skillService,
     skillDraftService,
+    skillRead: catalogSkillRead,
     expertService,
     workflowRead,
     workflowService,
+    instanceService,
+    packages,
+    scheduler,
+    authenticator,
+    backend,
   };
 }
 
@@ -158,6 +197,31 @@ export async function call(
   path: string,
   options: CallOptions = {},
 ): Promise<{ status: number; body: any; headers: Headers }> {
+  const response = await send(app, method, path, options);
+  const text = await response.text();
+  return {
+    status: response.status,
+    body: text === "" ? null : JSON.parse(text),
+    headers: response.headers,
+  };
+}
+
+/** 取原始响应，供非 JSON 载荷（zip、markdown）使用。 */
+export async function callRaw(
+  app: (request: Request) => Promise<Response>,
+  method: string,
+  path: string,
+  options: CallOptions = {},
+): Promise<Response> {
+  return send(app, method, path, options);
+}
+
+async function send(
+  app: (request: Request) => Promise<Response>,
+  method: string,
+  path: string,
+  options: CallOptions = {},
+): Promise<Response> {
   const headers = new Headers(options.headers ?? {});
   let body: string | undefined;
   if (options.rawBody !== undefined) {
@@ -166,15 +230,7 @@ export async function call(
     body = JSON.stringify(options.body);
     if (!headers.has("content-type")) headers.set("content-type", "application/json");
   }
-  const response = await app(
-    new Request(`http://127.0.0.1:3000${path}`, { method, headers, body }),
-  );
-  const text = await response.text();
-  return {
-    status: response.status,
-    body: text === "" ? null : JSON.parse(text),
-    headers: response.headers,
-  };
+  return app(new Request(`http://127.0.0.1:3000${path}`, { method, headers, body }));
 }
 
 export function withRevision(revision: number): Record<string, string> {

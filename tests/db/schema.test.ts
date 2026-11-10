@@ -20,6 +20,9 @@ const BUSINESS_TABLES = [
   "skill_tag",
   "tool",
   "tool_param",
+  "instance",
+  "task",
+  "task_attempt",
 ];
 
 beforeAll(async () => {
@@ -31,7 +34,7 @@ afterAll(async () => {
 });
 
 describe("数据库结构", () => {
-  test("业务表恰好 16 张，另有 schema_migrations", async () => {
+  test("业务表恰好 19 张，另有 schema_migrations", async () => {
     const rows = await db.query<{ table_name: string }>(
       `select table_name from information_schema.tables
        where table_schema = 'public' and table_type = 'BASE TABLE'
@@ -166,6 +169,8 @@ describe("数据库结构", () => {
       { table_name: "skill", column_name: "category_code" },
       { table_name: "skill", column_name: "description" },
       { table_name: "skill", column_name: "package_key" },
+      { table_name: "skill", column_name: "package_digest" },
+      { table_name: "skill", column_name: "package_size" },
       { table_name: "skill", column_name: "version" },
       { table_name: "skill", column_name: "enabled" },
       { table_name: "skill", column_name: "revision" },

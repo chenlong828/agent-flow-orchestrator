@@ -38,33 +38,31 @@ function restCode(error: AppError): string {
   return error.code === "database_unavailable" ? "service_unavailable" : error.code;
 }
 
+/** 执行面错误码与产品面不同：数据库不可用仍按 `service_unavailable`，其余原样。 */
+
+const STATUS_BY_CODE: Record<AppError["code"], number> = {
+  validation_error: 400,
+  not_found: 404,
+  name_conflict: 409,
+  revision_conflict: 409,
+  referenced: 409,
+  binding_conflict: 409,
+  file_conflict: 409,
+  draft_expired: 410,
+  payload_too_large: 413,
+  unsupported_media_type: 415,
+  skill_md_too_large: 422,
+  precondition_required: 428,
+  task_not_found: 404,
+  package_not_found: 404,
+  package_unavailable: 500,
+  unsupported_protocol: 400,
+  unauthorized: 401,
+  database_unavailable: 503,
+};
+
 function statusFor(error: AppError): number {
-  switch (error.code) {
-    case "validation_error":
-      return 400;
-    case "not_found":
-      return 404;
-    case "name_conflict":
-    case "revision_conflict":
-    case "referenced":
-    case "binding_conflict":
-    case "file_conflict":
-      return 409;
-    case "draft_expired":
-      return 410;
-    case "payload_too_large":
-      return 413;
-    case "unsupported_media_type":
-      return 415;
-    case "skill_md_too_large":
-      return 422;
-    case "precondition_required":
-      return 428;
-    case "package_unavailable":
-      return 500;
-    case "database_unavailable":
-      return 503;
-  }
+  return STATUS_BY_CODE[error.code];
 }
 
 export function errorResponse(error: unknown, requestId?: string): Response {

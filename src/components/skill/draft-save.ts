@@ -8,6 +8,7 @@ import {
 } from "../../core/kernel/index.ts";
 import { isUniqueViolation, type Db } from "../../core/platform/index.ts";
 import { SKILL_MD, buildSkillPackage } from "./package.ts";
+import { sha256Hex } from "./digest.ts";
 import type { SaveSkill, SaveSkillResult } from "./contract.ts";
 import {
   draftPrefix,
@@ -54,6 +55,8 @@ export async function saveDraft(
     body: proposed.body,
     files: attachments,
   });
+  const packageDigest = sha256Hex(packageBytes);
+  const packageSize = packageBytes.byteLength;
   const packageKey = `${deps.ids.next()}.zip`;
   await deps.store.put(`packages/${packageKey}`, packageBytes);
   const actorValue = requestActor ?? deps.actor;
@@ -64,6 +67,8 @@ export async function saveDraft(
         id,
         proposed,
         packageKey,
+        packageDigest,
+        packageSize,
         version,
         baseRevision,
         actorValue,
@@ -132,26 +137,78 @@ async function collectAttachments(
   return attachments;
 }
 
-async function applySave(
-  deps: SkillDraftDeps,
-  tx: Db,
-  args: {
-    id: string;
-    proposed: Proposed;
-    packageKey: string;
-    version: string;
-    baseRevision: number | null;
-    actorValue: string;
-  },
-): Promise<AppliedSave> {
-  const lockedDraft = await tx.one<DraftRow>(
+type ApplyArgs = {
+  id: string;
+  proposed: Proposed;
+  packageKey: string;
+  packageDigest: string;
+  packageSize: number;
+  version: string;
+  baseRevision: number | null;
+  actorValue: string;
+};
+
+async function requireDraft(deps: SkillDraftDeps, tx: Db, id: string): Promise<DraftRow> {
+  const draft = await tx.one<DraftRow>(
     `select id, skill_id, base_revision, base_version, expires_at, created_at
      from skill_draft where id = $1 for update`,
-    [args.id],
+    [id],
   );
-  if (lockedDraft === null) throw new NotFoundError("SkillDraft", args.id);
-  assertNotExpired(lockedDraft, deps);
+  if (draft === null) throw new NotFoundError("SkillDraft", id);
+  assertNotExpired(draft, deps);
+  return draft;
+}
 
+async function applyCreatedSave(
+  deps: SkillDraftDeps,
+  tx: Db,
+  args: ApplyArgs,
+  now: Date,
+): Promise<{ skillId: string; revision: number; created: boolean }> {
+  const skillId = deps.ids.next();
+  await insertSkill(tx, {
+    skillId,
+    proposed: args.proposed,
+    packageKey: args.packageKey,
+    packageDigest: args.packageDigest,
+    packageSize: args.packageSize,
+    version: args.version,
+    now,
+    actorValue: args.actorValue,
+  });
+  return { skillId, revision: 1, created: true };
+}
+
+async function applyUpdatedSave(
+  tx: Db,
+  args: ApplyArgs,
+  skillId: string,
+  now: Date,
+): Promise<{ revision: number; created: boolean; oldPackageKey: string }> {
+  const latest = await tx.one<CurrentSkill>(
+    "select id, name, package_key, version, revision from skill where id = $1 for update",
+    [skillId],
+  );
+  if (latest === null) throw new NotFoundError("Skill", skillId);
+  if (args.baseRevision !== latest.revision) {
+    throw new RevisionConflictError(latest.revision);
+  }
+  await updateSkill(tx, {
+    skillId,
+    latestRevision: latest.revision,
+    proposed: args.proposed,
+    packageKey: args.packageKey,
+    packageDigest: args.packageDigest,
+    packageSize: args.packageSize,
+    version: args.version,
+    now,
+    actorValue: args.actorValue,
+  });
+  return { revision: latest.revision + 1, created: false, oldPackageKey: latest.package_key };
+}
+
+async function applySave(deps: SkillDraftDeps, tx: Db, args: ApplyArgs): Promise<AppliedSave> {
+  const lockedDraft = await requireDraft(deps, tx, args.id);
   const categoryRow = await tx.one<{ code: string }>(
     "select code from skill_category where code = $1",
     [args.proposed.categoryCode],
@@ -160,53 +217,24 @@ async function applySave(
 
   const now = deps.clock.now();
   const draftSkillId = lockedDraft.skill_id;
-  const created = draftSkillId === null;
-  let skillId: string;
-  let revision: number;
-  let oldPackageKey: string | null = null;
-  if (created) {
-    skillId = deps.ids.next();
-    revision = 1;
-    await insertSkill(tx, {
-      skillId,
-      proposed: args.proposed,
-      packageKey: args.packageKey,
-      version: args.version,
-      now,
-      actorValue: args.actorValue,
-    });
+  let applied: { skillId: string; revision: number; created: boolean; oldPackageKey: string | null };
+  if (draftSkillId === null) {
+    const created = await applyCreatedSave(deps, tx, args, now);
+    applied = { ...created, oldPackageKey: null };
   } else {
-    const latest = await tx.one<CurrentSkill>(
-      "select id, name, package_key, version, revision from skill where id = $1 for update",
-      [draftSkillId],
-    );
-    if (latest === null) throw new NotFoundError("Skill", draftSkillId);
-    if (args.baseRevision !== latest.revision) {
-      throw new RevisionConflictError(latest.revision);
-    }
-    skillId = latest.id;
-    revision = latest.revision + 1;
-    oldPackageKey = latest.package_key;
-    await updateSkill(tx, {
-      skillId,
-      latestRevision: latest.revision,
-      proposed: args.proposed,
-      packageKey: args.packageKey,
-      version: args.version,
-      now,
-      actorValue: args.actorValue,
-    });
+    const updated = await applyUpdatedSave(tx, args, draftSkillId, now);
+    applied = { skillId: draftSkillId, ...updated };
   }
 
-  await replaceTags(tx, skillId, args.proposed.tags);
+  await replaceTags(tx, applied.skillId, args.proposed.tags);
   await tx.query("delete from skill_draft where id = $1", [args.id]);
   return {
-    id: skillId,
-    revision,
+    id: applied.skillId,
+    revision: applied.revision,
     version: args.version,
     updatedAt: toIso(now),
-    created,
-    oldPackageKey,
+    created: applied.created,
+    oldPackageKey: applied.oldPackageKey,
   };
 }
 
@@ -216,6 +244,8 @@ async function insertSkill(
     skillId: string;
     proposed: Proposed;
     packageKey: string;
+    packageDigest: string;
+    packageSize: number;
     version: string;
     now: Date;
     actorValue: string;
@@ -223,15 +253,17 @@ async function insertSkill(
 ): Promise<void> {
   await tx.query(
     `insert into skill
-      (id, name, category_code, description, package_key, version,
-       enabled, revision, created_at, updated_at, created_by, updated_by)
-     values ($1, $2, $3, $4, $5, $6, true, 1, $7, $7, $8, $8)`,
+      (id, name, category_code, description, package_key, package_digest, package_size,
+       version, enabled, revision, created_at, updated_at, created_by, updated_by)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, true, 1, $9, $9, $10, $10)`,
     [
       args.skillId,
       args.proposed.name,
       args.proposed.categoryCode,
       args.proposed.description,
       args.packageKey,
+      args.packageDigest,
+      args.packageSize,
       args.version,
       args.now,
       args.actorValue,
@@ -246,6 +278,8 @@ async function updateSkill(
     latestRevision: number;
     proposed: Proposed;
     packageKey: string;
+    packageDigest: string;
+    packageSize: number;
     version: string;
     now: Date;
     actorValue: string;
@@ -254,15 +288,18 @@ async function updateSkill(
   const changed = await tx.query<{ id: string }>(
     `update skill set
        name = $1, category_code = $2, description = $3,
-       package_key = $4, version = $5, revision = revision + 1,
-       updated_at = $6, updated_by = $7
-     where id = $8 and revision = $9
+       package_key = $4, package_digest = $5, package_size = $6,
+       version = $7, revision = revision + 1,
+       updated_at = $8, updated_by = $9
+     where id = $10 and revision = $11
      returning id`,
     [
       args.proposed.name,
       args.proposed.categoryCode,
       args.proposed.description,
       args.packageKey,
+      args.packageDigest,
+      args.packageSize,
       args.version,
       args.now,
       args.actorValue,

@@ -233,7 +233,7 @@ type SkillPackageSource = {
 - 包缺失/损坏（zip 不可读、`SKILL.md` 无效）→ `open` 抛 `PackageUnavailableError`（映射 `500 package_unavailable`），不返回部分字节。
 - 端口不暴露 HTTP 语义；条件请求与 304 判定在 `CMP-http-gateway` 完成。
 
-**实现状态**：`SkillPackageSource` 与 `packageId`/`digest`/`etag` 口径是 2026-11-10 调度层设计新增，尚未实现。实现需要在保存时记录包摘要与字节数（`skill` 表增 `package_digest`、`package_size` 两列），属非核心表的字段增量，由实现工序按 P2 处理并补迁移；现有 `getDocument`/`getPackage` 契约不变。
+**实现状态**：`SkillPackageSource` 与 `packageId`/`digest`/`etag` 口径已实现（2026-11-11）：`skill` 表增 `package_digest`、`package_size`，保存与种子写入时计算摘要；直接改基线、不做数据迁移。现有 `getDocument`/`getPackage` 契约不变。
 
 ## 4 依赖与边界
 

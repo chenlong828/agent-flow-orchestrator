@@ -14,7 +14,11 @@ export type ErrorCode =
   | "unsupported_media_type"
   | "skill_md_too_large"
   | "precondition_required"
+  | "task_not_found"
+  | "package_not_found"
   | "package_unavailable"
+  | "unsupported_protocol"
+  | "unauthorized"
   | "database_unavailable";
 
 export type ErrorDetails = Record<string, unknown>;
@@ -132,7 +136,7 @@ export class DraftExpiredError extends AppError {
 
 export class PayloadTooLargeError extends AppError {
   constructor(
-    limit: "file_bytes" | "file_count" | "package_bytes" | "draft_bytes",
+    limit: "file_bytes" | "file_count" | "package_bytes" | "draft_bytes" | "result_bytes",
     limitValue: number,
     actualValue: number,
   ) {

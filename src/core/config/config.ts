@@ -1,5 +1,11 @@
 import { join, resolve } from "node:path";
 import { ConfigError } from "./errors.ts";
+import {
+  EXECUTOR_KEYS,
+  parseExecutor,
+  resolveExecutorConfig,
+  type ExecutorFileConfig,
+} from "./executor-config.ts";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -11,6 +17,8 @@ export type Config = {
   logLevel: LogLevel;
   skillStorageRoot: string;
   skillDraftTtlHours: number;
+  taskMaxAttempts: number;
+  taskRetryDelayMs: number;
 };
 
 export type LoadConfigOptions = {
@@ -29,6 +37,7 @@ type FileConfig = {
   log?: {
     level?: LogLevel;
   };
+  executor?: ExecutorFileConfig;
 };
 
 const DEFAULT_HOST = "127.0.0.1";
@@ -39,7 +48,7 @@ const DEFAULT_LOG_LEVEL: LogLevel = "info";
 const DEFAULT_SKILL_STORAGE_ROOT = ".local/skills";
 const DEFAULT_SKILL_DRAFT_TTL_HOURS = 24;
 const LOG_LEVELS: LogLevel[] = ["debug", "info", "warn", "error"];
-const TOP_LEVEL_KEYS = new Set(["server", "app", "log"]);
+const TOP_LEVEL_KEYS = new Set(["server", "app", "log", "executor"]);
 const SERVER_KEYS = new Set(["host", "port"]);
 const APP_KEYS = new Set(["actor"]);
 const LOG_KEYS = new Set(["level"]);
@@ -182,6 +191,8 @@ function parseFile(raw: unknown, source: string): FileConfig {
   if (app !== undefined) config.app = app;
   const log = parseLog(raw.log, source);
   if (log !== undefined) config.log = log;
+  const executor = parseExecutor(raw.executor, source, fail, assertKnownKeys);
+  if (executor !== undefined) config.executor = executor;
   return config;
 }
 
@@ -216,6 +227,7 @@ function mergeFile(base: FileConfig, next: FileConfig): FileConfig {
     server: { ...(base.server ?? {}), ...(next.server ?? {}) },
     app: { ...(base.app ?? {}), ...(next.app ?? {}) },
     log: { ...(base.log ?? {}), ...(next.log ?? {}) },
+    executor: { ...(base.executor ?? {}), ...(next.executor ?? {}) },
   };
 }
 
@@ -291,7 +303,11 @@ function resolveEnvConfig(
   env: Record<string, string | undefined>,
   file: FileConfig,
 ): Omit<Config, "databaseUrl"> {
-  return { ...resolveServerConfig(env, file), ...resolveAppConfig(env, file) };
+  return {
+    ...resolveServerConfig(env, file),
+    ...resolveAppConfig(env, file),
+    ...resolveExecutorConfig(env, file.executor, fail),
+  };
 }
 
 export async function loadConfig(

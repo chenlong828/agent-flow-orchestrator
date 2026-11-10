@@ -165,7 +165,7 @@ Harness 是执行节点目录：`client_id` 绑定 `CMP-instance` 里实例所�
 
 - 权威来源是 `CMP-scheduler` 的 presence 读契约（[`scheduler` §3.3](../scheduler/spec.md)）；本组件不写 `health` / `last_heartbeat_at`，两列保留但非权威。
 - `lastHeartbeatAt` 派生为「最近一次 poll 时间」；从未 poll 则为 `null`。
-- 调度器不可用时，组合方降级为 `unknown` 并记 warning 日志，不伪造 `offline`。
+- 调度器不可用时，组合方降级为 `unknown`，不伪造 `offline`；当前没有结构化日志设施，降级不额外打日志（可观测性欠账，记 `OQ-10` 范围）。
 - 在线状态不参与派发：派发只看 `NodeDirectory.isDispatchable`（`enabled` + 已绑定）与 client 自报的 `capacity.free`（`executor-http-v2` §9 规定容量不做二次限制）。
 - 停用（`enabled=false`）语义：不派发新任务；在跑任务继续跑完；不向 client 下发 `stop`（`stop` 只由运维停止动作触发，见 `scheduler` §4.6）。
 
