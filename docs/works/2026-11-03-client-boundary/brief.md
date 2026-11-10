@@ -50,6 +50,8 @@ updated: 2026-11-03
 
 ## 已定框架
 
+> 2026-11-10 对齐复核：「交互方式」「session 绑定」「技能供给」三行已被 `executor-http-v2` 取代；进程/session 与并发模型亦有冲突。逐条对照见 [`v2-alignment.md`](v2-alignment.md)。
+
 | 事项 | 结论 |
 |---|---|
 | client 形态 | Bun CLI；常驻与单次两种运行方式 |
@@ -87,6 +89,7 @@ updated: 2026-11-03
 | T-CB-02 | design | global | in_progress | client 侧工作清单 |
 | T-CB-03 | design | global | done | 回写 S0 结论（技能可见性、全局根屏蔽/项目根保留、崩溃清理、权限、用量） |
 | T-CB-04 | design | global | done | 进程模型决策：一个活跃工作区一个 DSH 进程 |
+| T-CB-05 | design | global | open | 按 `executor-http-v2` 改写交互章节（§6 与 §4.2/§4.5/§4.6/§4.7），并更新 `client-work.md` 的 `CW-02`/`CW-07` 出口；见 [`v2-alignment.md`](v2-alignment.md) |
 
 ## 装载清单
 
