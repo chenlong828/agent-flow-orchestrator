@@ -28,6 +28,7 @@ updated: 2026-11-10
 | [`2026-11-10-scheduler-layer-design`](../works/2026-11-10-scheduler-layer-design/brief.md) | P1 | 按 `executor-http-v2` 定调度器侧组件切分、执行面场景与组件规格；不写实现 | 设计已落盘，待用户最终确认（P1 人工门） |
 | [`2026-11-10-harness-node-registry`](../works/2026-11-10-harness-node-registry/brief.md) | P2 | Harness 作为 client 节点目录（方向 A）：方案对比 + 第一期组件规格增量、`SCN-0206`、决策记录；不写实现 | 已完成（P2 已确认，2026-11-10） |
 | [`2026-11-10-node-registry-implementation`](../works/2026-11-10-node-registry-implementation/brief.md) | P2 | 落 `harness.client_id`/`client_token`、`API-41`、`NodeDirectory`/`ExecutorAuthenticator`、凭据落库与测试；派生状态与调度器不在此列 | 实现完成，待用户验收 |
+| [`2026-11-11-executor-joint-debug`](../works/2026-11-11-executor-joint-debug/brief.md) | P2 | 与 `agent-flow-client` 联调：连通性基线（现在可做）→ 执行面三端点（阻塞于调度层 P1 确认）→ 真实执行联调 | 计划已出（2026-11-11）；`T-JD-01` 可开始，`T-JD-02` 阻塞 |
 - M2 只产出裁定与规格，不写实现代码；M2 是 P1，人参与切分与契约评审后才可编码。
 - 无用户旅程的技术债 / 文档活走旁路，不进 `requirements/`。
 - B1 是基础设施工序（无 UI 改动；UI 为独立项目），按旁路处理，不建 `REQ`/`SCN`，`brief.md` 为锚点；追溯方式已在 `implementation-plan.md` §9 落为默认旁路。
