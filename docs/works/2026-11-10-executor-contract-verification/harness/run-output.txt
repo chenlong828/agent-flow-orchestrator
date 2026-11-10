@@ -1,0 +1,98 @@
+
+== S1 下发一次并回报 succeeded
+PASS  S1 请求带 Authorization Bearer — Bearer verify-token
+PASS  S1 请求带 X-Executor-Protocol: 2 — 2
+PASS  S1 请求带 X-Request-Id
+PASS  S1 POST 带 application/json; charset=utf-8
+PASS  S1 首个 poll 的 free = maxConcurrent
+PASS  S1 poll 带空 running[]
+PASS  S1 poll 带空 finished[]
+PASS  S1 结果 taskId
+PASS  S1 结果 attempt
+PASS  S1 结果 status
+PASS  S1 结果 stopReason
+PASS  S1 结果 usage
+PASS  S1 结果 error
+PASS  S1 结果 truncated
+PASS  S1 结果 message 含最终文本 — OK-V2-OK
+PASS  S1 结果带 sessionId
+PASS  S1 结果带 startedAt/finishedAt
+PASS  S1 首份结果 accepted=true
+PASS  S1 accepted 后存在 running=[]/finished=[] 的 poll — {"capacity":{"free":2},"running":[],"finished":[]}
+PASS  S1 stop:true 后退出 0
+
+== S2 首份结果被拒后不重报
+PASS  S2 accepted=false 后只报一次
+PASS  S2 accepted=false 后 finished 清空
+PASS  S2 退出 0
+
+== S3 运行中重复下发不重复执行
+PASS  S3 running[] 含 taskId
+PASS  S3 只启动一个 DSH 进程
+
+== S4 总超时结果
+PASS  S4 status=timeout
+PASS  S4 error.class=timeout
+FAIL  S4 error.code=prompt_timeout（契约 4.2 约定值） — 实际 code=timeout
+PASS  S4 stopReason=null
+PASS  S4 超时后 usage=null
+
+== S5 idle 看门狗
+PASS  S5 status=timeout
+PASS  S5 error.class=timeout
+PASS  S5 error.code=idle_timeout
+
+== S6 cancelInstances 取消在跑任务
+PASS  S6 status=cancelled
+PASS  S6 error.class=cancelled
+PASS  S6 取消后正常退出
+
+== S7 超长 prompt 拒绝执行
+PASS  S7 status=failed
+PASS  S7 error.class=scheduler
+PASS  S7 error.code=payload_too_large
+PASS  S7 未启动 DSH 进程
+
+== S8 401 退出
+PASS  S8 401 后退出码非 0 — exit=3
+
+== S9 unsupported_protocol 退出
+PASS  S9 400 后退出码非 0 — exit=3
+
+== S10 技能包下载与 digest 短路
+PASS  S10 第一次安装 GET 技能包
+PASS  S10 第一个任务 succeeded
+PASS  S10 技能落到 .dsh/skills/alpha
+PASS  S10 同 digest 第二次不再下载
+
+== S11 技能包缺失报 failed(asset)
+PASS  S11 status=failed
+PASS  S11 error.class=asset
+    实际 error.code=download_failed
+
+== S13 上报失败后 finished 对账
+PASS  S13 finished[] 带 attempt
+PASS  S13 finished[] 带 finishedAt（ISO-8601） — 2026-11-10T09:31:40.005Z
+PASS  S13 重试最终被接受
+
+== S14 并发与 free 上报
+PASS  S14 两个任务在跑时 free=0
+PASS  S14 同一实例两个任务都被取消
+
+== S16 未知字段与同批取消
+PASS  S16 同批 cancelInstances 命中则不执行
+PASS  S16 未知响应字段下仍成功
+
+== S15 nextPollAfterMs 节流
+PASS  S15 poll 间隔不小于 nextPollAfterMs — gaps=[555,558]
+
+== S17 包摘要不匹配重试一次性
+FAIL  S17 摘要不匹配后重试一次（契约要求） — expected="succeeded" actual="failed"
+NOTE  S17 实际：status=failed class=asset code=checksum_mismatch，技能包 GET 次数=1
+
+== S12 首次即 304 的行为（记录）
+NOTE  S12 首次请求即 304 → status=failed class=asset code=download_failed message=技能包 304 但本地无缓存：alpha
+
+合计 57 项：55 pass，2 fail
+  - S4 error.code=prompt_timeout（契约 4.2 约定值）（实际 code=timeout）
+  - S17 摘要不匹配后重试一次（契约要求）（expected="succeeded" actual="failed"）

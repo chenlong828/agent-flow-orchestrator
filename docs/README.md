@@ -46,7 +46,7 @@ docs/
 ├── playbook/                               ← 方法：同类问题怎么判断（项目本地，待技能合并）
 │   ├── backend-contract-boundaries.md
 │   └── code-health-rules.md
-├── works/                                  ← 执行：正在做什么（当前无在办工序）
+├── works/                                  ← 执行：正在做什么（4 份契约相关工序 + 接口验证已收口待归档；client-boundary 仍在办）
 └── history/                                ← 记忆：怎么走到这里（冻结只读）
     ├── decisions/                          ← 整篇决策记录，按日期命名
     └── works/                              ← 已归档工序，按日期命名
@@ -67,7 +67,7 @@ docs/
 1. [`../README.md`](../README.md) —— 项目定位与当前阶段
 2. [`../AGENTS.md`](../AGENTS.md) —— 技能加载、门禁与文档纪律
 3. [`plan/roadmap.md`](plan/roadmap.md) —— 里程碑、工序与依赖
-4. [`plan/open-questions.md`](plan/open-questions.md) —— 开放问题登记；当前有 6 项 hold（OQ-5～OQ-7、OQ-9～OQ-11），无阻塞项；历史条目已关闭归档
+4. [`plan/open-questions.md`](plan/open-questions.md) —— 开放问题登记；当前有 6 项 hold（OQ-5～OQ-7、OQ-9～OQ-11）与 8 项待定（OQ-12～OQ-19，2026-11-10 执行面契约 v2 接口验证转出），无阻塞项；历史条目已关闭归档
 5. [`design/architecture.md`](design/architecture.md) —— 现行组件边界、依赖与数据所有权
 6. [`design/scenarios/_index.md`](design/scenarios/_index.md) —— 业务域/价值流/场景的生成索引；先看场景再看组件
 7. [`design/scenarios/agent-capability-assets/expert-capability-definition-and-assembly/expert-definition-and-assembly-management/scenario.md`](design/scenarios/agent-capability-assets/expert-capability-definition-and-assembly/expert-definition-and-assembly-management/scenario.md) —— 首个试点场景：入口、运行序、外部引用与 3+1
