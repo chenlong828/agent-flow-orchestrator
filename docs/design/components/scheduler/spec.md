@@ -174,7 +174,7 @@ type SchedulerPresenceRead = {
 
 | 方法 | 目的 | 输入 | 输出 | 错误 | 并发/事务 |
 |---|---|---|---|---|---|
-| `enqueue` | 冻结快照并入队 | `EnqueueInput` | `EnqueueResult` | `ValidationError`、`PayloadTooLargeError`、`NotFoundError`（实例未登记）、`DatabaseUnavailableError` | 一批一个事务；同批同实例的 `skillIds` 投影不一致、或与实例在飞任务的 digest 不一致 → 整批拒绝 |
+| `enqueue` | 冻结快照并入队 | `EnqueueInput` | `EnqueueResult` | `ValidationError`、`PayloadTooLargeError`、`NotFoundError`（实例未登记）、`DatabaseUnavailableError` | 一批一个事务；同批同实例的 `skillIds` 投影不一致、或与该实例已下发未结算任务的 digest 不一致 → 整批拒绝 |
 | `poll` | 派发与对账 | `clientId`、`ClientReport`、`PollOptions` | `DispatchDecision` | `ValidationError`、`DatabaseUnavailableError` | 同 `clientId` 串行（单飞）；派发预留与任务状态同事务 |
 | `acceptResult` | 接受结果并结算 | `clientId`、`TaskResult` | `ResultAck` | `TaskNotFoundError`、`ValidationError`、`DatabaseUnavailableError` | 单事务；首份为准，后到只回 `accepted=false` |
 | `requestStop` | 置位停止电平 | `clientId` | `void` | 无 | 幂等 |
@@ -207,7 +207,8 @@ enqueue ──▶ queued ──dispatch──▶ dispatched ──settle──�
 | 契约 | 本组件落点 |
 |---|---|
 | `S-01` | §4.1 状态机；任务表唯一写入口；同一 `taskId` 只 `dispatched` 给绑定的 client |
-| `S-02` | §4.3 重派：`dispatchedAt + timeoutMs + resultGraceMs` 或 `lastPollAt + clientSilentMs` 超时 → `queued`，`attempt + 1` |
+| `S-02` | §4.3 重派：`dispatchedAt + timeoutMs + resultGraceMs` 或 `lastPollAt + clientSilentMs` 超时且**未收到结果** → `queued`，`attempt + 1` |
+| `S-08` 补充 | 已收到失败/超时结果的任务**不回队**（§4.5，2026-11-11 裁决）；只有未回报才按 `S-02` 回队 |
 | `S-03` | §4.3 未确认重发：`dispatched` 且不在 `running[]`、不在 `finished[]`、无结果 → 下一跳原样重发 |
 | `S-04` | `poll` 的批量上限 `min(free, maxTasksPerPoll)`；同 client 单飞，不超卖 |
 | `S-05` | §4.4 快照冻结；重派只递增 `attempt` |
@@ -221,8 +222,8 @@ enqueue ──▶ queued ──dispatch──▶ dispatched ──settle──�
 
 1. **未确认重发**：任务 `dispatched` 给 C，但本次 `report.running` 与 `report.finished` 都不含它、且没有已接受结果 → 本次 `tasks` 原样重发（同 `attempt`）。适用于「响应丢失」；`attempt` 不递增。重发同样计入 `S-04` 的容量（`tasks.length ≤ min(free, maxTasksPerPoll)`），超出容量的部分留到下一条 poll。
 2. **静默回队**：`now - C.lastPollAt > clientSilentMs`（契约常量 120000）→ C 上的 `dispatched` 任务回到 `queued`，`attempt + 1`，`notBefore = now`。
-3. **超时回队**：`now > dispatchedAt + timeoutMs + resultGraceMs`（契约常量 `resultGraceMs=60000`）→ 回到 `queued`，`attempt + 1`，`notBefore = now + taskRetryDelayMs`。
-4. **失败结果重试**：见 §4.5 的重试策略表。
+3. **超时回队**（未收到结果）：`now > dispatchedAt + timeoutMs + resultGraceMs`（契约常量 `resultGraceMs=60000`）→ 回到 `queued`，`attempt + 1`，`notBefore = now + taskRetryDelayMs`。
+4. **失败结果**：不回队，直接结算（§4.5）。
 
 - 重派后 `tasks` 只回**同一 client**（实例粘性，见 §4.7）；`S-02` 允许重派，但本组件把「另一个 client」排除在外。
 - 重派可能与旧副本重叠；旧副本结果先到则照常接受（`S-08`），新副本结果回 `accepted=false`。这是契约 §8 的既定代价。
@@ -247,10 +248,10 @@ type SkillSet = { digest: string; packages: SkillPackageRef[] };
 ```
 
 - `skillSet.digest` 的规范化口径（契约 `S-06` 要求「规范化由调度器定义」）：按 `packageId` 升序排列，对每项取 `[packageId, version, digest, sizeBytes]`，序列化为 UTF-8 JSON 数组后取 `sha256:<hex>`。空技能集为 `[]` 的摘要。
-- 同一实例上在飞任务（`dispatched` 未结算）的 `skillSet.digest` 必须相同：`enqueue` 时若实例已有在飞任务且 digest 不同 → 该实例的任务整批拒绝；`poll` 派发前复核，不一致不派发（任务留在 `queued`）。
+- 同一实例上已下发未结算任务（`dispatched`）的 `skillSet.digest` 必须相同：`enqueue` 时若实例已有已下发未结算任务且 digest 不同 → 该实例的任务整批拒绝；`poll` 派发前复核，不一致不派发（任务留在 `queued`）。
 - 技能包在任务进行中被保存成新版本时，原 `packageId` 不再由 `CMP-skill` 提供（当前不保留历史包）→ `P-03` 返回 404，client 报 `failed(asset)`，本组件按 §4.5 处理；不在任务进行中改写快照。
 
-### 4.5 结果结算与重试策略
+### 4.5 结果结算
 
 `acceptResult` 判定：
 
@@ -258,23 +259,21 @@ type SkillSet = { digest: string; packages: SkillPackageRef[] };
 2. 任务已 `done` → `accepted: false`。
 3. 否则接受：写 `done` 与 `outcome`/`error`；`attempt` 不参与判定（旧副本结果也算首份）。
 
-接受后按 `status` 与 `error.class`/`code` 决定是否回队（`S-02` 委托给调度器重试策略）：
+**失败或超时的结果直接结算，不自动重派**（用户 2026-11-11 裁决）：
 
-| 结果 | 默认动作 | 依据 |
-|---|---|---|
-| `succeeded` | `done(succeeded)` | — |
-| `cancelled` | `done(cancelled)` | 取消已生效 |
-| `timeout` + `code=idle_timeout` | 回队重试（有限次） | 疑似工具卡死，重派大概率能过 |
-| `timeout` + `code=prompt_timeout`（含未知总超时码） | `done(failed)`，不回队 | 任务本身太大，重派只会再超时；由上游拆分或调整 `timeoutMs` 新建任务 |
-| `failed` + `class=workspace` | 不回队；`CMP-instance.block`，同实例其余 `queued`/`dispatched` 任务置 `done(failed)` | 实例不可用；重复派发只会持续失败（`OQ-21` 的调度器侧兜底） |
-| `failed` + `class=asset` | 回队重试（有限次） | 制品瞬时不可用；超过上限后 `done(failed)` |
-| `failed` + `class=runtime` / `internal` | 回队重试（有限次） | 执行环境偶发失败 |
-| `failed` + `class=scheduler` / `protocol` | `done(failed)`，不回队 | 快照已冻结，重派不会改变输入；需人工处理 |
-| `failed` + `class=cancelled` | `done(cancelled)` | 与取消结果同义 |
+| 结果 | 结算 |
+|---|---|
+| `succeeded` | `done(succeeded)` |
+| `cancelled` | `done(cancelled)` |
+| `timeout`（`idle_timeout` 或 `prompt_timeout`，含未知总超时码） | `done(failed)`，`error` 保留原 `code` |
+| `failed` + `class=workspace` | `done(failed)`；`CMP-instance.block`，同实例其余 `queued`/`dispatched` 任务置 `done(failed)` |
+| `failed` + 其他 class | `done(failed)`（`class=cancelled` 时记 `done(cancelled)`） |
 
-- 重试上限 `taskMaxAttempts`（默认 3，可配置）与退避 `taskRetryDelayMs`（默认 5000，可配置），定义见 [`CMP-config`](../config/spec.md)。
-- 「调度器误判重派、被 client 拒绝」不计入尝试次数：`failed(scheduler)` 是 client 拒绝执行的唯一口径，直接结算，不再累计。
-- 重试不改变快照；`attempt` 单调递增。
+- 失败原因仍按 `status`/`error.class`/`error.code` 写入任务，供上游展示与排障；只是不再自动回队。
+- 需要重跑时由上游新建任务（新 `taskId`、重新入队），或等 `S-02` 的未回报重派；不在调度器内隐式重试。
+- **未回报的重派不是失败重试**：`S-02` 的静默或 `timeoutMs + resultGraceMs` 过期（client 崩溃、响应丢失）仍会回队，否则任务会永久卡在 `dispatched`。回队次数上限 `taskMaxAttempts`（默认 3，可配置），用尽后 `done(failed)`。
+- 「调度器误判重派、被 client 拒绝」不计入尝试次数：`failed(scheduler)` 直接结算。
+- 重派不改变快照；`attempt` 单调递增。
 
 ### 4.6 停止与取消（`S-07`）
 
@@ -329,9 +328,9 @@ type SkillSet = { digest: string; packages: SkillPackageRef[] };
 | `S-04` | `free=0` 空批；`free=3` 返回 ≤3；`free > maxTasksPerPoll` 截断到 10；同 client 并发 poll 不超卖 |
 | `S-03` | 不在 `running[]`/`finished[]`/无结果 → 原样重发，`attempt` 不变 |
 | `S-02` | 静默超过 `clientSilentMs` 回队；`timeoutMs + resultGraceMs` 过期回队；回队后 `attempt + 1`、快照不变 |
-| `S-06` | 同实例不同 digest 入队被拒；同实例在飞任务同 digest 才派发 |
+| `S-06` | 同实例不同 digest 入队被拒；同实例已下发未结算任务同 digest 才派发 |
 | `S-08` | 首份 `accepted=true`、第二份 `accepted=false`；未知 `taskId` → `TaskNotFoundError`；旧副本先到结果被接受 |
-| 重试策略 | 上表每类 `status`/`class`/`code` 各一例；`taskMaxAttempts` 用尽后 `done(failed)`；退避期不派发 |
+| 结算策略 | 上表每类 `status`/`class` 各一例，均直接 `done` 且不再派发；未回报回队用尽 `taskMaxAttempts` 后 `done(failed)`；退避期不派发 |
 | 控制 | `stop` 后 `tasks` 为空且 `stop=true`；取消后 `cancelInstances` 持续到结算；重复请求幂等 |
 | 节点门禁 | 节点未绑定/停用 → 不派发且 `attempt` 不变；节点恢复后继续派发；在跑任务在停用后仍完成 |
 | presence | 未 poll 过返回 `null`；poll 后返回时间、`free`、在跑数；重启后回到 `null` 直到首次 poll |
@@ -347,5 +346,5 @@ type SkillSet = { digest: string; packages: SkillPackageRef[] };
 ## 8 待定
 
 - 任务列表规模上界（几十 vs 上千）与批量下发查询的索引策略，属实现取舍，不改契约。
-- 退避是否按错误类别区分（`asset` 与 `runtime` 是否需要不同退避）——当前统一 `taskRetryDelayMs`，等真实失败样本再分化。
+- 失败不自动重派已定（2026-11-11）；若将来要按类别重试，需重开本节并给出 token 成本评估。
 - `inspect` 是否升级为对外只读面（`executor-http-v2` §12.4），待排障需求出现后定。

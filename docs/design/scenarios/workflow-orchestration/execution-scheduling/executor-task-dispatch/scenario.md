@@ -50,7 +50,7 @@ externalRefs: []
    - `dispatched` 但既不在 `running[]`、也不在 `finished[]`、且无已接受结果的任务，本次原样重发（同 `taskId`、同 `attempt`，`S-03`）。
 3. 容量裁决：可派发数 = `min(free, maxTasksPerPoll=10)`；同一 client 的 poll 串行，不超卖（`S-04`）。
 4. 挑选 `queued` 且 `notBefore` 已到、实例 `active` 且绑定该 client 的任务；按入队顺序（FIFO）取。
-5. 派发前复核同实例在飞任务的 `skillSet.digest` 一致（`S-06`）；不一致不派发，任务留在队列。
+5. 派发前复核同实例已下发未结算任务的 `skillSet.digest` 一致（`S-06`）；不一致不派发，任务留在队列。
 6. 下发 `TaskEnvelope` 快照（`prompt`、`workspacePath`、`timeoutMs`、`skillSet`）；`attempt` 从 1 开始，重派递增（`S-01`/`S-05`）。
 7. 无任务可派：挂起到 `pollHoldMs=30000` 或新任务入队唤醒；返回 `200` + `tasks: []` + `nextPollAfterMs: 0`。
 
@@ -76,7 +76,7 @@ externalRefs: []
 |---|---|---|
 | R1 | `TC-EXD-001` | `free=3` 时最多返回 3 条任务，字段完整（`taskId`/`instanceId`/`nodeId`/`attempt`/`prompt`/`workspacePath`/`timeoutMs`/`skillSet`），`attempt=1`；同批中指向同一实例的任务 `skillSet.digest` 相同 |
 | R2 | `TC-EXD-002` | `free=0` 返回空批且不下发；无任务时挂起约 30s 后返回空批；新任务入队立即唤醒并返回任务；`nextPollAfterMs=0` |
-| R3 | `TC-EXD-003` | 同实例并发派发的任务 digest 相同；同实例在飞任务已有不同 digest 时新任务不派发，任务留在队列 |
+| R3 | `TC-EXD-003` | 同实例并发派发的任务 digest 相同；同实例已下发未结算任务已有不同 digest 时新任务不派发，任务留在队列 |
 | N1 | `TC-EXD-004` | 响应丢失：任务既不在 `running[]` 也不在 `finished[]`、无结果 → 下一次 poll 原样重发且 `attempt` 不变；任务出现在 `running[]` 或 `finished[]` 时不重发 |
 
 ## 6 覆盖边界

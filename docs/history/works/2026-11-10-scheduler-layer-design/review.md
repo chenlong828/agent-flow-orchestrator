@@ -1,23 +1,23 @@
 ---
-layer: works
+layer: history
 module: global
-status: active
-updated: 2026-11-10
+status: frozen
+updated: 2026-11-11
 procedure: 2026-11-10-scheduler-layer-design
 ---
 
 # 评审：执行面调度层设计（P1，四档裁决）
 
 > 对象：本工序全部设计产物（见 [`brief.md`](brief.md) §3）。
-> 基线：[`executor-http-v2`](../../design/contracts/executor-http-v2.md)（冻结，`protocolVersion = 2`）。
+> 基线：[`executor-http-v2`](../../../design/contracts/executor-http-v2.md)（冻结，`protocolVersion = 2`）。
 > 级别：P1（新增组件、公共契约面、数据所有权）。
 > 裁决口径见 `arch-design-spec` 第 8 步；定级与裁决是两把尺子，不合并。
 
 ## 1 结论
 
-**有条件通过。** 无 blocker；有 7 项 `Decision now` 需要用户确认后才能冻结设计、允许进入实现工序；其余为已验证成立与 hold。
+**通过（2026-11-11 用户确认）。** 无 blocker；7 项 `Decision now` 已由用户逐项裁决，其中 `D-03`（失败重派）按用户判断改为「失败结果不自动重派」；设计可以冻结，实现工序另立。
 
-条件全部属于 `Decision now` 档：任一在实现后再改都会变成 breaking change（契约字段口径、数据身份、重试语义）。
+确认记录见 §7。`D-03` 的改动已同步到 `scheduler/spec.md` §4.5、`config/spec.md` 与 `SCN-0202`。
 
 ## 2 Blocker
 
@@ -29,7 +29,7 @@ procedure: 2026-11-10-scheduler-layer-design
 |---|---|---|---|---|
 | `D-01` | 组件切分：`CMP-scheduler` + `CMP-instance`，三端点并入 `CMP-http-gateway` | ① 3 组件（已选）；② 独立 `CMP-executor-gateway`（多一层装配与依赖，协议面与产品面共享错误信封，收益低）；③ 单 `CMP-scheduler` 全包（实例生命周期与任务状态机变化轴不同，会同步修改） | ①（用户已确认） | `architecture.md` §3、两份新规格 |
 | `D-02` | `skillSet.digest` 规范化口径 + 同实例不同 digest 在入队时整批拒绝 | ① 入队拒绝（当前）；② 排队到实例空出（需要第二层队列与调度状态）；③ 同实例串行安装、允许不同 digest（违反 `S-06`） | ① | `scheduler/spec.md` §4.4 |
-| `D-03` | 重试策略默认值：`taskMaxAttempts=3`、`taskRetryDelayMs=5000`；`prompt_timeout`/`scheduler`/`protocol`/`workspace` 不回队 | ① 当前策略；② 一律回队（会在「任务太大」与协议问题上无限重试）；③ 一律不回队（失去 at-least-once 的收敛价值） | ① | `scheduler/spec.md` §4.5 |
+| `D-03` | 失败结果是否自动重派 | ① 按错误类别有限重试（原草案：3 次 / 5s 退避）；② 一律回队（会在「任务太大」与协议问题上无限重试）；③ **失败/超时结果直接结算、不重派**（用户选择）；未回报的 `S-02` 回队保留，上限 `taskMaxAttempts=3` | ③（2026-11-11 用户裁决）；代价是失败任务需上游新建任务重跑，换来最多 1×`timeoutMs` 的收敛时间与最省 token | `scheduler/spec.md` §4.5、`config/spec.md` §3.1 |
 | `D-04` | 制品身份：`packageId=<skillId>.<revision>`，`digest=sha256(zip)`，`etag="sha256-<hex>"`；不保留历史包，旧 `packageId` 返回 404 | ① 当前（零保留，保存即失效）；② 历史包保留（需要 GC 与存储策略，`CMP-skill` 现状不支持，属范围扩展） | ①，把 ② 记 `scheduler/spec.md` §8 待定 | `skill/spec.md` §3.3、`kernel/spec.md` §3.6 |
 | `D-05` | 同一 `clientId` 的 `poll` 单飞；长轮询挂起在 `CMP-scheduler`，网关只传 `holdMs` | ① 当前（不超卖、唤醒简单）；② 网关挂起（需要在网关侧订阅入队事件，传输层承载业务唤醒） | ① | `scheduler/spec.md` §3.2、`http-gateway` §4.3 |
 | `D-06` | 5 张执行面场景停在 `status: draft`，正文按 `designed` 判据写齐 | ① 保持 `draft`，实现工序补 TC 与入口后转 `designed`（仓库 `docs:check` 要求 TC ID 已存在于 `tests/`）；② 本轮先写 20 个 `test(...)` 占位（跳过则 TC 不被识别，不跳过则测试必红，且属写实现代码） | ① | 场景卡 §5、`brief.md` §3 |
@@ -70,3 +70,15 @@ procedure: 2026-11-10-scheduler-layer-design
 - 改任务状态机的三值闭集或「首份结果为准」的接受语义。
 - 改执行面错误码（`task_not_found`、`package_not_found`、`unsupported_protocol`）或状态码映射。
 - 改实例粘性语义（只重派回原 client）。
+
+## 7 确认记录（2026-11-11）
+
+| 决策 | 用户选择 | 影响 |
+|---|---|---|
+| `D-01` 组件切分 | 3 组件（scheduler + instance，端点并入网关） | 已按此落规格，不改 |
+| `D-02` 技能集冲突 | 入队即拒绝冲突批次 | 契约 `S-06` 天然成立；上游需按实例分组提交 |
+| `D-03` 失败重派 | **不自动重派**（失败/超时直接结算） | 最省 token、收敛最快；失败任务由上游新建任务重跑；未回报仍按 `S-02` 回队，上限 3 |
+| `D-04` 制品身份 | 不保留历史包，旧 `packageId` 返回 404 | 在跑任务遇技能升级失败一次；无 GC 与存储预算 |
+| `D-05` 长轮询与单飞 | 挂起在 scheduler，同 client 单飞 | 单进程部署；多调度器实例不在范围 |
+| `D-06` 场景状态 | 保持 `draft`，实现后转档 | 不改 `docs:check` 口径 |
+| `D-07` 凭据来源 | 设计时为 `EXECUTOR_CLIENTS` 环境变量 | **已被同日裁决取代**：凭据落 `harness.client_token`（见 [`2026-11-10-executor-client-token`](../../decisions/2026-11-10-executor-client-token.md)），配置不再持有凭据 |

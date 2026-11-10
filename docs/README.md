@@ -56,7 +56,7 @@ docs/
 ├── playbook/                               ← 方法：同类问题怎么判断（项目本地，待技能合并）
 │   ├── backend-contract-boundaries.md
 │   └── code-health-rules.md
-├── works/                                  ← 执行：正在做什么（当前在办：2026-11-10-scheduler-layer-design、2026-11-10-node-registry-implementation、2026-11-11-executor-joint-debug）
+├── works/                                  ← 执行：正在做什么（当前在办：2026-11-10-node-registry-implementation、2026-11-11-executor-joint-debug）
 └── history/                                ← 记忆：怎么走到这里（冻结只读）
     ├── decisions/                          ← 整篇决策记录，按日期命名
     └── works/                              ← 已归档工序，按日期命名
@@ -105,7 +105,7 @@ docs/
 - 新建文档先问「属于哪一态」，按路径放置并写 frontmatter；`layer` 与目录矛盾、`status` 越出本层值域、`module` 与组件不符，发现即修。
 - `playbook/` 是方法层，不是现行系统契约；每条规则要有真实工序证据，废弃后归档，不保留半失效副本。`layer: playbook` 目前是项目本地值，待上游 `doc-layout-spec` 合并后以技能为准。
 - 一处一事：同一事实只有一份权威文档，其他地方引用不复制。
-- 需求进 `requirements/`；工序 `brief.md` 必须引 `REQ-xxxx`，一个 REQ 同时只挂一个在飞工序；无 REQ 的调研/概念工序引对应 `OQ` 并在 brief 说明边界。
+- 需求进 `requirements/`；工序 `brief.md` 必须引 `REQ-xxxx`，一个 REQ 同时只挂一个在办工序；无 REQ 的调研/概念工序引对应 `OQ` 并在 brief 说明边界。
 - 收口写 `result.md` 后才可归档到 `history/works/`；归档件不得作为设计依据。
 - 生成物标 `generated: true`，不手改。
 - `design/scenarios/_index.md` 是生成物；改场景后跑 `bun run docs:index`，提交前跑 `bun run docs:check`。CI 尚未接入，当前以该命令作为本地门禁。

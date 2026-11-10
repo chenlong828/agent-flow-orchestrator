@@ -2,7 +2,7 @@
 layer: plan
 module: global
 status: current
-updated: 2026-11-10
+updated: 2026-11-11
 ---
 
 # 路线图
@@ -19,22 +19,22 @@ updated: 2026-11-10
 
 ## 工序与依赖
 
-- 一个 `REQ` 同一时刻只允许一个在飞工序；开工 = 建 `docs/works/<工序>/` + 写 `brief.md` 并引 `REQ-xxxx`。
+- 一个 `REQ` 同一时刻只允许一个在办工序；开工 = 建 `docs/works/<工序>/` + 写 `brief.md` 并引 `REQ-xxxx`。
 
 **在办工序**
 
 | 工序 | 级别 | 范围 | 状态 |
 |---|---|---|---|
-| [`2026-11-10-scheduler-layer-design`](../works/2026-11-10-scheduler-layer-design/brief.md) | P1 | 按 `executor-http-v2` 定调度器侧组件切分、执行面场景与组件规格；不写实现 | 设计已落盘，待用户最终确认（P1 人工门） |
-| [`2026-11-10-harness-node-registry`](../works/2026-11-10-harness-node-registry/brief.md) | P2 | Harness 作为 client 节点目录（方向 A）：方案对比 + 第一期组件规格增量、`SCN-0206`、决策记录；不写实现 | 已完成（P2 已确认，2026-11-10） |
 | [`2026-11-10-node-registry-implementation`](../works/2026-11-10-node-registry-implementation/brief.md) | P2 | 落 `harness.client_id`/`client_token`、`API-41`、`NodeDirectory`/`ExecutorAuthenticator`、凭据落库与测试；派生状态与调度器不在此列 | 实现完成，待用户验收 |
-| [`2026-11-11-executor-joint-debug`](../works/2026-11-11-executor-joint-debug/brief.md) | P2 | 与 `agent-flow-client` 联调：连通性基线（现在可做）→ 执行面三端点（阻塞于调度层 P1 确认）→ 真实执行联调 | 计划已出（2026-11-11）；`T-JD-01` 可开始，`T-JD-02` 阻塞 |
+| [`2026-11-11-executor-joint-debug`](../works/2026-11-11-executor-joint-debug/brief.md) | P2 | 与 `agent-flow-client` 联调：连通性基线（现在可做）→ 执行面三端点（阻塞于调度层实现）→ 真实执行联调 | 计划已出（2026-11-11）；`T-JD-01` 可开始，`T-JD-02` 阻塞 |
 - M2 只产出裁定与规格，不写实现代码；M2 是 P1，人参与切分与契约评审后才可编码。
 - 无用户旅程的技术债 / 文档活走旁路，不进 `requirements/`。
 - B1 是基础设施工序（无 UI 改动；UI 为独立项目），按旁路处理，不建 `REQ`/`SCN`，`brief.md` 为锚点；追溯方式已在 `implementation-plan.md` §9 落为默认旁路。
 - 已知欠账：无 CI 门禁；文档校验目前只有场景索引（`docs:check`），完整文档树校验待补。
 
 ## 近期完成
+- `2026-11-10-scheduler-layer-design`（P1）与 `2026-11-10-harness-node-registry`（P2）：设计工序已收口归档。调度层按 `executor-http-v2` 落 3 组件切分、执行面 6 张场景与组件规格；其中 **失败/超时结果不自动重派**（2026-11-11 用户裁决，只保留未回报的 `S-02` 回队）。节点目录按「Harness 即节点目录、管理员维护」落第一期。见 [`history/works/2026-11-10-scheduler-layer-design/result.md`](../history/works/2026-11-10-scheduler-layer-design/result.md)、[`history/works/2026-11-10-harness-node-registry/result.md`](../history/works/2026-11-10-harness-node-registry/result.md)。
+
 - `2026-11-03-client-boundary`：边界与职责设计收口归档。产品侧确认当时**没有智能体客户端真实执行负载数据**，注册/心跳/租约/session 绑定/清理回执/幂等键等交互预设属过度设计，已被契约 v2 的 at-least-once 模型替换；保留职责、所有权与决策归属。结论见 [`result.md`](../history/works/2026-11-03-client-boundary/result.md)，与 v2 的逐条冲突见 [`v2-alignment.md`](../history/works/2026-11-03-client-boundary/v2-alignment.md)。
 
 - `2026-11-10-executor-contract-v2` 及配套评审：执行面契约 v2 收口，正文移入 [`design/contracts/executor-http-v2.md`](../design/contracts/executor-http-v2.md)。client 已按契约完成实现；调度器侧用桩服务做了 57 项接口断言（55 通过），2 项 client 偏离（总超时错误码、技能包摘要不匹配未重试）与 2 项契约边界（`C-05` 终止范围、400 双语义）等共 8 项转 [`open-questions.md`](open-questions.md) `OQ-12`–`OQ-19`。结论见 [`result.md`](../history/works/2026-11-10-executor-contract-verification/result.md)，验证报告见 [`verification.md`](../history/works/2026-11-10-executor-contract-verification/verification.md)。`2026-11-05-scheduler-contract-review`、`2026-11-07-client-architecture-review`、`2026-11-10-execution-semantics-review` 的对象均已被 v2 替换或吸收，同期收口归档。
@@ -54,4 +54,4 @@ updated: 2026-11-10
 - `2026-10-28-workflow-definition`：B3 工作流定义已实现——三张表、`CMP-workflow`、catalog/expert/kernel 增量、10 个 HTTP 端点、OpenAPI 与契约测试；B4 运行/实例与 UI 未做。结论见 [`result.md`](../history/works/2026-10-28-workflow-definition/result.md)。
 - `2026-10-25-scenario-index-pilot`：建立首个场景「智能体能力资产 / 专家能力定义与装配 / 专家定义与装配管理」，分配 `TC-EXP-001`～`TC-EXP-004`，新增场景索引生成器与 `docs:index` / `docs:check`。场景保持 `designed`，未宣称完整 CRUD 验收。结论见 [`result.md`](../history/works/2026-10-25-scenario-index-pilot/result.md)。
 - 2026-11-02：`docs/works/` 中已收口的 `2026-10-25-scenario-index-pilot`、`2026-10-26-skill-contract-v2`、`2026-10-28-skill-package`、`2026-10-29-tech-debt-cleanup`、`2026-10-29-workflow-viewport`、`2026-10-30-workflow-contract-boundary`、`2026-10-24-agentflow-execution-concept` 已整目录归档到 `history/works/`，frontmatter 改为 `frozen`；其中概念工序原在 result 中记为「不归档」，本次按 `doc-layout-spec` 生命周期统一归档，失效说明见其 result。归档件只作历史证据，不作设计依据。
-- 后续不预置 M2/M4 的答案；实际运行需求出现时再启动对应工序。B1+B3 覆盖控制面资产注册与工作流定义；执行面契约 v2 已冻结并由 client 实现。调度器侧已由 `2026-11-10-scheduler-layer-design` 完成设计与组件规格（`CMP-scheduler`、`CMP-instance` 为 `planned`），实现工序待该设计经 P1 确认后另立；B4 运行实例与任务来源（含实例登记、任务入队）未开始。当前有 6 项 hold 与 10 项待定（`OQ-12`–`OQ-19`、`OQ-21`、`OQ-22`），见 [`open-questions.md`](open-questions.md)。
+- 后续不预置 M2/M4 的答案；实际运行需求出现时再启动对应工序。B1+B3 覆盖控制面资产注册与工作流定义；执行面契约 v2 已冻结并由 client 实现。调度器侧设计已收口（`CMP-scheduler`、`CMP-instance` 为 `planned`），实现工序待立；B4 运行实例与任务来源（含实例登记、任务入队）未开始。当前有 6 项 hold 与 10 项待定（`OQ-12`–`OQ-19`、`OQ-21`、`OQ-22`），见 [`open-questions.md`](open-questions.md)。

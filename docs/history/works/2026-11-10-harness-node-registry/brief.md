@@ -1,7 +1,7 @@
 ---
-layer: works
+layer: history
 module: global
-status: active
+status: frozen
 updated: 2026-11-10
 procedure: 2026-11-10-harness-node-registry
 level: P2
@@ -21,10 +21,10 @@ level: P2
 
 ## 2 输入与约束
 
-- [`harness/spec.md`](../../design/components/harness/spec.md)：`health`/`lastHeartbeatAt` 只读，规格写明「只由未来执行器更新」（第 53 行）；`concurrency_max`、`queue_policy` 可写但无消费者。
-- [`executor-http-v2.md`](../../design/contracts/executor-http-v2.md)：无注册/心跳（第 65 行、§11.1）；容量只由 `capacity.free` 表达，调度器不做二次限制（§9）；凭据 `Bearer <token>` 绑定 `clientId`（§3）。
-- [`instance/spec.md`](../../design/components/instance/spec.md)：`enroll(instanceId, clientId, workspacePath)`，`instance` 无 `harnessId`。
-- [`scheduler/spec.md`](../../design/components/scheduler/spec.md)：派发只看 `instance.isDispatchable` 与 `capacity.free`，不读 Harness。
+- [`harness/spec.md`](../../../design/components/harness/spec.md)：`health`/`lastHeartbeatAt` 只读，规格写明「只由未来执行器更新」（第 53 行）；`concurrency_max`、`queue_policy` 可写但无消费者。
+- [`executor-http-v2.md`](../../../design/contracts/executor-http-v2.md)：无注册/心跳（第 65 行、§11.1）；容量只由 `capacity.free` 表达，调度器不做二次限制（§9）；凭据 `Bearer <token>` 绑定 `clientId`（§3）。
+- [`instance/spec.md`](../../../design/components/instance/spec.md)：`enroll(instanceId, clientId, workspacePath)`，`instance` 无 `harnessId`。
+- [`scheduler/spec.md`](../../../design/components/scheduler/spec.md)：派发只看 `instance.isDispatchable` 与 `capacity.free`，不读 Harness。
 - 产品端点无鉴权、只监听本机（`http-gateway/spec.md` §2）；因此「在管理面发放凭据」的风险要单独评估。
 - 当前 `EXECUTOR_CLIENTS`（config）是 token → `clientId` 的唯一来源，尚未实现。
 

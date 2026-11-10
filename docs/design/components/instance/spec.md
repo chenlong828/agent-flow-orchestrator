@@ -135,7 +135,7 @@ enroll ──▶ active ──block──▶ blocked ──unblock──▶ acti
 | `TaskRequest.instanceId` | 实例主键；任务绑定实例，实例绑定 client |
 | `TaskRequest.workspacePath` | `Instance.workspacePath` 原样透传；client 按 `P-01` §4.1 #3 校验 |
 | `S-02` 重派 | 实例粘性：重派只回 `Instance.clientId`；`OQ-20` 的结论落在本表 |
-| `S-06` 同容器技能集一致 | 由 `CMP-scheduler` 按 `instanceId` 聚合同实例在飞任务得出，本组件不存 digest |
+| `S-06` 同容器技能集一致 | 由 `CMP-scheduler` 按 `instanceId` 聚合同实例已下发未结算任务得出，本组件不存 digest |
 | 实例不可用（`OQ-21`） | 契约仍无上报载体；本组件 `blocked` 是调度器侧兜底，恢复由运维触发 |
 
 ### 4.4 节点停用与实例回收

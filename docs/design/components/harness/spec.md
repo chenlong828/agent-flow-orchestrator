@@ -31,7 +31,7 @@ updated: 2026-11-10
 - `client_id` 可空、全局唯一（非空时唯一）；绑定后同一节点不允许再绑第二个 Harness。空串视为未绑定，与 `null` 等价。
 - `client_id` 与 `client_token` 只能经 `bindClient` / `unbindClient` 修改，不进入 `create` / `update`：避免全量 `PUT` 漏传即解绑。
 - `client_id` 与 `client_token` 同时写入、同时清空；`client_token` 非空时 `client_id` 必填（表级 check 兜底）。两者都是 1–64 / 1–128 个不含空白与控制字符的字符串。
-- `client_token` 是明文凭据，仅供本机调试读回；不进入列表读模型，不出现在错误 `details` 与日志中。
+- `client_token` 是该节点的 Bearer 凭据，**永久保存在 Harness 表**（不是 `.env`、不是启动配置）；仅供本机调试从详情读回，不进入列表读模型，不出现在错误 `details` 与日志中。
 - 有工具引用时不可删除；删除前调用 `ReferenceGuard`，非空抛 `ReferencedError`。
 - 标签同 Harness 内唯一、按 `position` 连续；数量上限在表级设计确认。
 
@@ -141,7 +141,7 @@ type HarnessQuery = {
 |---|---|---|---|---|---|
 | `create` | 创建 Harness 与标签 | `CreateHarness` | `{ id, revision }` | `ValidationError`、`NameConflictError` | 单事务插入根与标签 |
 | `update` | 更新 Harness，整体替换标签 | `id`、`revision`、`UpdateHarness` | `{ id, revision }` | `NotFoundError`、`RevisionConflictError`、`NameConflictError`、`ValidationError` | 单事务；`revision` 乐观锁 |
-| `setEnabled` | 启停 | `id`、`revision`、`enabled` | `{ id, revision }` | `NotFoundError`、`RevisionConflictError` | 单行更新并递增 `revision`；停用不改变在飞任务 |
+| `setEnabled` | 启停 | `id`、`revision`、`enabled` | `{ id, revision }` | `NotFoundError`、`RevisionConflictError` | 单行更新并递增 `revision`；停用不改变已下发未结算任务 |
 | `bindClient` | 登记/换绑节点并写入凭据 | `id`、`revision`、`HarnessClientBinding` | `{ id, revision }` | `NotFoundError`、`RevisionConflictError`、`ValidationError`（`clientId`/`token` 为空、含空白或超长）、`BindingConflictError`（`clientId` 或 token 已被其他 Harness 占用） | 单行更新并递增 `revision`；两个唯一索引兜底 |
 | `unbindClient` | 解绑节点并清空凭据 | `id`、`revision` | `{ id, revision }` | `NotFoundError`、`RevisionConflictError` | 幂等：本就未绑定视为成功，仍递增 `revision` |
 | `delete` | 删除 Harness | `id`、`revision` | `void` | `NotFoundError`、`RevisionConflictError`、`ReferencedError` | 先 `ReferenceGuard`，再删除；同一事务 |

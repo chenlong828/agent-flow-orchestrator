@@ -10,7 +10,7 @@ decision: 2026-11-10-harness-node-registry
 
 > 背景：`executor-http-v2` 删除了 client 自注册与心跳，client 身份只剩 token → `clientId`；Harness 有 `concurrency_max`/`queue_policy`/`health`/`last_heartbeat_at` 等节点字段但没有运行期写入，执行面也不知道 Harness 的存在。
 > 用户裁决（2026-11-10）：**A. Harness 就是 client 节点目录，管理员维护，不恢复 client 自注册**；不做数据迁移（当前为演示数据，可直接重建）。
-> 方案对比：[`node-registry-options.md`](../../works/2026-11-10-harness-node-registry/node-registry-options.md)。
+> 方案对比：[`node-registry-options.md`](../works/2026-11-10-harness-node-registry/node-registry-options.md)。
 
 ## 1 决策
 

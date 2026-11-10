@@ -1,7 +1,7 @@
 ---
-layer: works
+layer: history
 module: global
-status: active
+status: frozen
 updated: 2026-11-10
 procedure: 2026-11-10-harness-node-registry
 level: P2
@@ -11,19 +11,19 @@ level: P2
 
 > 方向前提（用户 2026-11-10 裁决）：**A. Harness 就是 client 节点目录，管理员维护，不恢复 client 自注册。**
 > 本文比较 A 内部的 8 个子决策，给出推荐组合与分期；确认后按 `brief.md` `T-NODE-02` 落组件规格与迁移。
-> 契约基线：[`executor-http-v2`](../../design/contracts/executor-http-v2.md)（不改）。
+> 契约基线：[`executor-http-v2`](../../../design/contracts/executor-http-v2.md)（不改）。
 
 ## 1 现状（证据）
 
 | 事实 | 证据 |
 |---|---|
-| Harness 是资产目录：7 个端点、`harness`/`harness_tag` 两张表、status `current` | [`harness/spec.md`](../../design/components/harness/spec.md)、`tests/components/harness/service.test.ts`（13 例） |
+| Harness 是资产目录：7 个端点、`harness`/`harness_tag` 两张表、status `current` | [`harness/spec.md`](../../../design/components/harness/spec.md)、`tests/components/harness/service.test.ts`（13 例） |
 | `health`、`last_heartbeat_at` 只读，**从未被写入** | 规格第 53 行「只由未来执行器更新」；代码只有读取（`src/components/harness/service.ts:46-47`、`store.ts:60`），全仓无写入路径 |
-| `concurrency_max`、`queue_policy` 可写，但**无消费者** | 调度器只用 `capacity.free`（[`scheduler/spec.md`](../../design/components/scheduler/spec.md) §4.3） |
+| `concurrency_max`、`queue_policy` 可写，但**无消费者** | 调度器只用 `capacity.free`（[`scheduler/spec.md`](../../../design/components/scheduler/spec.md) §4.3） |
 | `enabled` 可启停，但**不参与任何运行判定** | Harness 只做 CRUD 与引用保护；无运行期读取方 |
-| client 身份只剩 token → `clientId`，无注册、无心跳 | 契约第 65 行、§11.1；[`BC-02`](../../history/works/2026-11-03-client-boundary/v2-alignment.md) |
-| 实例登记不引用 Harness | [`instance/spec.md`](../../design/components/instance/spec.md) §2，`instance` 无 `harnessId` |
-| 产品端点无鉴权、只监听本机 | [`http-gateway/spec.md`](../../design/components/http-gateway/spec.md) §2 |
+| client 身份只剩 token → `clientId`，无注册、无心跳 | 契约第 65 行、§11.1；[`BC-02`](../../works/2026-11-03-client-boundary/v2-alignment.md) |
+| 实例登记不引用 Harness | [`instance/spec.md`](../../../design/components/instance/spec.md) §2，`instance` 无 `harnessId` |
+| 产品端点无鉴权、只监听本机 | [`http-gateway/spec.md`](../../../design/components/http-gateway/spec.md) §2 |
 
 **结论**：Harness 现在只是「静态资产」，执行面完全不知道它。要做成节点目录，需要补三件事：**节点身份（clientId）**、**运行期状态（在线/离线/满载）**、**派发侧的可用性判定**。
 
@@ -92,7 +92,7 @@ level: P2
 | 选项 | 做法 | 代价 / 风险 |
 |---|---|---|
 | a `concurrency_max` 只做展示与告警，不参与派发 | 与契约 §9「容量只由 `free` 表达、调度器不做二次限制」一致 | 管理员配置的上限不能强制，只能事后发现 |
-| b 作为派发硬上限（`min(free, concurrency_max - 在飞)`） | 管理端可强制 | 与 §9 冲突，需改契约；且 `free` 已由 client 自报，双上限会出现「有槽但不派」的费解现象 |
+| b 作为派发硬上限（`min(free, concurrency_max - 已下发未结算数)`） | 管理端可强制 | 与 §9 冲突，需改契约；且 `free` 已由 client 自报，双上限会出现「有槽但不派」的费解现象 |
 | c 删除字段 | 收敛 | 破坏性变更，UI 依赖，需 `/api/v2` 级迁移 |
 
 **推荐 a**：`concurrency_max`、`queue_policy` 保持管理语义（展示/规划），不进入派发判定；`priority` 需要任务优先级模型，记 `待定`。
