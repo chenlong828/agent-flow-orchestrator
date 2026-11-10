@@ -32,3 +32,5 @@ updated: 2026-11-02
 | OQ-17 | **`If-None-Match` 与无缓存 304**：client 首次请求就带条件头，调度器按 HTTP 语义回 304 时 client 报「304 但本地无缓存」并 `failed(asset)`。 | 待定（`VR-01`）：契约写明 304 的前提，或 client 无缓存时去条件头重试一次。 |
 | OQ-18 | **`RunningTask.lastEventAt`**：契约标为可选，client 未发送；`2026-11-10-execution-semantics-review` 的 `SH-04` 认为它对派发排序有价值。 | 待定（`VD-06`）：按调度器观测需求决定是否要求 client 实现。 |
 | OQ-19 | **观测面 fail-open**：client 只读观测 HTTP 在非 loopback + 空 token 下仍启动（`raw_enabled` 默认 true），评审 `OB-01` 未采纳「拒绝启动」建议。 | 待定（`OB-01`）：属 client 侧安全项；建议改为启动期检查（非 loopback 且空 token → 退出 2）或强制 `raw_enabled=false`。 |
+| OQ-20 | **实例粘性没有契约条款**：边界设计把「实例绑定 client、重派不换 client」当硬约束，但 v2 的 `poll` 载荷不含 `clientId`，`S-02` 只要求「同一时刻派给一个 client」，**未禁止重派到另一个 client**；若实现按空闲派发，本地 `workspacePath` 会落到别的机器。 | 待定（2026-11-10 边界对齐 `BC-13`）：需在契约补「重派必须回到同一 client」或明确允许跨 client 重派及工作区准备责任；调度器实现前必须定。 |
+| OQ-21 | **实例不可用无上报载体**：client 无法声明「这个实例别再派」，只能事后报 `failed(workspace)`；`2026-11-10-execution-semantics-review` 的 `SA-01` 在 v2 中并未真正解决。 | 待定（`BC-14`）：可并入 `OQ-20` 一并处理；决定是否需要 client 侧「不可用实例」上报字段。 |

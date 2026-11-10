@@ -1,7 +1,7 @@
 ---
-layer: works
+layer: history
 module: global
-status: active
+status: frozen
 updated: 2026-11-03
 ---
 
@@ -42,7 +42,7 @@ updated: 2026-11-03
 
 ## 输入
 
-- [执行概念稿](../../history/works/2026-10-24-agentflow-execution-concept/concept-design.md) 的 D0–D11；
+- [执行概念稿](../2026-10-24-agentflow-execution-concept/concept-design.md) 的 D0–D11；
 - 2026-11-02/03 的方案讨论结论（本工序 brief 的“已定框架”）；
 - agent-flow-client 的 S0 结果（`agent-flow-client/docs/works/2026-11-03-s0-acp-verification/result.md`）：12 项 11 通过，技能可见性、受控技能根、并发、脚本、崩溃行为已有实测；
 - 现有 B1/B3 资产与工作流契约（只读）；
@@ -79,17 +79,17 @@ updated: 2026-11-03
 
 - [`boundary-design.md`](boundary-design.md)：边界与职责设计（框架稿，已回写 S0 与进程模型）。
 - [`client-work.md`](client-work.md)：client 侧工作清单（工作包、S0 结果、里程碑、依赖）。
-- 决策记录：[`2026-11-03-client-workspace-process-model.md`](../../history/decisions/2026-11-03-client-workspace-process-model.md)。
+- 决策记录：[`2026-11-03-client-workspace-process-model.md`](../../decisions/2026-11-03-client-workspace-process-model.md)。
 
 ## 任务表
 
 | ID | 类型 | 组件 | 状态 | 说明 |
 |---|---|---|---|---|
-| T-CB-01 | design | global | in_progress | 边界与职责设计框架稿 |
-| T-CB-02 | design | global | in_progress | client 侧工作清单 |
+| T-CB-01 | design | global | 完成 | 边界与职责设计框架稿（2026-11-10 收口） |
+| T-CB-02 | design | global | 完成 | client 侧工作清单（2026-11-10 收口） |
 | T-CB-03 | design | global | done | 回写 S0 结论（技能可见性、全局根屏蔽/项目根保留、崩溃清理、权限、用量） |
 | T-CB-04 | design | global | done | 进程模型决策：一个活跃工作区一个 DSH 进程 |
-| T-CB-05 | design | global | open | 按 `executor-http-v2` 改写交互章节（§6 与 §4.2/§4.5/§4.6/§4.7），并更新 `client-work.md` 的 `CW-02`/`CW-07` 出口；见 [`v2-alignment.md`](v2-alignment.md) |
+| T-CB-05 | design | global | 取消 | 原计划按 `executor-http-v2` 改写交互章节；2026-11-10 用户裁决整工序关闭，不再改写（无实际负载数据，原交互预设属过度设计） |
 
 ## 装载清单
 
