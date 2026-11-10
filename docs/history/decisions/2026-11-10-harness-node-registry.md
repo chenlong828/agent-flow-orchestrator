@@ -15,7 +15,7 @@ decision: 2026-11-10-harness-node-registry
 ## 1 决策
 
 1. **节点身份**：`harness` 增可空唯一列 `client_id`；一台执行机器对应一个 Harness、一个 `clientId`。绑定/解绑走专用 `PATCH /harnesses/{id}/client`（`API-41`），`create`/`update` 不接受 `clientId`。
-2. **凭据**：第一期 token → `clientId` 仍由配置 `EXECUTOR_CLIENTS` 提供；Harness 不存 token。第二期是否落库见 `OQ-23`（需前置管理面鉴权）。
+2. **凭据**：~~第一期 token → `clientId` 仍由配置 `EXECUTOR_CLIENTS` 提供；Harness 不存 token。~~ **已被 2026-11-10 用户裁决取代**：凭据落 `harness.client_token`（明文、详情可读回），与 `clientId` 同一次 `API-41` 原子写入，见 [`2026-11-10-executor-client-token.md`](2026-11-10-executor-client-token.md)；`OQ-23` 随之关闭。
 3. **在线状态**：不落库。`catalog` 组合 `CMP-scheduler` 的 `presence` 读，按 `unknown`/`online`/`overloaded`/`offline` 派生 `health` 与 `lastHeartbeatAt`；`harness.health`、`harness.last_heartbeat_at` 两列保留但不再作为权威。
 4. **派发门禁**：`scheduler` 派发前经 `kernel.NodeDirectory` 端口（`harness` 实现）校验节点已绑定且 `enabled`。节点停用只停止新增派发，在跑任务继续，不下发 `stop`；与实例 `blocked`（执行失败兜底）区分。
 5. **容量与队列**：`concurrency_max`、`queue_policy` 只做管理展示，不参与派发（`executor-http-v2` §9：容量只由 `capacity.free` 表达）。
@@ -29,7 +29,7 @@ decision: 2026-11-10-harness-node-registry
 |---|---|
 | 新建独立「执行节点」实体 | 与 Harness 字段高度重叠，会产生两套设备概念；用户已裁决 Harness 即节点目录 |
 | `clientId` 放进 `PUT /harnesses/{id}` | 全量替换语义下「漏传即解绑」，兼容风险高；沿用「启停走单独端点」的先例改为专用端点 |
-| token 与 `clientId` 一起落 Harness（第一期） | 产品端点无鉴权，本地写接口即可发放/换绑凭据；等管理面鉴权后作为第二阶段 |
+| token 与 `clientId` 一起落 Harness（第一期） | 原第一期担心产品端点无鉴权、本地写接口即可发放/换绑凭据；2026-11-10 用户以「方便对接调试」为由接受该风险，改为落库（见 [`2026-11-10-executor-client-token.md`](2026-11-10-executor-client-token.md)） |
 | 调度器回写 Harness 心跳 | 库内状态有陈旧窗口，仍要按时间戳判新鲜，且引入 `scheduler → harness` 写依赖；派生读更简单 |
 | 把 `concurrency_max` 作为派发硬上限 | 与契约 §9 冲突（容量只由 `free` 表达、调度器不做二次限制），会出现「有槽但不派」 |
 | 恢复 client 自注册与心跳 | 契约 v2 已明确删除该机制；第一期用 poll 观测已能覆盖 |
@@ -38,7 +38,7 @@ decision: 2026-11-10-harness-node-registry
 ## 3 影响
 
 - `harness` 表：+`client_id`（可空唯一）；`health`/`last_heartbeat_at` 保留但非权威。
-- `CMP-harness`：+`bindClient`/`unbindClient`、`HarnessRead.getByClientId`、`NodeDirectory` 实现；`HarnessSummary.clientId`。
+- `CMP-harness`：+`bindClient`/`unbindClient`、`HarnessRead.getByClientId`、`NodeDirectory` 实现；`HarnessSummary.clientId`；凭据列与 `ExecutorAuthenticator` 实现见 [`2026-11-10-executor-client-token.md`](2026-11-10-executor-client-token.md)。
 - `CMP-kernel`：+`NodeDirectory` 端口；`binding_conflict` 错误（409）。
 - `CMP-catalog`：Harness 列表/详情按 `SchedulerPresenceRead` 派生状态（新增对 `scheduler` 的读依赖）。
 - `CMP-scheduler`：派发门禁 + `SchedulerPresenceRead`；启动交集校验（配置 token ∩ 节点目录）。
@@ -49,6 +49,6 @@ decision: 2026-11-10-harness-node-registry
 
 ## 4 复试条件
 
-- 需要按节点发放/轮换凭据，或 UI 通过非本机地址访问管理面（`OQ-23`）时，重开「token 落库」与鉴权方案。
+- ~~需要按节点发放/轮换凭据时，重开「token 落库」~~：2026-11-10 已裁决落库（`OQ-23` 关闭）；若 UI 通过非本机地址访问管理面，先补管理面鉴权（凭据可读回的风险）。
 - 需要按 `concurrency_max` 强制限流或 `priority` 队列时，先改 `executor-http-v2` §9 与任务优先级模型。
 - 节点规模增长到需要自动发现/自动摘除时，另评估注册面（可能回到被否决的 D 方向）。

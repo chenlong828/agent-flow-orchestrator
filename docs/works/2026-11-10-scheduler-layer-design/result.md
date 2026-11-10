@@ -41,7 +41,7 @@ bun run check          # tsc --noEmit + bun test + docs:check
 | 实例登记、工作区路径、粘性、`blocked` 状态 | [`instance/spec.md`](../../design/components/instance/spec.md) §4 |
 | 执行面端点、错误映射、DTO | [`http-gateway/spec.md`](../../design/components/http-gateway/spec.md) §4.3、§5.8 |
 | `task_not_found` / `unsupported_protocol` 与 `SkillPackageSource` | [`kernel/spec.md`](../../design/components/kernel/spec.md) §3.1、§3.6 |
-| `EXECUTOR_CLIENTS`、重试参数、`[executor]` | [`config/spec.md`](../../design/components/config/spec.md) §3.1–§3.2 |
+| 重试参数、`[executor]` | [`config/spec.md`](../../design/components/config/spec.md) §3.1–§3.2；执行面凭据 2026-11-10 改为落 Harness 表，`EXECUTOR_CLIENTS` 已删除（[`2026-11-10-executor-client-token.md`](../../history/decisions/2026-11-10-executor-client-token.md)） |
 | `packageId` / `digest` / `etag` 与旧版本 404 | [`skill/spec.md`](../../design/components/skill/spec.md) §3.3 |
 | 5 张执行面场景 | [`execution-scheduling/`](../../design/scenarios/workflow-orchestration/execution-scheduling/) 与生成的 [`_index.md`](../../design/scenarios/_index.md) |
 | 开放问题处置 | [`plan/open-questions.md`](../../plan/open-questions.md) `OQ-18`、`OQ-20` 关闭；`OQ-21` 补调度器侧兜底；新增 `OQ-22` |

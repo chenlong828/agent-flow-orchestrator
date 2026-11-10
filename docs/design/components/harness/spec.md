@@ -18,7 +18,7 @@ updated: 2026-11-10
 
 | 表 | 关键字段 | 说明 |
 |---|---|---|
-| `harness` | `id`、`name`、`kind`、`address`、`access_mode`、`description`、`concurrency_max`、`queue_policy`、`enabled`、`client_id`、`health`、`last_heartbeat_at`、`revision`、审计字段 | 聚合根；`client_id` 是节点目录绑定，可空、唯一 |
+| `harness` | `id`、`name`、`kind`、`address`、`access_mode`、`description`、`concurrency_max`、`queue_policy`、`enabled`、`client_id`、`client_token`、`health`、`last_heartbeat_at`、`revision`、审计字段 | 聚合根；`client_id` 是节点目录绑定，可空、唯一；`client_token` 是该节点的 Bearer 凭据，可空、唯一 |
 | `harness_tag` | `harness_id`、`position`、`tag` | 有序子实体，随 Harness 级联删除 |
 
 不变量：
@@ -29,7 +29,9 @@ updated: 2026-11-10
 - `queue_policy ∈ fifo / priority`；`concurrency_max ≥ 1`。
 - 新对象 `health=unknown`、`last_heartbeat_at=null`；**两列保留但不再作为权威**：对外读值由 `catalog` 按 `CMP-scheduler` 的 presence 派生（§3.3），本组件不写这两列。
 - `client_id` 可空、全局唯一（非空时唯一）；绑定后同一节点不允许再绑第二个 Harness。空串视为未绑定，与 `null` 等价。
-- `client_id` 只能经 `bindClient` / `unbindClient` 修改，不进入 `create` / `update`：避免全量 `PUT` 漏传即解绑。
+- `client_id` 与 `client_token` 只能经 `bindClient` / `unbindClient` 修改，不进入 `create` / `update`：避免全量 `PUT` 漏传即解绑。
+- `client_id` 与 `client_token` 同时写入、同时清空；`client_token` 非空时 `client_id` 必填（表级 check 兜底）。两者都是 1–64 / 1–128 个不含空白与控制字符的字符串。
+- `client_token` 是明文凭据，仅供本机调试读回；不进入列表读模型，不出现在错误 `details` 与日志中。
 - 有工具引用时不可删除；删除前调用 `ReferenceGuard`，非空抛 `ReferencedError`。
 - 标签同 Harness 内唯一、按 `position` 连续；数量上限在表级设计确认。
 
@@ -40,9 +42,9 @@ type HarnessService = {
   create(input: CreateHarness): Promise<{ id: string; revision: number }>;
   update(id: string, revision: number, input: UpdateHarness): Promise<{ id: string; revision: number }>;
   setEnabled(id: string, revision: number, enabled: boolean): Promise<{ id: string; revision: number }>;
-  /** 绑定/换绑执行节点；同一 clientId 不能被两个 Harness 占用。 */
-  bindClient(id: string, revision: number, clientId: string): Promise<{ id: string; revision: number }>;
-  /** 解绑：节点回到未登记状态，不再参与执行面派发。 */
+  /** 登记执行节点：写入 clientId 与该节点凭据；同一 clientId 与同一 token 都不能被两个 Harness 占用。 */
+  bindClient(id: string, revision: number, binding: HarnessClientBinding): Promise<{ id: string; revision: number }>;
+  /** 解绑：清空 clientId 与凭据，节点回到未登记状态，不再参与执行面派发。 */
   unbindClient(id: string, revision: number): Promise<{ id: string; revision: number }>;
   delete(id: string, revision: number): Promise<void>;
 };
@@ -53,6 +55,12 @@ type HarnessNodeDirectory = {
   isDispatchable(clientId: string): Promise<boolean>;
   /** 已绑定且 enabled 的 clientId 列表；启动校验与排障用。 */
   listClientIds(): Promise<string[]>;
+};
+
+/** 执行面凭据解析（kernel.ExecutorAuthenticator），供执行端端点鉴权。 */
+type HarnessAuthenticator = {
+  /** 未知 token、已解绑或已轮换的旧 token 返回 null。 */
+  resolveClientId(token: string): Promise<string | null>;
 };
 
 type HarnessRead = {
@@ -110,6 +118,8 @@ type HarnessSummary = {
 
 type HarnessDetail = HarnessSummary & {
   description: string;
+  /** 明文凭据；只在详情读模型返回，列表不含。 */
+  clientToken: string | null;
   createdAt: string;
 };
 
@@ -132,12 +142,13 @@ type HarnessQuery = {
 | `create` | 创建 Harness 与标签 | `CreateHarness` | `{ id, revision }` | `ValidationError`、`NameConflictError` | 单事务插入根与标签 |
 | `update` | 更新 Harness，整体替换标签 | `id`、`revision`、`UpdateHarness` | `{ id, revision }` | `NotFoundError`、`RevisionConflictError`、`NameConflictError`、`ValidationError` | 单事务；`revision` 乐观锁 |
 | `setEnabled` | 启停 | `id`、`revision`、`enabled` | `{ id, revision }` | `NotFoundError`、`RevisionConflictError` | 单行更新并递增 `revision`；停用不改变在飞任务 |
-| `bindClient` | 绑定/换绑节点 | `id`、`revision`、`clientId` | `{ id, revision }` | `NotFoundError`、`RevisionConflictError`、`ValidationError`（`clientId` 为空/含空白）、`BindingConflictError`（该 `clientId` 已被其他 Harness 占用） | 单行更新并递增 `revision`；唯一索引兜底 |
-| `unbindClient` | 解绑节点 | `id`、`revision` | `{ id, revision }` | `NotFoundError`、`RevisionConflictError` | 幂等：本就未绑定视为成功，仍递增 `revision` |
+| `bindClient` | 登记/换绑节点并写入凭据 | `id`、`revision`、`HarnessClientBinding` | `{ id, revision }` | `NotFoundError`、`RevisionConflictError`、`ValidationError`（`clientId`/`token` 为空、含空白或超长）、`BindingConflictError`（`clientId` 或 token 已被其他 Harness 占用） | 单行更新并递增 `revision`；两个唯一索引兜底 |
+| `unbindClient` | 解绑节点并清空凭据 | `id`、`revision` | `{ id, revision }` | `NotFoundError`、`RevisionConflictError` | 幂等：本就未绑定视为成功，仍递增 `revision` |
 | `delete` | 删除 Harness | `id`、`revision` | `void` | `NotFoundError`、`RevisionConflictError`、`ReferencedError` | 先 `ReferenceGuard`，再删除；同一事务 |
 | `list` | 列表查询 | `HarnessQuery` | `Page<HarnessSummary>` | `ValidationError` | 读 |
 | `get` | 详情查询 | `id` | `HarnessDetail` | `NotFoundError` | 读 |
 | `getByClientId` | 按节点反查 | `clientId` | `HarnessSummary \| null` | 无 | 读；唯一索引命中 |
+| `ExecutorAuthenticator.resolveClientId` | 凭据解析 | `token` | `string \| null` | `DatabaseUnavailableError` | 读；`client_token` 唯一索引命中，未登记/已解绑返回 `null` |
 
 方法定义是本组件的权威来源；`http-gateway` 只把 DTO 映射到这些方法，不定义业务方法。
 
@@ -160,8 +171,8 @@ Harness 是执行节点目录：`client_id` 绑定 `CMP-instance` 里实例所�
 
 ## 4 依赖与边界
 
-- 允许：`platform` 的 `Db`；`kernel` 的 `Clock`、`IdGenerator`、`ReferenceGuard` 端口、`NodeDirectory` 端口与错误类型。
-- 本组件实现 `NodeDirectory`（`HarnessNodeDirectory`），由组合根注入 `scheduler`；不依赖 `scheduler`、`instance` 或 `http-gateway`。
+- 允许：`platform` 的 `Db`；`kernel` 的 `Clock`、`IdGenerator`、`ReferenceGuard` 端口、`NodeDirectory` 与 `ExecutorAuthenticator` 端口、错误类型。
+- 本组件实现 `NodeDirectory`（`HarnessNodeDirectory`）与 `ExecutorAuthenticator`（`HarnessAuthenticator`），由组合根注入 `scheduler` 与执行端路由；不依赖 `scheduler`、`instance` 或 `http-gateway`。
 - 禁止：导入 `tool` 组件的 store/service；直接读 `tool` 表；在组件内拼 HTTP 响应。
 - `HarnessRead` 供 `catalog` 组合使用；不把领域实体直接暴露给 HTTP。
 
@@ -171,7 +182,8 @@ Harness 是执行节点目录：`client_id` 绑定 `CMP-instance` 里实例所�
 - 存储：创建带标签、更新整体替换标签、启停、删除级联。
 - 删除保护：注入假的 `ReferenceGuard` 返回工具列表，断言不删除并抛 `ReferencedError`。
 - 读契约：列表筛选/分页/排序、详情。`toolCount` 由 `catalog` 通过工具读契约组合，Harness 组件不读工具表。
-- 节点目录：绑定/解绑幂等；`clientId` 空串与空白拒绝；同一 `clientId` 被第二个 Harness 绑定 → `BindingConflictError`；解绑后 `isDispatchable` 为 `false`。
+- 节点目录：登记/解绑幂等；`clientId` 空串、空白、超长拒绝；同一 `clientId` 或同一 token 被第二个 Harness 使用 → `BindingConflictError`，凭据冲突不回显 token；解绑后 `isDispatchable` 为 `false`、旧 token 解析为 `null`。
+- 凭据读模型：详情返回 `clientToken`，列表不返回；`getByClientId` 不返回凭据。
 - 派生状态：四类状态各一例（从未 poll、`free>0`、`free=0` 且有在跑、超过 `clientSilentMs`）；调度器不可用时降级 `unknown`。
 - 契约：对应 REST 端点的 3 正 1 反在 `http-gateway` 规格中列明。
 
@@ -184,5 +196,6 @@ Harness 是执行节点目录：`client_id` 绑定 `CMP-instance` 里实例所�
 ## 7 B1 实现口径
 
 - 保留 `health=overloaded` 枚举，用于外部界面的「高负载」展示；该值由派生口径产出，不由本组件写入。
-- `client_id` 是 2026-11-10 节点目录设计新增（见 [`history/decisions/2026-11-10-harness-node-registry.md`](../../../history/decisions/2026-11-10-harness-node-registry.md)），**未实现**；实现时直接在基线里加列，不做数据迁移（演示数据可丢弃）。
+- `client_id`、`client_token`、`bindClient`/`unbindClient`、`NodeDirectory` 与 `ExecutorAuthenticator` 已实现（2026-11-10，见 [`history/decisions/2026-11-10-harness-node-registry.md`](../../../history/decisions/2026-11-10-harness-node-registry.md) 与 [`2026-11-10-executor-client-token.md`](../../../history/decisions/2026-11-10-executor-client-token.md)）；直接在基线加列，未做数据迁移。
+- `health` / `lastHeartbeatAt` 的派生读（§3.3）**未实现**：依赖 `CMP-scheduler` 的 `presence` 读，随调度层落地；当前对外仍返回列内历史值。
 - `harness_tag` 不设业务数量上限，只做字段级长度与请求体校验。

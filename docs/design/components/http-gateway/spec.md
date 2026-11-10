@@ -95,7 +95,7 @@ updated: 2026-11-10
 | 400 | `validation_error` | 字段缺失/类型错误/枚举非法/范围越界/请求体未知字段/路径非法/`If-Match` 格式非法 |
 | 404 | `not_found` | 资源或引用目标不存在；草稿已清理 |
 | 409 | `name_conflict` | 名称大小写不敏感重复 |
-| 409 | `binding_conflict` | Harness 绑定执行节点时 `clientId` 已被其他 Harness 占用；`details.clientId` |
+| 409 | `binding_conflict` | Harness 登记执行节点时 `clientId` 已被其他 Harness 占用（`details.clientId`），或该 token 已被其他节点使用（`details.field=clientToken`，不回显 token 值） |
 | 409 | `revision_conflict` | `If-Match`/baseRevision 与当前 revision 不一致 |
 | 409 | `referenced` | 删除时仍有引用；`details.references` 非空 |
 | 409 | `file_conflict` | 草稿附件改名目标已存在；`details.path`、`newPath` |
@@ -116,7 +116,7 @@ updated: 2026-11-10
 
 ## 4 端点总表
 
-48 个产品业务端点（B1 38 个 + B3 工作流 10 个）；`/healthz` 单独列在 §4.2；执行面 3 个端点见 §4.3，不计入产品业务端点；开发者文档端点见 §4.4，不计入业务端点。
+49 个产品业务端点（B1 39 个 + B3 工作流 10 个）；`/healthz` 单独列在 §4.2；执行面 3 个端点见 §4.3，不计入产品业务端点；开发者文档端点见 §4.4，不计入业务端点。
 
 ### 4.1 业务端点
 
@@ -129,7 +129,7 @@ updated: 2026-11-10
 | `API-05` | PATCH | `/harnesses/{id}/enabled` | `UC-B1-01` | 启用/停用 | 200 详情 |
 | `API-06` | DELETE | `/harnesses/{id}` | `UC-B1-01` | 删除；被工具引用则 409 | 204 |
 | `API-07` | GET | `/harnesses/{id}/references` | `UC-B1-06` | 查询引用工具 | 200 引用页 |
-| `API-41` | PATCH | `/harnesses/{id}/client` | `UC-B1-01` | 绑定/解绑执行节点（`clientId`） | 200 详情 |
+| `API-41` | PATCH | `/harnesses/{id}/client` | `UC-B1-01` | 登记/解绑执行节点（`clientId` + 凭据） | 200 详情 |
 | `API-08` | GET | `/tools` | `UC-B1-02` | 工具列表/检索 | 200 列表 |
 | `API-09` | GET | `/tools/{id}` | `UC-B1-02` | 工具详情 | 200 详情 |
 | `API-10` | POST | `/tools` | `UC-B1-02` | 创建工具 | 201 + Location |
@@ -188,7 +188,7 @@ updated: 2026-11-10
 | `EXE-03` | GET | `/api/v1/executor/skill-packages/{packageId}` | 取技能包 | 200 zip / 304 |
 
 - 这三个端点不计入产品业务端点计数，也不写入 `openapi.yaml` 的产品 `paths`；它们由 `CMP-http-gateway` 的 `executor` 路由实现，调用 `CMP-scheduler` 与 `SkillPackageSource`。
-- 鉴权：`Authorization: Bearer <token>`，token → `clientId` 映射来自 `CMP-config.executorClients`；**产品端点不受影响**，仍无鉴权。
+- 鉴权：`Authorization: Bearer <token>`，token → `clientId` 由 `CMP-harness` 的 `ExecutorAuthenticator` 在 `harness.client_token` 上解析；**产品端点不受影响**，仍无鉴权。
 - 版本闸门：`X-Executor-Protocol` 必须精确等于 `2`；缺失或不等 → `400 unsupported_protocol`，不进入调度。
 - 常量（代码常量，不通过配置协商）：`maxResultBytes=262144`、`maxPromptBytes=1048576`、`maxSkillPackageBytes=67108864`、`maxTasksPerPoll=10`、`pollHoldMs=30000`、`clientPollTimeoutMs=40000`、`clientSilentMs=120000`、`resultGraceMs=60000`。
 - `P-01` 长轮询：网关把请求转给 `SchedulerService.poll` 并等待至多 `pollHoldMs`；请求体透传 `capacity`/`running`/`finished`，响应透传 `tasks`/`stop`/`cancelInstances`/`nextPollAfterMs`。
@@ -253,7 +253,11 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 | `revision` | number | 乐观锁 |
 | `updatedAt` | string | ISO-8601 |
 
-**详情 `HarnessDetail`**：列表项 + `description`、`createdAt`。
+**详情 `HarnessDetail`**：列表项 + `description`、`clientToken`、`createdAt`。
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `clientToken` | string \| null | 该节点的 Bearer 凭据明文，供本机对接调试；列表不返回；只经 `API-41` 写入 |
 
 **查询参数**：`q`、`kind`、`enabled`、`health`、`limit`、`offset`、`sort`（`name:asc|desc`、`updatedAt:asc|desc`，默认 `updatedAt:desc`）。
 
@@ -272,9 +276,18 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 
 - `POST` 可带 `enabled`（默认 `true`）；`PUT` 不带 `enabled`，启停走 `API-05`。
 - `POST` 默认 `health=unknown`、`lastHeartbeatAt=null`；两者不可写。
-- `POST` / `PUT` **不接受 `clientId`**（未知字段 400）；绑定/解绑只走 `API-41`。
+- `POST` / `PUT` **不接受 `clientId` / `token`**（未知字段 400）；登记与解绑只走 `API-41`。
 
-**绑定/解绑请求 `HarnessClientBinding`**：`{clientId: string | null}`；`clientId` 非空时 1–64 字、不含空白与控制字符；`null` 表示解绑。成功返回 `HarnessDetail`（含派生状态）。
+**节点登记请求 `HarnessClientBinding`**：
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `clientId` | string \| null | 是 | 1–64 字、不含空白与控制字符；`null` 表示解绑并清空凭据 |
+| `token` | string | `clientId` 非空时必填 | 1–128 字、不含空白与控制字符；`clientId` 为 `null` 时禁止携带 |
+
+- `clientId` 与 `token` 一次写入；换绑与轮换复用同一端点。
+- 成功返回 `HarnessDetail`（含 `clientId`、`clientToken` 与派生状态）。
+- 凭据冲突只报 `details.field=clientToken`，`message` 与 `details` 都不回显 token 值。
 
 ### 5.2 工具
 
@@ -703,7 +716,7 @@ B1/B3 不提供的页面动作：Harness 连接测试/心跳刷新、工具调�
 - Skill 草稿：建草稿（空/已有）、文件清单顺序、上传/覆盖/改名/删除、`SKILL.md` 保留、路径穿越、TTL 过期、取消、多草稿并存。
 - Skill 保存：新建/更新、`If-Match` 缺失/非法/旧值、名称冲突、版本进位、`SKILL.md` 超限、文件/总量超限、打包失败、数据库失败、成功后草稿 404。
 - 删除：Harness 被工具引用、工具/Skill 被专家引用、专家被工作流引用；无引用 204。
-- 节点目录：绑定成功回读 `clientId`；同 `clientId` 被第二个 Harness 绑定 409 `binding_conflict`；解绑幂等；缺 `If-Match` 428；`POST`/`PUT` 带 `clientId` 返回 400。
+- 节点目录：登记成功回读 `clientId` 与 `clientToken`（列表不含凭据）；同 `clientId` 或同一 token 被第二个 Harness 使用 409 `binding_conflict`；解绑清空两者且幂等；轮换后旧 token 不再可用；缺 `If-Match` 428；缺 `token` 或解绑带 `token` 400；`POST`/`PUT` 带 `clientId` 返回 400。
 - 装配：重复目标、目标不存在、旧 `revision`、顺序回读；聚合保存的省略/替换/清空语义。
 - 工作流：列表/详情、复制后缀、图保存/校验、DSL JSON/YAML、导入缺失专家、revision 冲突、validate 404。
 - 契约快照：响应字段集合与 DTO 表一致；新增字段必须更新本文。
@@ -721,10 +734,11 @@ B1/B3 不提供的页面动作：Harness 连接测试/心跳刷新、工具调�
 
 - 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 36 KB；OpenAPI 运行时资产约 85 KB、Swagger UI 静态资源约 2.14 MB，均单独计量，不计入组件预算。
 - 单独验证命令：`bun test tests/components/http-gateway`。
-- 文档入口：启动后访问 `/docs`；机器可读契约：`/openapi.yaml`。OpenAPI 资产随组件发布，覆盖 48 个业务 operation 与 Skill 包/草稿、工作流定义 DTO。
-- `API-41`（Harness 节点绑定）与 Harness 派生态状态为 2026-11-10 节点目录设计新增，**尚未实现**；实现时直接改基线表结构，不做数据迁移（演示数据可丢弃）。
+- 文档入口：启动后访问 `/docs`；机器可读契约：`/openapi.yaml`。OpenAPI 资产随组件发布，覆盖 49 个业务 operation 与 Skill 包/草稿、工作流定义 DTO。
+- `API-41`（Harness 节点登记）、`clientId`/`clientToken` 字段已实现，直接改基线表结构、未做数据迁移（演示数据可丢弃）。
+- 执行端三端点（§4.3）与 Harness 派生态 `health`/`lastHeartbeatAt` 仍未实现：前者随 `CMP-scheduler` 落地，后者依赖调度器 `presence` 读（`harness` §3.3），在此之前 `health` 仍返回列内历史值。
 - 执行面 3 个端点（`EXE-01`–`EXE-03`）为 2026-11-10 调度层设计新增，**尚未实现**；实现工序随 `CMP-scheduler`/`CMP-instance` 落地，落地前执行面路由不存在、产品端点行为不变。
-- 当前状态：`current`；B1 资产端点与 B3 工作流定义端点均已实现，运行时 OpenAPI 为 31 个 path、48 个 operation（含 `/healthz`）；B3 验证记录见 [工作流工序 result.md](../../../history/works/2026-10-28-workflow-definition/result.md)。
+- 当前状态：`current`；B1 资产端点与 B3 工作流定义端点均已实现，运行时 OpenAPI 为 32 个 path、49 个 operation（含 `/healthz`）；B3 验证记录见 [工作流工序 result.md](../../../history/works/2026-10-28-workflow-definition/result.md)。
 
 ## 10 B1/B3 实现口径与剩余问题
 

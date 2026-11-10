@@ -34,7 +34,6 @@ export type Config = {
   logLevel: LogLevel;           // 默认 info；可由 LOG_LEVEL 覆盖
   skillStorageRoot: string;     // 默认 .local/skills；可由 SKILL_STORAGE_ROOT 覆盖
   skillDraftTtlHours: number;   // 默认 24；可由 SKILL_DRAFT_TTL_HOURS 覆盖
-  executorClients: Record<string, string>; // clientId → Bearer token；只从 env 读取
   taskMaxAttempts: number;      // 执行面任务最大下发次数；默认 3
   taskRetryDelayMs: number;     // 回队退避；默认 5000
 };
@@ -71,10 +70,10 @@ export function loadConfig(options?: LoadConfigOptions): Promise<Config>;
   < process.env（包含 Bun 从 .env 加载的值）
 ```
 
-- 环境变量键：`HOST`、`PORT`、`DATABASE_URL`、`DEV_ACTOR`、`LOG_LEVEL`、`SKILL_STORAGE_ROOT`、`SKILL_DRAFT_TTL_HOURS`、`EXECUTOR_CLIENTS`、`TASK_MAX_ATTEMPTS`、`TASK_RETRY_DELAY_MS`。
+- 环境变量键：`HOST`、`PORT`、`DATABASE_URL`、`DEV_ACTOR`、`LOG_LEVEL`、`SKILL_STORAGE_ROOT`、`SKILL_DRAFT_TTL_HOURS`、`TASK_MAX_ATTEMPTS`、`TASK_RETRY_DELAY_MS`。
 - 空字符串视为未设置，沿用现有行为。
 - `SKILL_STORAGE_ROOT` 为空时按未设置处理，回退 `.local/skills`；`SKILL_DRAFT_TTL_HOURS` 必须是正整数小时，非法值报 `config_validation_error`。
-- `EXECUTOR_CLIENTS` 是 JSON 对象字符串：键为 `clientId`（非空、不含空白），值为 Bearer token（非空）；解析失败或值类型不符报 `config_validation_error`。同一 token 不得映射到两个 `clientId`，否则报 `config_validation_error`（错误信息只报 `clientId`，不带 token）。token 只放 `.env` 或进程环境，不写 TOML、日志或错误信息。
+- 执行面凭据**不通过配置提供**：token → `clientId` 由 `CMP-harness` 的 `harness.client_token` 解析（经 `kernel.ExecutorAuthenticator`），登记与轮换走 `API-41`；配置里不出现任何 token，也不读 `.env` 中的凭据键。
 - `TASK_MAX_ATTEMPTS` 必须是 1–10 的整数，默认 3；`TASK_RETRY_DELAY_MS` 必须是 0–600000 的整数，默认 5000。
 - `executor-http-v2` §3 的常量（`pollHoldMs=30000`、`maxTasksPerPoll=10`、`clientSilentMs=120000`、`resultGraceMs=60000`、`maxResultBytes`、`maxPromptBytes`、`maxSkillPackageBytes`、`clientPollTimeoutMs`）不通过配置协商，代码常量固定；本组件不读取。
 - 已存在的 shell 环境变量优先于 `.env`；这是 Bun 的加载语义。
@@ -121,7 +120,7 @@ retry_delay_ms = 5000
 - 环境覆盖：`PORT`、`HOST`、`DATABASE_URL`、`DEV_ACTOR`、`LOG_LEVEL`、`SKILL_STORAGE_ROOT`、`SKILL_DRAFT_TTL_HOURS` 覆盖默认值。
 - 文件入口：`CONFIG_FILE` 指定单文件；缺失时报 `config_read_error`。
 - 校验：非法 TOML、未知键、空白 host、非法 port、非法 log level、非正整数 TTL 均报 `ConfigError`，并带字段。
-- 执行面：`EXECUTOR_CLIENTS` 合法 JSON 解析为映射；非法 JSON、空 token、空白 clientId、token 重复映射到两个 clientId 均报 `ConfigError`；`TASK_MAX_ATTEMPTS` / `TASK_RETRY_DELAY_MS` 越界报错；错误信息不包含 token 值。
+- 执行面：`TASK_MAX_ATTEMPTS` / `TASK_RETRY_DELAY_MS` 越界报错；配置中不出现凭据，错误信息不包含任何 token 值。
 - 进程冒烟：`config/local.toml` 设 3100，启动后 `/healthz` 返回 200。
 - 架构测试：除入口/脚本/测试基座外，组件不得导入 `core/config`。
 
@@ -137,5 +136,5 @@ retry_delay_ms = 5000
 - `CMP-platform` 继续拥有 `schema_migrations`、数据库连接、迁移、ID/时钟、健康检查与文件存储适配。
 - `.env` 不进入 TOML，也不由本组件解析。
 - `SKILL_STORAGE_ROOT` 默认 `.local/skills`；`SKILL_DRAFT_TTL_HOURS` 默认 24；两者只从环境变量覆盖。
-- 执行面 token 只在 `EXECUTOR_CLIENTS`（`.env`）中维护；`[executor]` 分节只放重试次数与退避，不放任何凭据。
-- **实现状态**：`EXECUTOR_CLIENTS`、`TASK_MAX_ATTEMPTS`、`TASK_RETRY_DELAY_MS` 与 `[executor]` 分节是 2026-11-10 调度层设计新增，尚未实现；实现工序随 `CMP-scheduler` 落地，落地前这些键不存在，启动配置行为保持不变。
+- 执行面凭据按 [`2026-11-10-executor-client-token.md`](../../../history/decisions/2026-11-10-executor-client-token.md) 落 Harness 表，不再有 `EXECUTOR_CLIENTS`；`[executor]` 分节只放重试次数与退避。
+- **实现状态**：`TASK_MAX_ATTEMPTS`、`TASK_RETRY_DELAY_MS` 与 `[executor]` 分节是 2026-11-10 调度层设计新增，尚未实现；实现工序随 `CMP-scheduler` 落地，落地前这些键不存在，启动配置行为保持不变。

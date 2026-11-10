@@ -46,13 +46,13 @@ bun run check          # tsc --noEmit + bun test + docs:check（本轮无代码�
 
 ## 4 未完成与待确认
 
-1. **P2 最终确认**：设计已落盘，按 `arch-design-spec` P2 仍需用户最终确认后才允许实现。
-2. **实现未做**（`T-NODE-03`）：`harness.client_id` 列、`API-41`、派生状态、门禁与测试均未落地。
-3. **场景状态 `draft`**：`SCN-0206` 与执行面其他 5 张一致，运行序/引用/测试方案齐，但 `docs:check` 要求 TC 已存在，待实现工序补测试后转 `designed`。
-4. **第二期未决**：token 是否落库与轮换（`OQ-23`，需管理面鉴权）；`concurrency_max` 告警与 `priority` 队列仍未做。
-5. **未做**：节点自动摘除、UI 适配（独立项目）、`openapi.yaml` 更新。
+1. **P2 最终确认**：已确认（用户 2026-11-10），同日追加「凭据落库」裁决；实现已另立 [`2026-11-10-node-registry-implementation`](../2026-11-10-node-registry-implementation/brief.md)。
+2. **实现**（`T-NODE-03`）：`harness.client_id`/`client_token`、`API-41`、`NodeDirectory`/`ExecutorAuthenticator` 已落地；**派生状态 `health`/`lastHeartbeatAt` 仍延后**（依赖调度器 `presence`，见实现工序 `review.md` `D-03`）。
+3. **场景状态 `draft`**：`SCN-0206` 仍为 `draft`；登记/凭据用例的测试已落，派发门禁与 presence 断言待调度层实现后补齐再转 `designed`。
+4. **已按用户裁决变更**：token 落 Harness 表（[`2026-11-10-executor-client-token.md`](../../history/decisions/2026-11-10-executor-client-token.md)），`OQ-23` 关闭；`concurrency_max` 告警与 `priority` 队列仍未做。
+5. **未做**：节点自动摘除、UI 适配（独立项目）；`openapi.yaml`、`API-41` 已随实现工序更新。
 
 ## 5 下一步
 
-- 用户确认后：另立实现工序（P2），按 `review` 与组件规格落代码；实现时直接改 `0001_baseline.sql` 并重建开发库。
-- 若第二期要做 token 落库，先解决管理面鉴权（`OQ-23`），再改 `N-02` 的结论。
+- 实现工序：[`2026-11-10-node-registry-implementation`](../2026-11-10-node-registry-implementation/brief.md)（`T-NODE-03` 已完成，直接改基线并重建开发库）。
+- 派生 `health`/`lastHeartbeatAt` 与派发门禁随调度层工序落地；生产前若暴露非本机，先补管理面鉴权（决策记录 §4）。

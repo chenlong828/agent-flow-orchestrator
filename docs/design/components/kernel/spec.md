@@ -81,7 +81,7 @@ class DatabaseUnavailableError extends AppError {}
 - `package_unavailable` 表示已保存 Skill 的包缺失/损坏/`SKILL.md` 无效；不用于草稿目录缺失。
 - `unauthorized` 只由执行面守护产生：Bearer 缺失或 token 未映射到 `clientId`；产品端点不使用。
 - `task_not_found` 只用于执行面 `P-02`：请求的 `taskId` 不存在或不属于该 client 的实例；其他资源的「不存在」仍用 `not_found`。
-- `binding_conflict` 只用于执行面实例登记：同 `instanceId` 的 `clientId`/`workspacePath` 被改成不同值，或同一 client 下 `workspacePath` 重复登记；不用于任务或资产。
+- `binding_conflict` 只用于执行面的节点绑定与实例登记：Harness 登记时 `clientId` 或 token 已被其他节点占用（`details.field` 区分，凭据冲突不回显 token 值）；实例登记时同 `instanceId` 的 `clientId`/`workspacePath` 被改成不同值，或同一 client 下 `workspacePath` 重复登记。不用于任务或资产名称。
 - `unsupported_protocol` 只用于 `X-Executor-Protocol` 与当前整数版本不匹配（`executor-http-v2` §3、§13）；请求体形状错误用 `validation_error`。
 - `database_unavailable` 只由 `platform` 在连接不可用时抛出；`http-gateway` 映射为 503。
 
@@ -223,7 +223,22 @@ type NodeDirectory = {
 - 端口不含在线状态：在线/离线/满载由 `CMP-scheduler` 的 presence 观测派生，`catalog` 组合展示（见 `harness` §3.3）。
 - 端口不含 HTTP 语义；错误只抛 `DatabaseUnavailableError`（读库失败）。
 
-### 3.8 方法契约
+### 3.8 执行面凭据解析端口
+
+```ts
+/** 执行面 Bearer 凭据解析：token → clientId。由 CMP-harness 实现，执行端路由使用。 */
+type ExecutorAuthenticator = {
+  /** 未知 token 或未绑定节点返回 null；不区分「凭据不存在」与「节点已解绑」。 */
+  resolveClientId(token: string): Promise<string | null>;
+};
+```
+
+- 端口定义在 kernel，实现在 `CMP-harness`（`harness.client_token` 唯一索引）；执行端路由只依赖本端口。
+- 返回 `null` 时由调用方决定语义：执行端返回 `401 unauthorized`。
+- 端口不含 HTTP 语义，也不返回节点状态；「节点启用/停用」由 `NodeDirectory` 回答。
+- 错误只抛 `DatabaseUnavailableError`。
+
+### 3.9 方法契约
 
 | 方法 | 目的 | 输入 | 输出 | 错误 | 说明 |
 |---|---|---|---|---|---|
@@ -241,13 +256,14 @@ type NodeDirectory = {
 | `SkillPackageSource.open` | 取包字节流 | `packageId` | `{ref, stream}` | `PackageUnavailableError` | 由 `skill` 实现；流不经过业务内存 |
 | `NodeDirectory.isDispatchable` | 节点是否可接活 | `clientId` | `boolean` | `DatabaseUnavailableError` | 由 `harness` 实现；`enabled` + 已绑定 |
 | `NodeDirectory.listClientIds` | 可派发节点清单 | 无 | `string[]` | `DatabaseUnavailableError` | 启动交集校验用 |
+| `ExecutorAuthenticator.resolveClientId` | 凭据解析 | `token` | `string \| null` | `DatabaseUnavailableError` | 未登记/已解绑返回 `null` |
 
 ## 4. 依赖与边界
 
 - 允许依赖：仅 TypeScript 标准库与纯类型工具。
 - 禁止依赖：`platform`、任何领域组件、`catalog`、`http-gateway`、Bun/PostgreSQL 驱动。
 - 本组件不拥有数据表；`schema_migrations` 属于 `platform`。
-- **实现状态**：`task_not_found`、`unsupported_protocol`、`TaskNotFoundError`、`UnsupportedProtocolError` 与 `SkillPackageSource` 端口是 2026-11-10 调度层设计新增，尚未实现；现有错误类型与端口不变。
+- **实现状态**：`binding_conflict`、`BindingConflictError`、`NodeDirectory` 与 `ExecutorAuthenticator` 已实现；`task_not_found`、`unsupported_protocol`、`TaskNotFoundError`、`UnsupportedProtocolError` 与 `SkillPackageSource` 端口是 2026-11-10 调度层设计新增，尚未实现；其余错误类型与端口不变。
 - 所有公开类型不得包含 HTTP 状态码、SQL 行类型或框架类型。
 
 ## 5. 单独验证
@@ -265,6 +281,7 @@ bunx tsc --noEmit
 | 存储端口 | `put/get/head/list/delete/move` 的 key 约束、幂等与流语义稳定，领域可用假实现替换 |
 | 制品端口 | `currentForSkill`/`describe`/`open` 的不可变与错误语义稳定，可用假实现替换 |
 | 节点目录端口 | `isDispatchable`/`listClientIds` 的语义稳定，可用假实现替换；未知 client 返回 `false`/`[]` |
+| 凭据解析端口 | `resolveClientId` 未知 token 返回 `null`；解绑后旧 token 返回 `null` |
 | 依赖边界 | `kernel` 不导入 `platform`/领域/`catalog`/`http-gateway` |
 
 ## 6. 预算

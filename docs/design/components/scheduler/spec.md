@@ -296,11 +296,11 @@ type SkillSet = { digest: string; packages: SkillPackageRef[] };
 3. 任一不满足 → 不派发，任务留在 `queued`；不报错、不消耗 `attempt`。
 
 - **节点停用（`enabled=false`）**：不派发新任务；在跑任务继续跑完；不向 client 下发 `stop`（`stop` 只由 `requestStop` 触发）。与实例 `blocked` 的区别：`blocked` 是执行失败兜底，会把同实例任务结算为失败；停用是管理员意图，只停止新增派发。
-- **启动交集校验**：组合根取 `Config.executorClients`（token → `clientId`）与 `NodeDirectory.listClientIds()` 求交；只有交集内的 `clientId` 能通过鉴权并被派发。
-  - 有 token 无节点（或节点停用）：鉴权通过，但**不派发**（空批、不消耗 `attempt`），启动时记一条 warning；不返回 `401`，避免 client 因管理动作被踢下线。
-  - 未知 token：`401 unauthorized`（client 停止并退出，契约 §4.1）。
-  - 有节点无 token：无法认证，不派发。
-  - 校验不在启动期读库阻断（节点目录允许后补），失败只记日志。
+- **凭据解析**：执行端 Bearer token 经 `ExecutorAuthenticator.resolveClientId` 解析（由 `CMP-harness` 在 `harness.client_token` 上实现），不读配置、不做启动期交集校验。
+  - 未知 token（含已解绑、已轮换的旧 token）：`401 unauthorized`（client 停止并退出，契约 §4.1）。
+  - token 有效但节点停用：鉴权通过，但**不派发**（空批、不消耗 `attempt`），记一条 warning；不返回 `401`，避免管理动作把 client 踢下线。
+  - token 有效但实例不可用：同样不派发，任务留在 `queued`。
+  - 启动期不再比对「配置 token ∩ 节点目录」：凭据与节点在同一行，天然一致；`listClientIds` 只用于排障与启动日志。
 - **presence 读**：`SchedulerPresenceRead.presence` 返回最近 poll 时间、最近上报 `free` 与在跑数；`catalog` 按 [`CMP-harness` §3.3](../harness/spec.md) 的口径派生在线状态。presence 是进程内观测，调度器重启后到首次 poll 前为 `null`（展示为 `unknown`）。
 
 ## 5 依赖与边界
@@ -308,7 +308,7 @@ type SkillSet = { digest: string; packages: SkillPackageRef[] };
 允许依赖：
 
 - `CMP-instance` 的读契约（`get` / `isDispatchable` / 绑定信息）；
-- `CMP-kernel` 的 `SkillPackageSource` 端口（冻结技能集时解析包引用）、`NodeDirectory` 端口（派发前校验节点可用）、`Clock`、`IdGenerator`、错误类型、分页类型；
+- `CMP-kernel` 的 `SkillPackageSource` 端口（冻结技能集时解析包引用）、`NodeDirectory` 端口（派发前校验节点可用）、`ExecutorAuthenticator` 端口（执行端鉴权）、`Clock`、`IdGenerator`、错误类型、分页类型；
 - `CMP-platform` 的 `Db`（事务与查询）。
 
 禁止依赖：
