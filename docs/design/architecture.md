@@ -2,7 +2,7 @@
 layer: design
 module: global
 status: current
-updated: 2026-11-02
+updated: 2026-11-10
 ---
 
 # B1+B3 架构与契约边界
@@ -12,11 +12,11 @@ updated: 2026-11-02
 
 ## 1 结论
 
-1. 一个 Bun 进程、一个 PostgreSQL 数据库、10 个组件：共享契约、启动配置、运行时平台、四类资产、工作流定义、只读目录、HTTP 网关。
+1. 一个 Bun 进程、一个 PostgreSQL 数据库、12 个组件：共享契约、启动配置、运行时平台、四类资产、工作流定义、只读目录、HTTP 网关，以及执行面的调度器与实例登记（后两者 `planned`，见 §3）。
 2. 外部契约只有 **REST API `/api/v1`**；本仓库不提供 CLI、库或产品 UI。UI 是独立项目，若接入只按契约调用；双方互不进入对方项目改代码。Swagger UI 仅作为开发者文档，不是产品界面。
 3. 内部契约按同一原则逐层收窄：函数/类 → 组件 → 模块 → 进程/项目；每层只通过公开契约交互，不越过边界读写对方内部。
 4. 每个组件只有一个主目标；数据只有一个写入口；读模型通过公开读契约组合。
-5. 37 个 B1 业务端点 + 10 个 B3 工作流端点 = 47 个业务端点；另有 `/healthz` 与开发者文档端点 `/docs`、`/docs/*`、`/openapi.yaml`，不计入业务端点。
+5. 37 个 B1 业务端点 + 10 个 B3 工作流端点 = 47 个产品业务端点；执行面另有 3 个端点（`/api/v1/executor/*`，`planned`，不计入产品端点）；另有 `/healthz` 与开发者文档端点 `/docs`、`/docs/*`、`/openapi.yaml`，不计入业务端点。
 
 ## 2 契约边界原则
 
@@ -57,7 +57,12 @@ updated: 2026-11-02
 | `CMP-expert` | 维护专家聚合、五区、有序装配与引用 | `expert`、`expert_persona`、`expert_skill`、`expert_tool`、`expert_ref` | `platform`、`kernel` |
 | `CMP-workflow` | 维护工作流聚合、唯一当前定义、图校验与专家引用投影 | `workflow`、`workflow_definition`、`workflow_expert_ref` | `platform`、`kernel` |
 | `CMP-catalog` | 组合跨资产的列表/详情/文档/整包/引用只读投影，并实现 `ReferenceGuard` | 无 | 四类资产与工作流的公开读契约、`kernel` |
-| `CMP-http-gateway` | 把 HTTP 请求翻译为用例调用、映射 DTO/错误，处理 multipart/下载，并托管开发者 API 文档 | 无 | `catalog`、四类资产与工作流写服务、`platform`（健康检查）、`kernel`、Bun HTTP/流 API |
+| `CMP-scheduler` | 维护执行面任务列表（`queued`/`dispatched`/`done`）、派发裁决、重派与结果接受 | `task`、`task_attempt` | `instance`（读）、`kernel`（`SkillPackageSource` 端口）、`platform` |
+| `CMP-instance` | 维护执行实例：工作区路径、client 绑定与可用性状态 | `instance` | `platform`、`kernel` |
+| `CMP-http-gateway` | 把 HTTP 请求翻译为用例调用、映射 DTO/错误，处理 multipart/下载，并托管开发者 API 文档；含执行面 `executor` 路由 | 无 | `catalog`、四类资产与工作流写服务、`scheduler`、`kernel`（`SkillPackageSource` 端口）、`platform`（健康检查）、Bun HTTP/流 API |
+
+- `CMP-scheduler` 与 `CMP-instance` 是执行面组件，状态 `planned`（2026-11-10 设计定稿，未实现）；其余 10 个组件状态 `current`。
+- 执行面端点 `EXE-01`–`EXE-03` 由 `CMP-http-gateway` 承载，契约权威是 [`contracts/executor-http-v2.md`](contracts/executor-http-v2.md)；组件落点见 [`components/scheduler/spec.md`](components/scheduler/spec.md) 与 [`components/instance/spec.md`](components/instance/spec.md)。
 
 组件 ID 与目录：`CMP-*` 对应 `docs/design/components/<short-name>/spec.md`；任务表可用去掉 `CMP-` 的简称。`kernel`、`config`、`platform` 是三个独立组件；物理目录可用 `src/core/{kernel,config,platform}` 收口，但 `core` 只是容器，不是组件。
 
@@ -71,7 +76,17 @@ main / scripts
 http-gateway
   ├── catalog                   （读）
   ├── harness / tool / skill / expert / workflow（写）
+  ├── scheduler                 （执行面 poll / 结果接受）
   ├── platform                  （健康检查）
+  └── kernel                    （错误类型、SkillPackageSource 端口）
+
+scheduler
+  ├── instance                  （读：get / isDispatchable / listDispatchable）
+  ├── platform                  （Db、Clock、ID 实现）
+  └── kernel                    （SkillPackageSource 端口、错误类型）
+
+instance
+  ├── platform                  （Db、Clock、ID 实现）
   └── kernel                    （错误类型）
 
 catalog
@@ -96,8 +111,9 @@ config
   └── 无外部依赖（Bun TOML/文件 API）
 ```
 
-- 依赖方向只能向下：`http-gateway` → `catalog`/领域写服务/`platform`（健康检查）/`kernel`；`catalog` → 领域读契约/`kernel`；领域 → `platform`/`kernel`；`platform` → `kernel`；`main`/脚本 → `config`/`platform`；`config`/`kernel` → 无外部依赖。
-- 禁止：领域组件互相导入写服务或 store；`http-gateway` 直接导入 store 或 `FileStore`；`catalog` 直接写表；循环依赖；同层横向写调用。
+- 依赖方向只能向下：`http-gateway` → `catalog`/领域写服务/`scheduler`/`platform`（健康检查）/`kernel`；`scheduler` → `instance`（读契约）/`platform`/`kernel`；`instance` → `platform`/`kernel`；`catalog` → 领域读契约/`kernel`；领域 → `platform`/`kernel`；`platform` → `kernel`；`main`/脚本 → `config`/`platform`；`config`/`kernel` → 无外部依赖。
+- 禁止：领域组件互相导入写服务或 store；`http-gateway` 直接导入 store 或 `FileStore`；`catalog` 直接写表；循环依赖；同层横向写调用；`scheduler`/`instance` 互相写对方表；`instance` 导入 `scheduler`。
+- `scheduler` 只在读侧依赖 `instance`：取 `workspacePath`、判定可派发、实例失败时 `block`；`instance` 不知道任务与派发。
 - `ReferenceGuard` 端口定义在 `kernel`，`catalog` 实现；领域删除服务只依赖端口，不依赖 `catalog` 类型。组合根负责注入。
 - `FileStore` 端口定义在 `kernel`，`platform` 实现；`skill` 只依赖端口，不直接使用 Bun 文件 API；组合根把存储根与适配器注入 `skill`。
 - `catalog` 不拥有表，不执行写操作；只通过领域公开读契约读数据。
@@ -117,6 +133,8 @@ config
 | `CMP-expert` | `expert`、`expert_persona`、`expert_skill`、`expert_tool`、`expert_ref` | 专家服务 |
 | `CMP-workflow` | `workflow`、`workflow_definition`、`workflow_expert_ref` | 工作流服务 |
 | `CMP-catalog` | 无 | 无，只读组合 |
+| `CMP-scheduler` | `task`、`task_attempt` | 调度器服务 |
+| `CMP-instance` | `instance` | 实例服务 |
 | `CMP-http-gateway` | 无 | 无，只做协议翻译与 OpenAPI / Swagger UI 托管 |
 
 - 引用计数、`toolCount`、`usedByCount`、`refCount` 不落可写列；工作流的 `refCount` 由 `catalog` 组合 `workflow_expert_ref` 得出。
@@ -127,7 +145,7 @@ config
 ## 6 外部 REST 契约
 
 - 基础路径：`/api/v1`；健康检查：`/healthz`（不在 `/api/v1` 下）。
-- 47 个业务端点：B1 37 个（Harness 7、工具 6、Skill 15、专家 9）+ B3 工作流 10 个。
+- 47 个产品业务端点：B1 37 个（Harness 7、工具 6、Skill 15、专家 9）+ B3 工作流 10 个；执行面另有 3 个端点（`EXE-01`–`EXE-03`，`planned`），不计入产品端点，语义权威为 [`contracts/executor-http-v2.md`](contracts/executor-http-v2.md)。
 - 开发者文档：Swagger UI `/docs`、静态资源 `/docs/*`、OpenAPI `/openapi.yaml`；OpenAPI 资产由 `CMP-http-gateway` 直接提供，不在 `docs/` 维护设计副本；不计入业务端点，不写入 OpenAPI `paths`。
 - 契约明细：方法、路径、查询参数、请求/响应 DTO、错误码、并发头、删除引用列表，全部在 [`components/http-gateway/spec.md`](components/http-gateway/spec.md)。
 - 外部 UI 页面映射（参考）：Harness 页、工具页、Skill 页、专家页、工作流页；本仓库无 Key/工作区/实例/看板端点。
@@ -153,7 +171,7 @@ config
 
 ## 9 验证
 
-- **架构测试**：领域组件只依赖 `kernel`/`platform`，互调检查先把相对导入解析成绝对路径再判归属，并含“合成违规导入必须被抓到”的自测；无跨组件 store 导入；`Bun.sql` 只在 `platform/db`；Bun 文件 API 只出现在 `config`（读 TOML）、`http-gateway`（读文档静态资源）与 `platform`（存储适配器）；`FileStore` 只由 `skill` 依赖、由 `platform` 实现；无循环依赖；`http-gateway` 不碰 store、不碰 `FileStore`；`catalog` 无写操作；`kernel` 不导入运行时组件；`config` 只被入口/脚本/测试引用。
+- **架构测试**：领域组件只依赖 `kernel`/`platform`，互调检查先把相对导入解析成绝对路径再判归属，并含“合成违规导入必须被抓到”的自测；`scheduler` 对 `instance` 的读依赖与 `http-gateway` 对 `scheduler` 的依赖在实现工序加入白名单（当前代码未落，测试不需改）；无跨组件 store 导入；`Bun.sql` 只在 `platform/db`；Bun 文件 API 只出现在 `config`（读 TOML）、`http-gateway`（读文档静态资源）与 `platform`（存储适配器）；`FileStore` 只由 `skill` 依赖、由 `platform` 实现；无循环依赖；`http-gateway` 不碰 store、不碰 `FileStore`；`catalog` 无写操作；`kernel` 不导入运行时组件；`config` 只被入口/脚本/测试引用。
 - **字段白名单测试**：`http-gateway` 的请求字段白名单与 `openapi.yaml` 的请求体 schema 逐项对齐，避免网关 DTO 与契约漂移。
 - **组件测试**：每个组件能只加载自身源码 + 规格 + 测试运行验证命令。
 - **契约测试**：HTTP 端点按 `http-gateway/spec.md` 的 3 正 1 反验证；错误码、字段、分页、`If-Match`、引用列表、multipart、下载头；文档端点验证 HTML、静态资源与 OpenAPI 结构。
@@ -162,8 +180,8 @@ config
 
 ## 10 实施状态
 
-- 当前 10 个组件、16 张表、1 个只向前基线迁移（`0001_baseline.sql`）；REST 47 个业务端点 + `/healthz`。
-- B1 资产注册中心与 B3 工作流定义已实现并通过验证；B2 Key/工作区、B4 实例/看板、ACP 执行模型未实现。
+- 当前 10 个 `current` 组件 + 2 个 `planned` 组件（`CMP-scheduler`、`CMP-instance`）、16 张表（执行面表未建）、1 个只向前基线迁移（`0001_baseline.sql`）；REST 47 个产品业务端点 + `/healthz`；执行面 3 个端点待实现。
+- B1 资产注册中心与 B3 工作流定义已实现并通过验证；执行面调度层（`executor-http-v2` 的 `P-01`–`P-03` + `S-01`–`S-08`）已设计完成、未实现；B2 Key/工作区、B4 实例/看板、ACP 执行模型未实现。
 - Skill 包形态 v2 已落地：草稿/保存/下载与 `GET /skills/{id}/document`；不再提供 `POST /skills`、`PUT /skills/{id}`。
 - `ReferenceGuard` 按端口方案实现：端口在 `kernel`，由 `catalog` 实现，领域删除服务经组合根注入。
 - 组件状态均为 `current`；历史实现见 [`result.md`](../history/works/2026-10-24-db-backend-infra/result.md)（归档件，仅作追溯）。

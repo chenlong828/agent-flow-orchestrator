@@ -25,7 +25,9 @@ docs/
 │   │   ├── skill/spec.md
 │   │   ├── expert/spec.md
 │   │   ├── catalog/spec.md
-│   │   └── http-gateway/spec.md
+│   │   ├── http-gateway/spec.md
+│   │   ├── scheduler/spec.md               ← 执行面任务列表与派发（planned）
+│   │   └── instance/spec.md                ← 执行面实例与工作区登记（planned）
 │   └── scenarios/
 │       ├── _index.md
 │       ├── agent-capability-assets/
@@ -38,17 +40,23 @@ docs/
 │       │       └── skill-retrieval-and-supply/
 │       │           └── scenario.md
 │       └── workflow-orchestration/
-│           └── workflow-definition/
-│               ├── workflow-portfolio-management/
-│               │   └── scenario.md
-│               ├── workflow-editing-and-publishing/
-│               │   └── scenario.md
-│               └── workflow-definition-exchange/
-│                   └── scenario.md
+│           ├── workflow-definition/
+│           │   ├── workflow-portfolio-management/
+│           │   │   └── scenario.md
+│           │   ├── workflow-editing-and-publishing/
+│           │   │   └── scenario.md
+│           │   └── workflow-definition-exchange/
+│           │       └── scenario.md
+│           └── execution-scheduling/       ← 执行面调度
+│               ├── executor-task-dispatch/scenario.md
+│               ├── executor-result-settlement/scenario.md
+│               ├── executor-skill-package-supply/scenario.md
+│               ├── executor-control-signals/scenario.md
+│               └── executor-protocol-gate/scenario.md
 ├── playbook/                               ← 方法：同类问题怎么判断（项目本地，待技能合并）
 │   ├── backend-contract-boundaries.md
 │   └── code-health-rules.md
-├── works/                                  ← 执行：正在做什么（当前无在办工序）
+├── works/                                  ← 执行：正在做什么（当前在办：2026-11-10-scheduler-layer-design）
 └── history/                                ← 记忆：怎么走到这里（冻结只读）
     ├── decisions/                          ← 整篇决策记录，按日期命名
     └── works/                              ← 已归档工序，按日期命名
@@ -57,7 +65,7 @@ docs/
 其余内容在诞生时创建，**不预建空目录、不预建索引行**：
 
 - `requirements/`：一卡一文件 `REQ-0001-<slug>.md`，只回答「为什么做」；
-- `design/scenarios/`：`<领域>/<价值流>/<场景>/scenario.md`，业务功能树按需建立；专家、Skill 与工作流定义的场景与生成索引已存在；
+- `design/scenarios/`：`<领域>/<价值流>/<场景>/scenario.md`，业务功能树按需建立；专家、Skill、工作流定义与执行面调度的场景与生成索引已存在（执行面 5 张为 `draft`，待实现工序补测试与入口后转 `designed`）；
 - `design/components/` 与 `design/scenarios/` 是**按文档类型分的兄弟目录**：前者是单组件规格，后者是跨组件运行序；`architecture.md` 是系统视图。三者不混放，也不因为“一切皆组件”而扁平化。
 - `design/contracts/`：跨项目 REST 契约（`executor-http-v2`）。放在 design 而不是 works，是因为契约是现行真相、会被另一个项目引用；client 仓库保留同构副本，冲突时以本仓库为准。这是 `doc-layout-spec` 的项目本地扩展，上游合并前以本段为准。
 - `works/`：一级只有工序目录 `YYYY-MM-DD-<短名>/`，含 `brief.md`，收口后补 `result.md` 再整目录归档。
@@ -75,10 +83,12 @@ docs/
 6. [`design/scenarios/_index.md`](design/scenarios/_index.md) —— 业务域/价值流/场景的生成索引；先看场景再看组件
 7. [`design/scenarios/agent-capability-assets/expert-capability-definition-and-assembly/expert-definition-and-assembly-management/scenario.md`](design/scenarios/agent-capability-assets/expert-capability-definition-and-assembly/expert-definition-and-assembly-management/scenario.md) —— 首个试点场景：入口、运行序、外部引用与 3+1
     `design/scenarios/agent-capability-assets/skill-capability-definition-and-supply/` 下有 Skill 草稿与发布、检索与供给两个 `verified` 场景；`design/scenarios/workflow-orchestration/` 下另有工作流定义三个 `verified` 场景：组合管理、编辑与校验、定义交换；覆盖 B3 定义侧，B4 运行与 UI 未做，以场景索引为准。
+    执行面调度在 `design/scenarios/workflow-orchestration/execution-scheduling/` 下：任务派发、结果回收与重派、技能包供给、停止与取消、协议版本与凭据，共 5 张 `draft` 场景，运行序/引用/测试方案已按 `designed` 判据写齐，待实现工序补测试 ID 与入口后转档。
 8. [`design/components/kernel/spec.md`](design/components/kernel/spec.md) 与 [`config/spec.md`](design/components/config/spec.md) —— 共享错误/分页/端口，以及 TOML 启动配置
 9. [`design/components/http-gateway/spec.md`](design/components/http-gateway/spec.md) —— 对外 REST 契约；运行时 `/openapi.yaml` 与 Swagger UI `/docs` 由 `CMP-http-gateway` 直接提供；外部项目若接入按此消费
 10. [`design/components/workflow/spec.md`](design/components/workflow/spec.md) —— `CMP-workflow` 的聚合、图保存/校验、DSL 与专家引用投影
-11. [`design/contracts/executor-http-v2.md`](design/contracts/executor-http-v2.md) —— 执行面契约 v2：三端点、at-least-once、客户端承诺与调度器职责；接口一致性验证与偏离清单见 [`history/works/2026-11-10-executor-contract-verification/verification.md`](history/works/2026-11-10-executor-contract-verification/verification.md)
+    - 执行面：[`design/components/scheduler/spec.md`](design/components/scheduler/spec.md) 与 [`instance/spec.md`](design/components/instance/spec.md) —— 任务列表、派发/重派/结果接受，以及实例与工作区登记（`planned`）
+11. [`design/contracts/executor-http-v2.md`](design/contracts/executor-http-v2.md) —— 执行面契约 v2：三端点、at-least-once、客户端承诺与调度器职责；调度器侧落点见 [`components/scheduler/spec.md`](design/components/scheduler/spec.md) 与 [`components/instance/spec.md`](design/components/instance/spec.md)；接口一致性验证与偏离清单见 [`history/works/2026-11-10-executor-contract-verification/verification.md`](history/works/2026-11-10-executor-contract-verification/verification.md)
 12. [`history/works/2026-10-28-workflow-definition/result.md`](history/works/2026-10-28-workflow-definition/result.md) —— B3 工作流定义实现结果与验证记录
 13. [`playbook/backend-contract-boundaries.md`](playbook/backend-contract-boundaries.md) —— 后端聚合写、列表读模型与 BFF 边界的可复用判定；与现行规格冲突时以规格为准
 14. [`history/works/2026-10-24-db-backend-infra/result.md`](history/works/2026-10-24-db-backend-infra/result.md) —— B1 实现结果、验证命令与偏差（已归档，历史证据，不作设计依据）

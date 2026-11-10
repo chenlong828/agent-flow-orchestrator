@@ -2,14 +2,14 @@
 layer: plan
 module: global
 status: current
-updated: 2026-11-02
+updated: 2026-11-10
 ---
 
 # 开放问题
 
 本表只收跨工序疑问；需求请建 `requirements/REQ-xxxx.md`。工序领取时在 `brief.md` 记编号；有结论后写去向（转 REQ / 落 `history/decisions/`），条目不删除。
 
-当前无阻塞性开放问题；2026-10-29 技术债清理留下 6 项 hold，见下表 OQ-5～OQ-7、OQ-9～OQ-11（OQ-8 已于 2026-11-02 关闭）；OQ-12～OQ-19 为 2026-11-10 执行面契约 v2 接口验证转出。OQ-1～OQ-4 已于 2026-10-25 关闭归档，条目保留供追溯，结论见 [项目边界与早期开放问题归档](../history/decisions/2026-10-25-project-boundary-and-open-questions.md)。
+当前无阻塞性开放问题；2026-10-29 技术债清理留下 6 项 hold，见下表 OQ-5～OQ-7、OQ-9～OQ-11（OQ-8 已于 2026-11-02 关闭）；OQ-12～OQ-19 为 2026-11-10 执行面契约 v2 接口验证转出；OQ-18、OQ-20 已于 2026-11-10 由调度层设计关闭，OQ-22 为该设计转出。OQ-1～OQ-4 已于 2026-10-25 关闭归档，条目保留供追溯，结论见 [项目边界与早期开放问题归档](../history/decisions/2026-10-25-project-boundary-and-open-questions.md)。
 
 | # | 问题 | 结论 / 去向 |
 |---|---|---|
@@ -30,7 +30,8 @@ updated: 2026-11-02
 | OQ-15 | **总超时的 `error.code`**：契约 §4.2 约定 `prompt_timeout`，client 实报 `timeout`（`agent-flow-client/src/components/runtime/runtime.ts:112`），调度器按 `code` 分流会漏判「任务太大」。 | 待定（`VD-01`）：优先 client 侧修复为 `prompt_timeout`，不改契约。 |
 | OQ-16 | **技能包摘要不匹配是否重试**：契约 §4.3 #2 要求「不匹配重试一次」，client 直接 `failed(asset/checksum_mismatch)`，GET 只发 1 次。 | 待定（`VD-02`）：client 补一次重试；或契约降级为「由调度器重派」。 |
 | OQ-17 | **`If-None-Match` 与无缓存 304**：client 首次请求就带条件头，调度器按 HTTP 语义回 304 时 client 报「304 但本地无缓存」并 `failed(asset)`。 | 待定（`VR-01`）：契约写明 304 的前提，或 client 无缓存时去条件头重试一次。 |
-| OQ-18 | **`RunningTask.lastEventAt`**：契约标为可选，client 未发送；`2026-11-10-execution-semantics-review` 的 `SH-04` 认为它对派发排序有价值。 | 待定（`VD-06`）：按调度器观测需求决定是否要求 client 实现。 |
+| OQ-18 | **`RunningTask.lastEventAt`**：契约标为可选，client 未发送；`2026-11-10-execution-semantics-review` 的 `SH-04` 认为它对派发排序有价值。 | 已关闭（2026-11-10，调度层设计）：调度器不依赖它排序或判活，只作观测字段；client 不发送不影响派发。落点见 `design/components/scheduler/spec.md` §4.3。 |
 | OQ-19 | **观测面 fail-open**：client 只读观测 HTTP 在非 loopback + 空 token 下仍启动（`raw_enabled` 默认 true），评审 `OB-01` 未采纳「拒绝启动」建议。 | 待定（`OB-01`）：属 client 侧安全项；建议改为启动期检查（非 loopback 且空 token → 退出 2）或强制 `raw_enabled=false`。 |
-| OQ-20 | **实例粘性没有契约条款**：边界设计把「实例绑定 client、重派不换 client」当硬约束，但 v2 的 `poll` 载荷不含 `clientId`，`S-02` 只要求「同一时刻派给一个 client」，**未禁止重派到另一个 client**；若实现按空闲派发，本地 `workspacePath` 会落到别的机器。 | 待定（2026-11-10 边界对齐 `BC-13`）：需在契约补「重派必须回到同一 client」或明确允许跨 client 重派及工作区准备责任；调度器实现前必须定。 |
-| OQ-21 | **实例不可用无上报载体**：client 无法声明「这个实例别再派」，只能事后报 `failed(workspace)`；`2026-11-10-execution-semantics-review` 的 `SA-01` 在 v2 中并未真正解决。 | 待定（`BC-14`）：可并入 `OQ-20` 一并处理；决定是否需要 client 侧「不可用实例」上报字段。 |
+| OQ-20 | **实例粘性没有契约条款**：边界设计把「实例绑定 client、重派不换 client」当硬约束，但 v2 的 `poll` 载荷不含 `clientId`，`S-02` 只要求「同一时刻派给一个 client」，**未禁止重派到另一个 client**；若实现按空闲派发，本地 `workspacePath` 会落到别的机器。 | 已关闭（2026-11-10，用户裁决 + 调度层设计）：粘性作为调度器硬约束，实例首次派发绑定 `clientId`，重派只回同一 client；**不改 v2 契约**。落点：`design/components/instance/spec.md` §4.3、`design/components/scheduler/spec.md` §4.7。 |
+| OQ-21 | **实例不可用无上报载体**：client 无法声明「这个实例别再派」，只能事后报 `failed(workspace)`；`2026-11-10-execution-semantics-review` 的 `SA-01` 在 v2 中并未真正解决。 | 待定（`BC-14`）：调度层设计已给调度器侧兜底——`failed(workspace)` 后实例转 `blocked`、同实例任务结算失败、不再派发（见 `design/components/instance/spec.md` §4.1）。契约仍无上报载体，是否补字段留待 P2 契约修订。 |
+| OQ-22 | **任务启动入口归属**：实例登记（界面设置 `workspacePath`）与任务入队（fan-out 任务列表、prompt 组成）需要 HTTP 面与用例，但 `executor-http-v2` 只有执行面三端点，调度层设计只留了领域接缝（`InstanceService.enroll`、`SchedulerService.enqueue`）。 | 待定（2026-11-10 调度层设计转出）：由 B4 运行/任务启动工序确定端点、鉴权与界面契约；在定之前不新增对外端点。 |

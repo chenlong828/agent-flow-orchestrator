@@ -3,14 +3,14 @@ layer: design
 module: global
 status: current
 generated: true
-updated: 2026-11-04
+updated: 2026-11-10
 ---
 
 # 业务场景索引
 
 > 生成物，不手改。修改场景后运行 `bun run docs:index`；校验运行 `bun run docs:check`。
 
-共 6 个场景。
+共 11 个场景。
 
 ## 智能体能力资产
 
@@ -36,3 +36,13 @@ updated: 2026-11-04
 | [SCN-0101 工作流组合管理](workflow-orchestration/workflow-definition/workflow-portfolio-management/scenario.md) | verified | [scenario.md#3 运行序](workflow-orchestration/workflow-definition/workflow-portfolio-management/scenario.md#3-运行序) | `CMP-http-gateway src/components/http-gateway/app.ts#createHttpApp`<br>`CMP-workflow src/components/workflow/service.ts#createWorkflowService`<br>`CMP-catalog src/components/catalog/index.ts#createCatalog` | [docs/design/components/workflow/spec.md#3 公共契约](../components/workflow/spec.md#3-公共契约)<br>[docs/design/components/http-gateway/spec.md#5.6 工作流](../components/http-gateway/spec.md#56-工作流) | `R1 TC-WFP-001` 列表筛选与详情返回当前定义和节点/阶段计数<br>`R2 TC-WFP-002` 复制只复制图，节点/阶段/边 ID 保留且源不变<br>`R3 TC-WFP-003` 更新元数据与删除按 revision 生效<br>`N1 TC-WFP-004` 重名创建与缺失 If-Match 被拒绝 | `src/components/http-gateway/openapi.yaml#listWorkflows`<br>`src/components/http-gateway/openapi.yaml#createWorkflow`<br>`src/components/http-gateway/openapi.yaml#copyWorkflow`<br>`src/components/http-gateway/openapi.yaml#updateWorkflow`<br>`src/components/http-gateway/openapi.yaml#deleteWorkflow` |
 | [SCN-0102 工作流编辑与校验](workflow-orchestration/workflow-definition/workflow-editing-and-publishing/scenario.md) | verified | [scenario.md#3 运行序](workflow-orchestration/workflow-definition/workflow-editing-and-publishing/scenario.md#3-运行序) | `CMP-http-gateway src/components/http-gateway/app.ts#createHttpApp`<br>`CMP-workflow src/components/workflow/service.ts#createWorkflowService`<br>`CMP-catalog src/components/catalog/index.ts#createCatalog` | [docs/design/components/workflow/spec.md#5 领域不变量](../components/workflow/spec.md#5-领域不变量)<br>[docs/design/components/http-gateway/spec.md#5.6 工作流](../components/http-gateway/spec.md#56-工作流) | `R1 TC-WFE-001` 保存有效图递增 revision 并回读阶段/节点/边/布局/视口<br>`R2 TC-WFE-002` 形状错误（含非对象视口）返回 400 且不保存<br>`R3 TC-WFE-003` 拓扑问题阻断保存，validate 统一返回 errors<br>`N1 TC-WFE-004` 保存缺失专家返回 400 且整事务回滚 | `src/components/http-gateway/openapi.yaml#saveWorkflowDefinition`<br>`src/components/http-gateway/openapi.yaml#validateWorkflow` |
 | [SCN-0103 工作流定义交换](workflow-orchestration/workflow-definition/workflow-definition-exchange/scenario.md) | verified | [scenario.md#3 运行序](workflow-orchestration/workflow-definition/workflow-definition-exchange/scenario.md#3-运行序) | `CMP-http-gateway src/components/http-gateway/app.ts#createHttpApp`<br>`CMP-workflow src/components/workflow/service.ts#createWorkflowService`<br>`CMP-catalog src/components/catalog/index.ts#createCatalog` | [docs/design/components/workflow/spec.md#3 公共契约](../components/workflow/spec.md#3-公共契约)<br>[docs/design/components/http-gateway/spec.md#5.6 工作流](../components/http-gateway/spec.md#56-工作流) | `R1 TC-WFX-001` 导出 JSON 含 DSL 结构且不含内部字段<br>`R2 TC-WFX-002` YAML 与 JSON 结构等价且保持数组顺序<br>`R3 TC-WFX-003` 导入总是新建，idMap 恒等，缺失专家清空并给 warning<br>`N1 TC-WFX-004` 导入未知字段与空图被拒绝且不落库 | `src/components/http-gateway/openapi.yaml#exportWorkflowDsl`<br>`src/components/http-gateway/openapi.yaml#importWorkflow` |
+
+### 执行面调度
+
+| 场景 | 状态 | 流程设计 | 代码入口 | 文档 | 测试 | 外部引用 |
+|---|---|---|---|---|---|---|
+| [SCN-0201 执行面任务派发](workflow-orchestration/execution-scheduling/executor-task-dispatch/scenario.md) | draft | [scenario.md#3 运行序](workflow-orchestration/execution-scheduling/executor-task-dispatch/scenario.md#3-运行序) | 待实现 | [docs/design/components/scheduler/spec.md#3 公共契约](../components/scheduler/spec.md#3-公共契约)<br>[docs/design/components/http-gateway/spec.md#4.3 执行面端点](../components/http-gateway/spec.md#43-执行面端点)<br>[docs/design/components/instance/spec.md#3 公共契约](../components/instance/spec.md#3-公共契约) | 待实现 | 待实现 |
+| [SCN-0202 执行面结果回收与重派收敛](workflow-orchestration/execution-scheduling/executor-result-settlement/scenario.md) | draft | [scenario.md#3 运行序](workflow-orchestration/execution-scheduling/executor-result-settlement/scenario.md#3-运行序) | 待实现 | [docs/design/components/scheduler/spec.md#4 状态机与不变量](../components/scheduler/spec.md#4-状态机与不变量)<br>[docs/design/components/http-gateway/spec.md#4.3 执行面端点](../components/http-gateway/spec.md#43-执行面端点)<br>[docs/design/components/scheduler/spec.md#6 验证计划](../components/scheduler/spec.md#6-验证计划) | 待实现 | 待实现 |
+| [SCN-0203 执行面技能包供给](workflow-orchestration/execution-scheduling/executor-skill-package-supply/scenario.md) | draft | [scenario.md#3 运行序](workflow-orchestration/execution-scheduling/executor-skill-package-supply/scenario.md#3-运行序) | 待实现 | [docs/design/components/http-gateway/spec.md#4.3 执行面端点](../components/http-gateway/spec.md#43-执行面端点)<br>[docs/design/components/skill/spec.md#3.3 编排面制品供给](../components/skill/spec.md#33-编排面制品供给)<br>[docs/design/components/kernel/spec.md#3.6 执行面制品端口](../components/kernel/spec.md#36-执行面制品端口) | 待实现 | 待实现 |
+| [SCN-0204 执行面停止与取消](workflow-orchestration/execution-scheduling/executor-control-signals/scenario.md) | draft | [scenario.md#3 运行序](workflow-orchestration/execution-scheduling/executor-control-signals/scenario.md#3-运行序) | 待实现 | [docs/design/components/scheduler/spec.md#4 状态机与不变量](../components/scheduler/spec.md#4-状态机与不变量)<br>[docs/design/components/http-gateway/spec.md#4.3 执行面端点](../components/http-gateway/spec.md#43-执行面端点)<br>[docs/design/components/instance/spec.md#4 状态机与不变量](../components/instance/spec.md#4-状态机与不变量) | 待实现 | 待实现 |
+| [SCN-0205 执行面协议版本与凭据闸门](workflow-orchestration/execution-scheduling/executor-protocol-gate/scenario.md) | draft | [scenario.md#3 运行序](workflow-orchestration/execution-scheduling/executor-protocol-gate/scenario.md#3-运行序) | 待实现 | [docs/design/components/http-gateway/spec.md#4.3 执行面端点](../components/http-gateway/spec.md#43-执行面端点)<br>[docs/design/components/http-gateway/spec.md#3.3 错误体](../components/http-gateway/spec.md#33-错误体)<br>[docs/design/components/kernel/spec.md#3.1 错误](../components/kernel/spec.md#31-错误) | 待实现 | 待实现 |

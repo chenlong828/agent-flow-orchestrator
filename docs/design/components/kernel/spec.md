@@ -3,7 +3,7 @@ layer: design
 module: kernel
 status: current
 component: CMP-kernel
-updated: 2026-10-29
+updated: 2026-11-10
 ---
 
 # `CMP-kernel` 共享契约组件规格
@@ -38,7 +38,11 @@ type ErrorCode =
   | "unsupported_media_type"  // 415
   | "skill_md_too_large"      // 422
   | "precondition_required"   // 428
+  | "task_not_found"          // 404
+  | "binding_conflict"        // 409
   | "package_unavailable"     // 500
+  | "unsupported_protocol"    // 400
+  | "unauthorized"            // 401
   | "database_unavailable";   // 503
 
 type ErrorDetails = Record<string, unknown>;
@@ -60,7 +64,11 @@ class PayloadTooLargeError extends AppError {}
 class UnsupportedMediaTypeError extends AppError {}
 class SkillMdTooLargeError extends AppError {}
 class PreconditionRequiredError extends AppError {}
+class TaskNotFoundError extends AppError {}
+class BindingConflictError extends AppError {}
 class PackageUnavailableError extends AppError {}
+class UnsupportedProtocolError extends AppError {}
+class UnauthorizedError extends AppError {}
 class DatabaseUnavailableError extends AppError {}
 ```
 
@@ -71,6 +79,10 @@ class DatabaseUnavailableError extends AppError {}
 - `file_conflict` 用于草稿附件改名目标已存在；`revision_conflict` 只用于 revision/baseRevision 闸门。
 - `payload_too_large` 覆盖单文件、文件数、包总量/草稿总量；`skill_md_too_large` 只覆盖生成的 `SKILL.md`。
 - `package_unavailable` 表示已保存 Skill 的包缺失/损坏/`SKILL.md` 无效；不用于草稿目录缺失。
+- `unauthorized` 只由执行面守护产生：Bearer 缺失或 token 未映射到 `clientId`；产品端点不使用。
+- `task_not_found` 只用于执行面 `P-02`：请求的 `taskId` 不存在或不属于该 client 的实例；其他资源的「不存在」仍用 `not_found`。
+- `binding_conflict` 只用于执行面实例登记：同 `instanceId` 的 `clientId`/`workspacePath` 被改成不同值，或同一 client 下 `workspacePath` 重复登记；不用于任务或资产。
+- `unsupported_protocol` 只用于 `X-Executor-Protocol` 与当前整数版本不匹配（`executor-http-v2` §3、§13）；请求体形状错误用 `validation_error`。
 - `database_unavailable` 只由 `platform` 在连接不可用时抛出；`http-gateway` 映射为 503。
 
 ### 3.2 分页
@@ -165,7 +177,36 @@ type FileStore = {
 - `delete` 幂等，不存在视为成功；只删文件或空目录，不递归删非空目录。
 - `move` 在同一存储根内原子改名；目标存在时由调用方先保证不存在。
 
-### 3.6 方法契约
+### 3.6 执行面制品端口
+
+```ts
+/** 不可变技能包引用；packageId 与内容一一对应，由 CMP-skill 发放。 */
+type SkillPackageRef = {
+  packageId: string;
+  skillId: string;
+  name: string;
+  version: string;
+  digest: string;      // sha256:<hex>，包字节摘要
+  sizeBytes: number;
+  etag: string;        // HTTP ETag 值（含引号），与 P-03 一致
+};
+
+type SkillPackageSource = {
+  /** 入队冻结：取 Skill 当前包的不可变引用。 */
+  currentForSkill(skillId: string): Promise<SkillPackageRef>;
+  /** P-03 解析：未知或已下架返回 null。 */
+  describe(packageId: string): Promise<SkillPackageRef | null>;
+  /** P-03 取流：与 describe 同一引用；包缺失/损坏抛 PackageUnavailableError。 */
+  open(packageId: string): Promise<{ ref: SkillPackageRef; stream: ReadableStream<Uint8Array> }>;
+};
+```
+
+- 端口由 `CMP-skill` 实现，组合根注入 `CMP-scheduler`（冻结技能集）与 `CMP-http-gateway`（`P-03` 供流）。
+- `packageId` 必须对应不可变内容：内容变化必须换 `packageId`；`digest` 与 `etag` 由内容派生，不允许调用方自行拼装。
+- `currentForSkill` 在 Skill 不存在时抛 `NotFoundError`，包缺失时抛 `PackageUnavailableError`；`describe` 只区分「有/无」，不抛包损坏。
+- 端口不含 HTTP 语义（状态码、头部名、304 判定）；条件请求由 `CMP-http-gateway` 用 `etag` 比较后决定。
+
+### 3.7 方法契约
 
 | 方法 | 目的 | 输入 | 输出 | 错误 | 说明 |
 |---|---|---|---|---|---|
@@ -178,12 +219,16 @@ type FileStore = {
 | `FileStore.list` | 列文件 | `prefix` | `FileStat[]` | 平台存储错误 | 只返回文件，按 key 排序 |
 | `FileStore.delete` | 幂等删除 | `key` | `void` | 平台存储错误 | 不存在成功；不递归 |
 | `FileStore.move` | 原子改名 | `from`, `to` | `void` | 平台存储错误 | 同根内 |
+| `SkillPackageSource.currentForSkill` | 取当前包引用 | `skillId` | `SkillPackageRef` | `NotFoundError`、`PackageUnavailableError` | 不读整包内容 |
+| `SkillPackageSource.describe` | 解析包引用 | `packageId` | `SkillPackageRef \| null` | 无 | 未知返回 null |
+| `SkillPackageSource.open` | 取包字节流 | `packageId` | `{ref, stream}` | `PackageUnavailableError` | 由 `skill` 实现；流不经过业务内存 |
 
 ## 4. 依赖与边界
 
 - 允许依赖：仅 TypeScript 标准库与纯类型工具。
 - 禁止依赖：`platform`、任何领域组件、`catalog`、`http-gateway`、Bun/PostgreSQL 驱动。
 - 本组件不拥有数据表；`schema_migrations` 属于 `platform`。
+- **实现状态**：`task_not_found`、`unsupported_protocol`、`TaskNotFoundError`、`UnsupportedProtocolError` 与 `SkillPackageSource` 端口是 2026-11-10 调度层设计新增，尚未实现；现有错误类型与端口不变。
 - 所有公开类型不得包含 HTTP 状态码、SQL 行类型或框架类型。
 
 ## 5. 单独验证
@@ -199,6 +244,7 @@ bunx tsc --noEmit
 | 分页 | 缺省、边界、超上限、负数均符合契约 |
 | 引用端口 | 空/非空引用返回结构稳定，领域可用假实现替换 |
 | 存储端口 | `put/get/head/list/delete/move` 的 key 约束、幂等与流语义稳定，领域可用假实现替换 |
+| 制品端口 | `currentForSkill`/`describe`/`open` 的不可变与错误语义稳定，可用假实现替换 |
 | 依赖边界 | `kernel` 不导入 `platform`/领域/`catalog`/`http-gateway` |
 
 ## 6. 预算

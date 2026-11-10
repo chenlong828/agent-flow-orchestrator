@@ -3,7 +3,7 @@ layer: design
 module: http-gateway
 status: current
 component: CMP-http-gateway
-updated: 2026-10-30
+updated: 2026-11-10
 ---
 
 # `CMP-http-gateway` 组件规格与 REST API 契约
@@ -115,7 +115,7 @@ updated: 2026-10-30
 
 ## 4 端点总表
 
-47 个业务端点（B1 37 个 + B3 工作流 10 个）；`/healthz` 单独列在 §4.2；开发者文档端点见 §4.3，不计入业务端点。
+47 个产品业务端点（B1 37 个 + B3 工作流 10 个）；`/healthz` 单独列在 §4.2；执行面 3 个端点见 §4.3，不计入产品业务端点；开发者文档端点见 §4.4，不计入业务端点。
 
 ### 4.1 业务端点
 
@@ -175,7 +175,41 @@ updated: 2026-10-30
 |---|---|---|---|---|---|
 | `API-H` | GET | `/healthz` | 进程与数据库健康 | 200 `{status:"ok",database:"up"}` | 503 `{status:"degraded",database:"down"}` |
 
-### 4.3 开发者文档端点（非业务 API）
+### 4.3 执行面端点
+
+执行面是第 4 类 API 面：给智能体 client 用，不属于 `/api/v1` 产品资源，但同样挂在 `/api/v1` 下、单独一套约定。语义权威是 [`design/contracts/executor-http-v2.md`](../../contracts/executor-http-v2.md)；本节只定义传输落点、错误映射与 `P-03` 的头部。
+
+| ID | 方法 | 路径 | 用途 | 成功 |
+|---|---|---|---|---|
+| `EXE-01` | POST | `/api/v1/executor/poll` | 取任务 + 上报在跑状态 + 收停止/取消 | 200 `PollResponse` |
+| `EXE-02` | POST | `/api/v1/executor/tasks/{taskId}/result` | 交结果 | 200 `ResultAck` |
+| `EXE-03` | GET | `/api/v1/executor/skill-packages/{packageId}` | 取技能包 | 200 zip / 304 |
+
+- 这三个端点不计入产品业务端点计数，也不写入 `openapi.yaml` 的产品 `paths`；它们由 `CMP-http-gateway` 的 `executor` 路由实现，调用 `CMP-scheduler` 与 `SkillPackageSource`。
+- 鉴权：`Authorization: Bearer <token>`，token → `clientId` 映射来自 `CMP-config.executorClients`；**产品端点不受影响**，仍无鉴权。
+- 版本闸门：`X-Executor-Protocol` 必须精确等于 `2`；缺失或不等 → `400 unsupported_protocol`，不进入调度。
+- 常量（代码常量，不通过配置协商）：`maxResultBytes=262144`、`maxPromptBytes=1048576`、`maxSkillPackageBytes=67108864`、`maxTasksPerPoll=10`、`pollHoldMs=30000`、`clientPollTimeoutMs=40000`、`clientSilentMs=120000`、`resultGraceMs=60000`。
+- `P-01` 长轮询：网关把请求转给 `SchedulerService.poll` 并等待至多 `pollHoldMs`；请求体透传 `capacity`/`running`/`finished`，响应透传 `tasks`/`stop`/`cancelInstances`/`nextPollAfterMs`。
+- `P-03` 头部：`Content-Length`、`ETag`（来自 `SkillPackageRef.etag`）、`X-Checksum-Sha256`、`Cache-Control: private, max-age=3600`；`If-None-Match` 与 ETag 相等 → `304`，无响应体。`304` 只在客户端本地已有副本时有意义（`VR-01`，client 侧修复）。
+- `P-03` 的 `packageId` 与内容一一对应：Skill 保存新版本后旧 `packageId` 返回 `404`；包缺失/损坏返回 `500 package_unavailable`，不返回部分字节。
+
+执行面错误映射（沿用 §3.3 信封，`code` 为稳定英文）：
+
+| HTTP | `code` | 触发 |
+|---:|---|---|
+| 400 | `unsupported_protocol` | `X-Executor-Protocol` 缺失或不等于 `2` |
+| 400 | `validation_error` | 请求体未知字段、字段类型/范围非法、`status`/`error.class` 不在闭集 |
+| 401 | `unauthorized` | Bearer 缺失或 token 未映射到 `clientId` |
+| 404 | `task_not_found` | `P-02` 的 `taskId` 不存在或不属于该 client 的实例 |
+| 404 | `package_not_found` | `P-03` 的 `packageId` 不存在或已下架 |
+| 413 | `payload_too_large` | 结果体超过 `maxResultBytes`；`details.limit=result_bytes` |
+| 500 | `package_unavailable` | 包文件缺失/损坏 |
+| 503 | `service_unavailable` | 数据库不可用 |
+
+- 执行面不复用产品端点的 `X-Actor`、`If-Match`、REVISION 并发语义；并发与幂等以契约 `S-01`–`S-08` 与 `C-01`–`C-09` 为准。
+- 执行面响应同样回显 `X-Request-Id`；错误信封不包含 token、路径敏感信息或堆栈。
+
+### 4.4 开发者文档端点（非业务 API）
 
 | 方法 | 路径 | 用途 | 成功 |
 |---|---|---|---|
@@ -590,10 +624,40 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 | `API-39` | `workflow.exportDsl` |
 | `API-40` | `workflow.importDsl` + `catalog.getWorkflow` |
 | `API-H` | `platform.Health.check` |
+| `EXE-01` | `scheduler.poll` |
+| `EXE-02` | `scheduler.acceptResult` |
+| `EXE-03` | `SkillPackageSource.describe` + `SkillPackageSource.open` |
 
 - 写端点由 `http-gateway` 调用领域写方法，再用 `catalog` 回读详情；路由层不拼字段。`SKP-15` 例外：保存返回 `SaveSkillResult`，不回读整包。
 - `API-28/29` 的请求体只表达装配顺序；`API-30` 的请求体可同时表达五区、引用与两类装配顺序；`catalog` 负责把 `skillIds`/`toolIds` 解析为摘要。
 - 领域方法表见各组件规格的「方法契约」章节。
+
+### 5.8 执行面 DTO
+
+传输形状与 [`executor-http-v2`](../../contracts/executor-http-v2.md) §5 一致；本节只登记与本仓库组件方法的对应关系，字段语义以契约与组件规格为准。
+
+**`PollRequest`**（`EXE-01` 请求）
+
+```ts
+type PollRequest = {
+  capacity: { free: number };
+  running: { taskId: string; instanceId: string; startedAt: string; lastEventAt?: string }[];
+  finished: { taskId: string; attempt: number; finishedAt: string }[];
+};
+```
+
+**`PollResponse`**（`EXE-01` 响应）：`{tasks: TaskRequest[]; stop: boolean; cancelInstances: string[]; nextPollAfterMs: number}`；`tasks.length ≤ min(free, 10)`；`free=0` 时为空数组。
+
+**`TaskRequest`**（下发项）：`{taskId, instanceId, nodeId, attempt, prompt, workspacePath, timeoutMs, skillSet}`；`skillSet` 为 `{digest, packages: SkillPackage[]}`；`downloadUrl` 由服务端拼为 `/api/v1/executor/skill-packages/{packageId}`。
+
+**`TaskResult`**（`EXE-02` 请求）：`{taskId, attempt, status, sessionId?, message, truncated, stopReason, usage, error, startedAt?, finishedAt?}`；`status` 闭集 `succeeded/failed/cancelled/timeout`；`error.class` 闭集见契约 §5。
+
+**`ResultAck`**（`EXE-02` 响应）：`{taskId, accepted}`；`accepted=false` 表示任务已结算或结果不被接受，client 丢弃本地副本。
+
+**`SkillPackage`**（下发项与 `P-03` 元数据）：`{packageId, name, version, digest, sizeBytes, downloadUrl, etag?}`；`ETag` 与 `etag` 同源，均来自 `SkillPackageRef.etag`。
+
+- DTO ↔ 领域映射只在路由层完成：`PollRequest` → `ClientReport`，`PollResponse` ← `DispatchDecision`，`TaskResult` → 领域 `TaskResult`，`SkillPackage` ← `SkillPackageRef`。
+- 执行面 DTO 不写 `openapi.yaml`（契约由 `executor-http-v2` 文件承载）；实现工序在 `src/components/http-gateway/executor/` 落路由与类型。
 
 ## 6 外部 UI 页面映射（参考，不属于本仓库交付与验收）
 
@@ -635,11 +699,12 @@ B1/B3 不提供的页面动作：Harness 连接测试/心跳刷新、工具调�
 - 装配：重复目标、目标不存在、旧 `revision`、顺序回读；聚合保存的省略/替换/清空语义。
 - 工作流：列表/详情、复制后缀、图保存/校验、DSL JSON/YAML、导入缺失专家、revision 冲突、validate 404。
 - 契约快照：响应字段集合与 DTO 表一致；新增字段必须更新本文。
+- 执行面（§4.3）：协议版本闸门、Bearer → `clientId`、未知字段 400、`maxResultBytes` 413、`P-03` 的 ETag/304/`X-Checksum-Sha256`/404/500；三个端点各自 3 正 1 反，断言见场景 `SCN-0201`–`SCN-0205`。
 - 外部 UI 若接入，可用同一份端点/DTO 表做适配层契约测试；不共享代码。
 
 ## 8 依赖与边界
 
-- 允许：`catalog` 读契约；四类资产写服务；工作流写服务；`platform` 的 `Health`；`kernel` 的错误、分页、ID/时钟类型；Bun 的 multipart/流读取；文档子模块的 Bun 文件读取与本地静态资源。
+- 允许：`catalog` 读契约；四类资产写服务；工作流写服务；`scheduler` 的 `poll`/`acceptResult`；`kernel` 的 `SkillPackageSource` 端口；`platform` 的 `Health`；`kernel` 的错误、分页、ID/时钟类型；Bun 的 multipart/流读取；文档子模块的 Bun 文件读取与本地静态资源。
 - 禁止：导入任何 store；执行 SQL；直接使用 `FileStore` 或 Bun 文件 API 读写包/草稿；在路由层实现名称唯一、引用保护、版本递增、路径校验等业务规则；直接序列化领域实体；文档子模块接触数据库或领域服务。
 - 校验分工：HTTP 校验 multipart/JSON 形状、必填、类型、简单范围、未知字段、请求体大小；领域校验路径、文件数/总量、唯一性、引用、状态与事务不变量。
 - 错误映射：领域错误 → HTTP `code`/状态码；未知异常 → 500，不泄漏 SQL/堆栈。
@@ -649,6 +714,7 @@ B1/B3 不提供的页面动作：Harness 连接测试/心跳刷新、工具调�
 - 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 36 KB；OpenAPI 运行时资产约 85 KB、Swagger UI 静态资源约 2.14 MB，均单独计量，不计入组件预算。
 - 单独验证命令：`bun test tests/components/http-gateway`。
 - 文档入口：启动后访问 `/docs`；机器可读契约：`/openapi.yaml`。OpenAPI 资产随组件发布，覆盖 47 个业务 operation 与 Skill 包/草稿、工作流定义 DTO。
+- 执行面 3 个端点（`EXE-01`–`EXE-03`）为 2026-11-10 调度层设计新增，**尚未实现**；实现工序随 `CMP-scheduler`/`CMP-instance` 落地，落地前执行面路由不存在、产品端点行为不变。
 - 当前状态：`current`；B1 资产端点与 B3 工作流定义端点均已实现，运行时 OpenAPI 为 31 个 path、48 个 operation（含 `/healthz`）；B3 验证记录见 [工作流工序 result.md](../../../history/works/2026-10-28-workflow-definition/result.md)。
 
 ## 10 B1/B3 实现口径与剩余问题

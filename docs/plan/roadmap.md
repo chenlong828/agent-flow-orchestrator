@@ -2,7 +2,7 @@
 layer: plan
 module: global
 status: current
-updated: 2026-11-02
+updated: 2026-11-10
 ---
 
 # 路线图
@@ -20,6 +20,12 @@ updated: 2026-11-02
 ## 工序与依赖
 
 - 一个 `REQ` 同一时刻只允许一个在飞工序；开工 = 建 `docs/works/<工序>/` + 写 `brief.md` 并引 `REQ-xxxx`。
+
+**在办工序**
+
+| 工序 | 级别 | 范围 | 状态 |
+|---|---|---|---|
+| [`2026-11-10-scheduler-layer-design`](../works/2026-11-10-scheduler-layer-design/brief.md) | P1 | 按 `executor-http-v2` 定调度器侧组件切分、执行面场景与组件规格；不写实现 | 设计已落盘，待用户最终确认（P1 人工门） |
 - M2 只产出裁定与规格，不写实现代码；M2 是 P1，人参与切分与契约评审后才可编码。
 - 无用户旅程的技术债 / 文档活走旁路，不进 `requirements/`。
 - B1 是基础设施工序（无 UI 改动；UI 为独立项目），按旁路处理，不建 `REQ`/`SCN`，`brief.md` 为锚点；追溯方式已在 `implementation-plan.md` §9 落为默认旁路。
@@ -45,4 +51,4 @@ updated: 2026-11-02
 - `2026-10-28-workflow-definition`：B3 工作流定义已实现——三张表、`CMP-workflow`、catalog/expert/kernel 增量、10 个 HTTP 端点、OpenAPI 与契约测试；B4 运行/实例与 UI 未做。结论见 [`result.md`](../history/works/2026-10-28-workflow-definition/result.md)。
 - `2026-10-25-scenario-index-pilot`：建立首个场景「智能体能力资产 / 专家能力定义与装配 / 专家定义与装配管理」，分配 `TC-EXP-001`～`TC-EXP-004`，新增场景索引生成器与 `docs:index` / `docs:check`。场景保持 `designed`，未宣称完整 CRUD 验收。结论见 [`result.md`](../history/works/2026-10-25-scenario-index-pilot/result.md)。
 - 2026-11-02：`docs/works/` 中已收口的 `2026-10-25-scenario-index-pilot`、`2026-10-26-skill-contract-v2`、`2026-10-28-skill-package`、`2026-10-29-tech-debt-cleanup`、`2026-10-29-workflow-viewport`、`2026-10-30-workflow-contract-boundary`、`2026-10-24-agentflow-execution-concept` 已整目录归档到 `history/works/`，frontmatter 改为 `frozen`；其中概念工序原在 result 中记为「不归档」，本次按 `doc-layout-spec` 生命周期统一归档，失效说明见其 result。归档件只作历史证据，不作设计依据。
-- 后续不预置 M2/M4 的答案；实际运行需求出现时再启动对应工序。B1+B3 覆盖控制面资产注册与工作流定义；执行面契约 v2 已冻结并由 client 实现，调度器侧 executor 端点（`P-01`–`P-03` + 任务表）仍是 P1 待立工序，B4 运行实例未开始。当前有 6 项 hold 与 10 项待定（`OQ-12`–`OQ-21`），见 [`open-questions.md`](open-questions.md)。
+- 后续不预置 M2/M4 的答案；实际运行需求出现时再启动对应工序。B1+B3 覆盖控制面资产注册与工作流定义；执行面契约 v2 已冻结并由 client 实现。调度器侧已由 `2026-11-10-scheduler-layer-design` 完成设计与组件规格（`CMP-scheduler`、`CMP-instance` 为 `planned`），实现工序待该设计经 P1 确认后另立；B4 运行实例与任务来源（含实例登记、任务入队）未开始。当前有 6 项 hold 与 10 项待定（`OQ-12`–`OQ-19`、`OQ-21`、`OQ-22`），见 [`open-questions.md`](open-questions.md)。

@@ -3,7 +3,7 @@ layer: design
 module: skill
 status: current
 component: CMP-skill
-updated: 2026-11-02
+updated: 2026-11-10
 ---
 
 # `CMP-skill` 组件规格
@@ -215,6 +215,26 @@ type SkillQuery = {
 - 新包写入、fsync、数据库提交成功后才删草稿；删除草稿目录失败交 GC，不影响保存结果。
 - 旧包删除失败交 GC；GC 只删非当前指针且超过 grace period 的包。
 
+### 3.3 编排面制品供给
+
+Skill 包对编排面的供给有两种既有形态（`getDocument`、`getPackage`）；执行面需要**不可变包身份**，因此另有 `SkillPackageSource` 端口（定义见 [`CMP-kernel` §3.6](../kernel/spec.md)），由本组件实现、组合根注入 `CMP-scheduler` 与 `CMP-http-gateway`。
+
+```ts
+type SkillPackageSource = {
+  currentForSkill(skillId: string): Promise<SkillPackageRef>;
+  describe(packageId: string): Promise<SkillPackageRef | null>;
+  open(packageId: string): Promise<{ ref: SkillPackageRef; stream: ReadableStream<Uint8Array> }>;
+};
+```
+
+- `packageId` 形如 `<skillId>.<revision>`，由当前包指针派生；同一 `packageId` 对应的 zip 字节不变。
+- `digest` 是 zip 字节的 sha256，`etag` 为 `"sha256-<hex>"`（带引号），二者都由包字节派生，不由调用方拼装；`sizeBytes` 是 zip 文件字节数。
+- 保存新版本会推进 `revision` 并切换包指针，旧 `packageId` 随即失效（当前不保留历史包）：`describe` 返回 `null`，`P-03` 按 `404 package_not_found` 处理；`open` 只对仍有效的 `packageId` 提供字节。任务进行中遇到 Skill 升级请按 [`executor-http-v2`](../../contracts/executor-http-v2.md) §4.3 处理，不在任务内改写技能集。
+- 包缺失/损坏（zip 不可读、`SKILL.md` 无效）→ `open` 抛 `PackageUnavailableError`（映射 `500 package_unavailable`），不返回部分字节。
+- 端口不暴露 HTTP 语义；条件请求与 304 判定在 `CMP-http-gateway` 完成。
+
+**实现状态**：`SkillPackageSource` 与 `packageId`/`digest`/`etag` 口径是 2026-11-10 调度层设计新增，尚未实现。实现需要在保存时记录包摘要与字节数（`skill` 表增 `package_digest`、`package_size` 两列），属非核心表的字段增量，由实现工序按 P2 处理并补迁移；现有 `getDocument`/`getPackage` 契约不变。
+
 ## 4 依赖与边界
 
 - 允许：`platform` 的 `Db` 与 `FileStore` 实现；`kernel` 的 `Clock`、`IdGenerator`、`ReferenceGuard`、`FileData`/`FileStore` 端口与错误类型。
@@ -235,6 +255,7 @@ type SkillQuery = {
 - 删除：引用保护、包/草稿清理、GC。
 - 重建：单基线 `0001_baseline.sql` 后 16 张业务表、1 个迁移；种子 12 个 Skill 各有合法包与 23 条专家装配边。
 - 契约：对应 REST 端点 3 正 1 反在 `http-gateway` 规格中列明。
+- 制品供给（设计已定、未实现）：`packageId` 不可变、`digest`/`etag` 由字节派生、旧版本 404、包损坏 500；与 `CMP-scheduler` 的冻结口径一致。
 
 ## 6 预算与运行
 
