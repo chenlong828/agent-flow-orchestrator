@@ -375,6 +375,114 @@ describe("Harness HTTP 契约", () => {
     expect(missing.body.error.code).toBe("not_found");
   });
 
+  test("API-41 登记节点写入 clientId 与凭据，详情回读、列表不含凭据", async () => {
+    const created = await createHarness("node-01");
+    expect(created.clientId).toBeNull();
+    expect(created.clientToken).toBeNull();
+
+    const bound = await call(ctx.app, "PATCH", `/api/v1/harnesses/${created.id}/client`, {
+      body: { clientId: "build-node-01", token: "tok-build-01" },
+      headers: withRevision(1),
+    });
+    expect(bound.status).toBe(200);
+    expect(bound.body).toMatchObject({
+      clientId: "build-node-01",
+      clientToken: "tok-build-01",
+      revision: 2,
+    });
+
+    const detail = await call(ctx.app, "GET", `/api/v1/harnesses/${created.id}`);
+    expect(detail.body.clientId).toBe("build-node-01");
+    expect(detail.body.clientToken).toBe("tok-build-01");
+
+    const list = await call(ctx.app, "GET", "/api/v1/harnesses?q=node-01");
+    expect(list.body.items[0].clientId).toBe("build-node-01");
+    expect("clientToken" in list.body.items[0]).toBe(false);
+  });
+
+  test("API-41 轮换凭据复用同一入口，解绑清空 clientId 与凭据", async () => {
+    const created = await createHarness("node-02");
+    await call(ctx.app, "PATCH", `/api/v1/harnesses/${created.id}/client`, {
+      body: { clientId: "node-a", token: "tok-old" },
+      headers: withRevision(1),
+    });
+    const rotated = await call(ctx.app, "PATCH", `/api/v1/harnesses/${created.id}/client`, {
+      body: { clientId: "node-a", token: "tok-new" },
+      headers: withRevision(2),
+    });
+    expect(rotated.body).toMatchObject({ clientId: "node-a", clientToken: "tok-new" });
+
+    const unbound = await call(ctx.app, "PATCH", `/api/v1/harnesses/${created.id}/client`, {
+      body: { clientId: null },
+      headers: withRevision(3),
+    });
+    expect(unbound.status).toBe(200);
+    expect(unbound.body).toMatchObject({
+      clientId: null,
+      clientToken: null,
+      revision: 4,
+    });
+  });
+
+  test("API-41 冲突与校验：重复 clientId 409、缺 token 400、解绑带 token 400", async () => {
+    const first = await createHarness("node-03");
+    const second = await createHarness("node-04");
+    await call(ctx.app, "PATCH", `/api/v1/harnesses/${first.id}/client`, {
+      body: { clientId: "node-a", token: "tok-a" },
+      headers: withRevision(1),
+    });
+
+    const conflict = await call(ctx.app, "PATCH", `/api/v1/harnesses/${second.id}/client`, {
+      body: { clientId: "node-a", token: "tok-b" },
+      headers: withRevision(1),
+    });
+    expect(conflict.status).toBe(409);
+    expect(conflict.body.error.code).toBe("binding_conflict");
+    expect(conflict.body.error.details).toEqual({ field: "clientId", clientId: "node-a" });
+
+    const missingToken = await call(
+      ctx.app,
+      "PATCH",
+      `/api/v1/harnesses/${second.id}/client`,
+      { body: { clientId: "node-b" }, headers: withRevision(1) },
+    );
+    expect(missingToken.status).toBe(400);
+    expect(missingToken.body.error.code).toBe("validation_error");
+    expect(missingToken.body.error.details.field).toBe("token");
+
+    const tokenOnUnbind = await call(
+      ctx.app,
+      "PATCH",
+      `/api/v1/harnesses/${first.id}/client`,
+      { body: { clientId: null, token: "tok-a" }, headers: withRevision(2) },
+    );
+    expect(tokenOnUnbind.status).toBe(400);
+    expect(tokenOnUnbind.body.error.details.field).toBe("token");
+
+    const unknownField = await call(ctx.app, "PUT", `/api/v1/harnesses/${first.id}`, {
+      body: { ...harnessBody("node-03"), clientId: "node-x" },
+      headers: withRevision(2),
+    });
+    expect(unknownField.status).toBe(400);
+    expect(unknownField.body.error.code).toBe("validation_error");
+
+    const noPrecondition = await call(
+      ctx.app,
+      "PATCH",
+      `/api/v1/harnesses/${first.id}/client`,
+      { body: { clientId: "node-c", token: "tok-c" } },
+    );
+    expect(noPrecondition.status).toBe(428);
+
+    const missing = await call(
+      ctx.app,
+      "PATCH",
+      "/api/v1/harnesses/0191f2f0-0000-7000-8000-000000000000/client",
+      { body: { clientId: "node-c", token: "tok-c" }, headers: withRevision(1) },
+    );
+    expect(missing.status).toBe(404);
+  });
+
   test("API-06 删除使用旧 revision 返回 409，且不删除资源", async () => {
     const created = await createHarness("stale-delete");
     const stale = await call(ctx.app, "DELETE", `/api/v1/harnesses/${created.id}`, {

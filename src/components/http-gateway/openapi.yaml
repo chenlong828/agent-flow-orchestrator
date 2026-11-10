@@ -19,7 +19,7 @@ info:
     - 无登录/鉴权；`X-Actor` 仅用于显示，不是身份。请求可带 `X-Request-Id`，响应可回显。无 CORS 配置。
   x-source-spec: docs/design/components/http-gateway/spec.md
   x-contract-status: current
-  x-api-count: 47
+  x-api-count: 48
   license:
     name: Internal use only
   x-runtime-asset: true
@@ -277,6 +277,48 @@ paths:
         '503':
           "$ref": "#/components/responses/ServiceUnavailable"
       description: 设置 Harness 启停；请求体为 `{enabled:boolean}`，成功返回更新后的详情。
+  "/api/v1/harnesses/{id}/client":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    patch:
+      tags:
+      - Harness
+      summary: API-41 登记/解绑执行节点
+      operationId: bindHarnessClient
+      x-api-id: API-41
+      x-component-method: harness.bindClient / harness.unbindClient + catalog.getHarness
+      description: |
+        登记执行节点：`clientId` 与 Bearer 凭据一起写入，换绑与轮换复用本端点；提交 `{clientId:null}` 解绑并清空凭据。
+        `clientId` 或 token 已被其他 Harness 占用时返回 409 `binding_conflict`。
+      parameters:
+      - "$ref": "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/HarnessClientBinding"
+      responses:
+        '200':
+          description: 登记后的 Harness 详情，含 `clientId` 与 `clientToken`。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/HarnessDetail"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '428':
+          "$ref": "#/components/responses/PreconditionRequired"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
   "/api/v1/harnesses/{id}/references":
     parameters:
     - "$ref": "#/components/parameters/Id"
@@ -1922,6 +1964,7 @@ components:
       - address
       - accessMode
       - enabled
+      - clientId
       - health
       - lastHeartbeatAt
       - concurrencyMax
@@ -1954,6 +1997,12 @@ components:
         enabled:
           type: boolean
           description: 是否启用
+        clientId:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 64
+          description: 绑定的执行节点 clientId；null 表示未登记，只经 API-41 修改
         health:
           "$ref": "#/components/schemas/HarnessHealth"
           description: 运行时健康状态，只读
@@ -1999,11 +2048,15 @@ components:
             type: string
             maxLength: 500
             description: 描述
+          clientToken:
+            type: string
+            nullable: true
+            description: 该执行节点的 Bearer 凭据明文，供本机对接调试；只在详情返回，列表不含
           createdAt:
             type: string
             format: date-time
             description: 创建时间，ISO-8601 UTC
-      description: Harness 详情；列表项字段加描述与创建时间。
+      description: Harness 详情；列表项字段加描述、凭据与创建时间。
     HarnessCreate:
       type: object
       required:
@@ -2094,6 +2147,23 @@ components:
             type: string
           description: 能力标签，有序
       description: 全量更新 Harness 请求；不接收 enabled，启停走独立端点。
+    HarnessClientBinding:
+      type: object
+      required:
+      - clientId
+      properties:
+        clientId:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 64
+          description: 执行节点 clientId；null 表示解绑并清空凭据
+        token:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: 该节点的 Bearer 凭据；clientId 非 null 时必填，解绑时禁止携带
+      description: 节点登记请求；clientId 与 token 一起写入，换绑与轮换复用该入口。
     HarnessList:
       type: object
       required:
@@ -3573,7 +3643,7 @@ components:
           schema:
             "$ref": "#/components/schemas/ErrorResponse"
     Conflict:
-      description: 名称重复、revision/baseRevision 冲突、附件改名目标已存在，或删除时仍被引用；`error.code` 区分。
+      description: 名称重复、revision/baseRevision 冲突、节点绑定冲突（`binding_conflict`）、附件改名目标已存在，或删除时仍被引用；`error.code` 区分。
       content:
         application/json:
           schema:

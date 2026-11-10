@@ -18,6 +18,8 @@ export type HarnessRootRow = {
   concurrency_max: number;
   queue_policy: QueuePolicy;
   enabled: boolean;
+  client_id: string | null;
+  client_token: string | null;
   health: HarnessHealth;
   last_heartbeat_at: Date | string | null;
   revision: number;
@@ -135,6 +137,81 @@ async function deleteRoot(tx: Db, id: string, revision: number): Promise<number>
   return rows.length;
 }
 
+type ClientWriteOptions = {
+  tx: Db;
+  id: string;
+  revision: number;
+  clientId: string;
+  token: string;
+  now: Date;
+  actor: string | null;
+};
+
+async function bindClient(options: ClientWriteOptions): Promise<number> {
+  const rows = await options.tx.query<{ id: string }>(
+    `update harness set client_id = $1, client_token = $2, revision = revision + 1,
+           updated_at = $3, updated_by = $4
+         where id = $5 and revision = $6
+         returning id`,
+    [
+      options.clientId,
+      options.token,
+      options.now,
+      options.actor,
+      options.id,
+      options.revision,
+    ],
+  );
+  return rows.length;
+}
+
+type UnbindOptions = {
+  tx: Db;
+  id: string;
+  revision: number;
+  now: Date;
+  actor: string | null;
+};
+
+async function unbindClient(options: UnbindOptions): Promise<number> {
+  const rows = await options.tx.query<{ id: string }>(
+    `update harness set client_id = null, client_token = null, revision = revision + 1,
+           updated_at = $1, updated_by = $2
+         where id = $3 and revision = $4
+         returning id`,
+    [options.now, options.actor, options.id, options.revision],
+  );
+  return rows.length;
+}
+
+async function findByClientId(tx: Db, clientId: string): Promise<HarnessRootRow | null> {
+  return tx.one<HarnessRootRow>("select * from harness where client_id = $1", [clientId]);
+}
+
+async function findClientIdByToken(tx: Db, token: string): Promise<string | null> {
+  const row = await tx.one<{ client_id: string | null }>(
+    "select client_id from harness where client_token = $1",
+    [token],
+  );
+  return row?.client_id ?? null;
+}
+
+async function isDispatchable(tx: Db, clientId: string): Promise<boolean> {
+  const row = await tx.one<{ ok: number }>(
+    "select 1 as ok from harness where client_id = $1 and enabled",
+    [clientId],
+  );
+  return row !== null;
+}
+
+async function listDispatchableClientIds(tx: Db): Promise<string[]> {
+  const rows = await tx.query<{ client_id: string }>(
+    "select client_id from harness where client_id is not null and enabled order by client_id",
+    [],
+  );
+  return rows.map((row) => row.client_id);
+}
+
 async function findRoot(tx: Db, id: string, forUpdate = false): Promise<HarnessRootRow | null> {
   return tx.one<HarnessRootRow>(
     `select * from harness where id = $1${forUpdate ? " for update" : ""}`,
@@ -188,8 +265,14 @@ export function createHarnessStore() {
     insertRoot,
     updateRoot,
     setEnabled,
+    bindClient,
+    unbindClient,
     deleteRoot,
     findRoot,
+    findByClientId,
+    findClientIdByToken,
+    isDispatchable,
+    listDispatchableClientIds,
     listRoots,
     replaceTags,
     tagsFor,

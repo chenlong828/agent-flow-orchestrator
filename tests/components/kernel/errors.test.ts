@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   AppError,
+  BindingConflictError,
   DatabaseUnavailableError,
   DraftExpiredError,
   FileConflictError,
@@ -19,6 +20,17 @@ import {
 } from "../../../src/core/kernel/index.ts";
 
 describe("kernel 错误分类", () => {
+  test("节点登记冲突区分 clientId 与凭据，凭据冲突不回显 token", () => {
+    const clientConflict = new BindingConflictError("clientId", "node-a");
+    expect(clientConflict.code).toBe("binding_conflict");
+    expect(clientConflict.details).toEqual({ field: "clientId", clientId: "node-a" });
+
+    const tokenConflict = new BindingConflictError("clientToken");
+    expect(tokenConflict.code).toBe("binding_conflict");
+    expect(tokenConflict.details).toEqual({ field: "clientToken" });
+    expect(tokenConflict.message).toBe("该 token 已被其他 Harness 使用");
+  });
+
   test("校验错误携带 field/reason，且默认不可重试", () => {
     const error = new ValidationError("name", "不能为空");
     expect(error).toBeInstanceOf(AppError);

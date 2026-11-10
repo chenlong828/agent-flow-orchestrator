@@ -12,6 +12,16 @@ create table harness (
   concurrency_max integer not null check (concurrency_max >= 1),
   queue_policy text not null check (queue_policy in ('fifo', 'priority')),
   enabled boolean not null default true,
+  -- 执行节点登记：client_id 是节点目录绑定，client_token 是该节点的 Bearer 凭据。
+  -- 两者只经 PATCH /harnesses/{id}/client 写入；解绑同时清空。
+  client_id text check (
+    client_id is null
+    or (char_length(client_id) between 1 and 64 and client_id !~ '\s')
+  ),
+  client_token text check (
+    client_token is null
+    or (char_length(client_token) between 1 and 128 and client_token !~ '\s')
+  ),
   health text not null default 'unknown'
     check (health in ('unknown', 'online', 'offline', 'overloaded')),
   last_heartbeat_at timestamptz,
@@ -20,10 +30,14 @@ create table harness (
   updated_at timestamptz not null default now(),
   created_by text,
   updated_by text,
-  check (char_length(name) between 1 and 80)
+  check (char_length(name) between 1 and 80),
+  -- 凭据必须挂在已绑定的节点上；解绑与清空凭据是同一次写入。
+  check (client_token is null or client_id is not null)
 );
 
 create unique index harness_name_lower_key on harness (lower(name));
+create unique index harness_client_id_key on harness (client_id);
+create unique index harness_client_token_key on harness (client_token);
 create index harness_kind_idx on harness (kind);
 create index harness_enabled_idx on harness (enabled);
 create index harness_health_idx on harness (health);

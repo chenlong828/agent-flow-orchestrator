@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import {
+  BindingConflictError,
   NameConflictError,
   NotFoundError,
   ReferencedError,
@@ -8,6 +9,8 @@ import {
   normalizePageQuery,
 } from "../../../src/core/kernel/index.ts";
 import {
+  createHarnessAuthenticator,
+  createHarnessNodeDirectory,
   createHarnessRead,
   createHarnessService,
   type HarnessService,
@@ -282,5 +285,147 @@ describe("Harness 读契约", () => {
     const missing = await read.get("0191f2f0-0000-7000-8000-000000000000").catch((e) => e);
     expect(missing).toBeInstanceOf(NotFoundError);
     expect(missing.code).toBe("not_found");
+  });
+});
+
+describe("Harness 执行节点登记", () => {
+  test("登记节点同时写入 clientId 与凭据，详情回读、列表不返回凭据", async () => {
+    const created = await service.create(createInput("build-01"));
+    const bound = await service.bindClient(created.id, 1, {
+      clientId: "build-node-01",
+      token: "tok-build-01",
+    });
+    expect(bound).toEqual({ id: created.id, revision: 2 });
+
+    const detail = await read.get(created.id);
+    expect(detail.clientId).toBe("build-node-01");
+    expect(detail.clientToken).toBe("tok-build-01");
+    expect(detail.revision).toBe(2);
+
+    const page = await read.list({ page: normalizePageQuery() });
+    expect(page.items[0]?.clientId).toBe("build-node-01");
+    expect("clientToken" in (page.items[0] as object)).toBe(false);
+  });
+
+  test("解绑清空 clientId 与凭据；本就未绑定时解绑仍成功并递增 revision", async () => {
+    const created = await service.create(createInput("build-01"));
+    await service.bindClient(created.id, 1, {
+      clientId: "build-node-01",
+      token: "tok-build-01",
+    });
+    await service.unbindClient(created.id, 2);
+    const unbound = await read.get(created.id);
+    expect(unbound.clientId).toBeNull();
+    expect(unbound.clientToken).toBeNull();
+    expect(unbound.revision).toBe(3);
+
+    await service.unbindClient(created.id, 3);
+    const again = await read.get(created.id);
+    expect(again.clientId).toBeNull();
+    expect(again.revision).toBe(4);
+  });
+
+  test("同一 clientId 被第二个 Harness 绑定返回 binding_conflict，旧值不变", async () => {
+    const first = await service.create(createInput("build-01"));
+    const second = await service.create(createInput("build-02"));
+    await service.bindClient(first.id, 1, { clientId: "node-a", token: "tok-a" });
+
+    const error = await service
+      .bindClient(second.id, 1, { clientId: "node-a", token: "tok-b" })
+      .catch((e) => e);
+    expect(error).toBeInstanceOf(BindingConflictError);
+    expect(error.code).toBe("binding_conflict");
+    expect(error.details).toEqual({ field: "clientId", clientId: "node-a" });
+    expect((await read.get(second.id)).clientId).toBeNull();
+  });
+
+  test("凭据被第二个节点使用返回 binding_conflict，且不回显 token 值", async () => {
+    const first = await service.create(createInput("build-01"));
+    const second = await service.create(createInput("build-02"));
+    await service.bindClient(first.id, 1, { clientId: "node-a", token: "shared-token" });
+
+    const error = await service
+      .bindClient(second.id, 1, { clientId: "node-b", token: "shared-token" })
+      .catch((e) => e);
+    expect(error).toBeInstanceOf(BindingConflictError);
+    expect(error.details).toEqual({ field: "clientToken" });
+    expect(JSON.stringify(error.details)).not.toContain("shared-token");
+    expect(error.message).not.toContain("shared-token");
+  });
+
+  test("clientId 与 token 的形状校验：空白、超长、非字符串均被拒绝", async () => {
+    const created = await service.create(createInput("build-01"));
+    const cases: { binding: { clientId: string; token: string }; field: string }[] = [
+      { binding: { clientId: "", token: "tok" }, field: "clientId" },
+      { binding: { clientId: "has space", token: "tok" }, field: "clientId" },
+      { binding: { clientId: "x".repeat(65), token: "tok" }, field: "clientId" },
+      { binding: { clientId: "node-a", token: "" }, field: "token" },
+      { binding: { clientId: "node-a", token: "has space" }, field: "token" },
+      { binding: { clientId: "node-a", token: "x".repeat(129) }, field: "token" },
+    ];
+    for (const { binding, field } of cases) {
+      const error = await service.bindClient(created.id, 1, binding).catch((e) => e);
+      expect(error).toBeInstanceOf(ValidationError);
+      expect(error.details.field).toBe(field);
+    }
+    expect((await read.get(created.id)).revision).toBe(1);
+  });
+
+  test("未知 Harness 与旧 revision 分别返回 not_found 与 revision_conflict", async () => {
+    const missing = await service
+      .bindClient("0191f2f0-0000-7000-8000-000000000000", 1, {
+        clientId: "node-a",
+        token: "tok-a",
+      })
+      .catch((e) => e);
+    expect(missing).toBeInstanceOf(NotFoundError);
+
+    const created = await service.create(createInput("build-01"));
+    const stale = await service
+      .bindClient(created.id, 9, { clientId: "node-a", token: "tok-a" })
+      .catch((e) => e);
+    expect(stale).toBeInstanceOf(RevisionConflictError);
+    expect(stale.details.currentRevision).toBe(1);
+  });
+
+  test("getByClientId 命中已登记节点，未登记返回 null", async () => {
+    const created = await service.create(createInput("build-01"));
+    await service.bindClient(created.id, 1, { clientId: "node-a", token: "tok-a" });
+    const found = await read.getByClientId("node-a");
+    expect(found?.id).toBe(created.id);
+    expect("clientToken" in (found as object)).toBe(false);
+    expect(await read.getByClientId("node-missing")).toBeNull();
+  });
+
+  test("节点目录端口：启用且已绑定才可派发，停用与解绑后不可派发", async () => {
+    const db = await getTestDb();
+    const directory = createHarnessNodeDirectory({ db });
+    const created = await service.create(createInput("build-01"));
+    expect(await directory.isDispatchable("node-a")).toBe(false);
+
+    await service.bindClient(created.id, 1, { clientId: "node-a", token: "tok-a" });
+    expect(await directory.isDispatchable("node-a")).toBe(true);
+    expect(await directory.listClientIds()).toEqual(["node-a"]);
+
+    await service.setEnabled(created.id, 2, false);
+    expect(await directory.isDispatchable("node-a")).toBe(false);
+    expect(await directory.listClientIds()).toEqual([]);
+
+    await service.setEnabled(created.id, 3, true);
+    await service.unbindClient(created.id, 4);
+    expect(await directory.isDispatchable("node-a")).toBe(false);
+  });
+
+  test("凭据解析：已登记 token 返回 clientId，未知 token 与解绑后的 token 返回 null", async () => {
+    const db = await getTestDb();
+    const authenticate = createHarnessAuthenticator({ db });
+    const created = await service.create(createInput("build-01"));
+    await service.bindClient(created.id, 1, { clientId: "node-a", token: "tok-a" });
+
+    expect(await authenticate.resolveClientId("tok-a")).toBe("node-a");
+    expect(await authenticate.resolveClientId("tok-unknown")).toBeNull();
+
+    await service.unbindClient(created.id, 2);
+    expect(await authenticate.resolveClientId("tok-a")).toBeNull();
   });
 });

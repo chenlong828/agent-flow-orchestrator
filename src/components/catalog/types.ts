@@ -36,6 +36,7 @@ export type HarnessListItem = {
   address: string;
   accessMode: "agent" | "ssh" | "container_registry";
   enabled: boolean;
+  clientId: string | null;
   health: "unknown" | "online" | "offline" | "overloaded";
   lastHeartbeatAt: string | null;
   concurrencyMax: number;
@@ -48,6 +49,8 @@ export type HarnessListItem = {
 
 export type HarnessDetailView = HarnessListItem & {
   description: string;
+  /** 明文 Bearer 凭据；只在详情返回，供本机对接调试。 */
+  clientToken: string | null;
   createdAt: string;
 };
 

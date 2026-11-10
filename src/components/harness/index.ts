@@ -1,6 +1,7 @@
 export type {
   CreateHarness,
   HarnessAccessMode,
+  HarnessClientBinding,
   HarnessDetail,
   HarnessHealth,
   HarnessKind,
@@ -11,6 +12,11 @@ export type {
   QueuePolicy,
   UpdateHarness,
 } from "./types.ts";
-export { createHarnessRead, createHarnessService } from "./service.ts";
+export {
+  createHarnessAuthenticator,
+  createHarnessNodeDirectory,
+  createHarnessRead,
+  createHarnessService,
+} from "./service.ts";
 export type { HarnessDeps } from "./service.ts";
 export type { HarnessRootRow } from "./store.ts";

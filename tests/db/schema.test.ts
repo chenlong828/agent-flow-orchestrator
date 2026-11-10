@@ -58,6 +58,40 @@ describe("数据库结构", () => {
     ]);
   });
 
+  test("Harness 节点登记列与唯一索引落库，凭据必须挂在已绑定节点上", async () => {
+    const columns = await db.query<{ column_name: string; is_nullable: string }>(
+      `select column_name, is_nullable
+       from information_schema.columns
+       where table_schema = 'public' and table_name = 'harness'
+         and column_name in ('client_id', 'client_token')
+       order by column_name`,
+    );
+    expect(columns).toEqual([
+      { column_name: "client_id", is_nullable: "YES" },
+      { column_name: "client_token", is_nullable: "YES" },
+    ]);
+
+    const indexes = await db.query<{ indexname: string }>(
+      `select indexname from pg_indexes
+       where schemaname = 'public' and tablename = 'harness'
+         and indexname in ('harness_client_id_key', 'harness_client_token_key')
+       order by indexname`,
+    );
+    expect(indexes.map((row) => row.indexname)).toEqual([
+      "harness_client_id_key",
+      "harness_client_token_key",
+    ]);
+
+    const orphan = await db
+      .query(
+        `insert into harness (id, name, kind, address, access_mode, concurrency_max, queue_policy, client_token)
+         values ('0191f2f0-0000-7000-8000-0000000000aa', 'orphan-token', 'container',
+                 '10.0.4.11:7801', 'agent', 1, 'fifo', 'tok-without-node')`,
+      )
+      .catch((error) => error);
+    expect(String(orphan)).toContain("harness_check");
+  });
+
   test("引用保护外键为 RESTRICT，子表为 CASCADE", async () => {
     const constraints = await db.query<{ name: string; delete_rule: string }>(
       `select c.conname as name, c.confdeltype as delete_rule

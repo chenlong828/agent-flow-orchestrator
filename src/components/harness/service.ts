@@ -1,4 +1,5 @@
 import {
+  BindingConflictError,
   ensureBoolean,
   toIso,
   toIsoOrNull,
@@ -11,14 +12,22 @@ import {
   RevisionConflictError,
   ValidationError,
   type Clock,
+  type ExecutorAuthenticator,
   type IdGenerator,
+  type NodeDirectory,
   type Page,
   type ReferenceGuard,
 } from "../../core/kernel/index.ts";
-import { isForeignKeyViolation, isUniqueViolation, type Db } from "../../core/platform/index.ts";
+import {
+  isForeignKeyViolation,
+  isUniqueViolation,
+  violationConstraint,
+  type Db,
+} from "../../core/platform/index.ts";
 import { createHarnessStore, type HarnessRootRow, type HarnessStore } from "./store.ts";
 import type {
   CreateHarness,
+  HarnessClientBinding,
   HarnessDetail,
   HarnessQuery,
   HarnessRead,
@@ -43,6 +52,7 @@ function toSummary(row: HarnessRootRow, tags: string[]): HarnessSummary {
     address: row.address,
     accessMode: row.access_mode,
     enabled: row.enabled,
+    clientId: row.client_id,
     health: row.health,
     lastHeartbeatAt: toIsoOrNull(row.last_heartbeat_at),
     concurrencyMax: row.concurrency_max,
@@ -57,6 +67,7 @@ function toDetail(row: HarnessRootRow, tags: string[]): HarnessDetail {
   return {
     ...toSummary(row, tags),
     description: row.description,
+    clientToken: row.client_token,
     createdAt: toIso(row.created_at),
   };
 }
@@ -197,23 +208,15 @@ async function updateHarness(
   }
 }
 
-async function setHarnessEnabled(
+/** 单行乐观锁写：写返回 0 时按「不存在」或「revision 过期」抛出。 */
+async function applyRevisioned(
   ctx: HarnessServiceContext,
   id: string,
   revision: number,
-  enabled: boolean,
-  requestActor?: string,
+  write: (tx: Db) => Promise<number>,
 ): Promise<{ id: string; revision: number }> {
-  const now = ctx.clock.now();
   return ctx.db.transaction(async (tx) => {
-    const changed = await ctx.store.setEnabled({
-      tx,
-      id,
-      revision,
-      enabled: ensureBoolean(enabled, "enabled"),
-      now,
-      actor: requestActor ?? ctx.actor,
-    });
+    const changed = await write(tx);
     if (changed === 0) {
       const latest = await ctx.store.findRoot(tx, id);
       if (latest === null) throw new NotFoundError("Harness", id);
@@ -221,6 +224,103 @@ async function setHarnessEnabled(
     }
     return { id, revision: revision + 1 };
   });
+}
+
+async function setHarnessEnabled(
+  ctx: HarnessServiceContext,
+  id: string,
+  revision: number,
+  enabled: boolean,
+  requestActor?: string,
+): Promise<{ id: string; revision: number }> {
+  const enabledValue = ensureBoolean(enabled, "enabled");
+  const now = ctx.clock.now();
+  return applyRevisioned(ctx, id, revision, (tx) =>
+    ctx.store.setEnabled({
+      tx,
+      id,
+      revision,
+      enabled: enabledValue,
+      now,
+      actor: requestActor ?? ctx.actor,
+    }),
+  );
+}
+
+const CLIENT_ID_PATTERN = /^[^\s\u0000-\u001f\u007f]{1,64}$/;
+const CLIENT_TOKEN_PATTERN = /^[^\s\u0000-\u001f\u007f]{1,128}$/;
+
+function ensureClientId(value: unknown): string {
+  if (typeof value !== "string") throw new ValidationError("clientId", "必须是字符串");
+  if (!CLIENT_ID_PATTERN.test(value)) {
+    throw new ValidationError("clientId", "必须是 1–64 个非空白字符");
+  }
+  return value;
+}
+
+function ensureClientToken(value: unknown): string {
+  if (typeof value !== "string") throw new ValidationError("token", "必须是字符串");
+  if (!CLIENT_TOKEN_PATTERN.test(value)) {
+    throw new ValidationError("token", "必须是 1–128 个非空白字符");
+  }
+  return value;
+}
+
+/** 唯一约束冲突按约束名分派：clientId 与 token 各有独立索引，名称冲突不在此路径。 */
+function throwClientConflict(error: unknown, clientId: string): never {
+  const constraint = isUniqueViolation(error) ? violationConstraint(error) : null;
+  if (constraint === "harness_client_token_key") {
+    throw new BindingConflictError("clientToken");
+  }
+  if (constraint === "harness_client_id_key") {
+    throw new BindingConflictError("clientId", clientId);
+  }
+  throw error;
+}
+
+async function bindHarnessClient(
+  ctx: HarnessServiceContext,
+  id: string,
+  revision: number,
+  binding: HarnessClientBinding,
+  requestActor?: string,
+): Promise<{ id: string; revision: number }> {
+  const clientId = ensureClientId(binding?.clientId);
+  const token = ensureClientToken(binding?.token);
+  const now = ctx.clock.now();
+  try {
+    return await applyRevisioned(ctx, id, revision, (tx) =>
+      ctx.store.bindClient({
+        tx,
+        id,
+        revision,
+        clientId,
+        token,
+        now,
+        actor: requestActor ?? ctx.actor,
+      }),
+    );
+  } catch (error) {
+    return throwClientConflict(error, clientId);
+  }
+}
+
+async function unbindHarnessClient(
+  ctx: HarnessServiceContext,
+  id: string,
+  revision: number,
+  requestActor?: string,
+): Promise<{ id: string; revision: number }> {
+  const now = ctx.clock.now();
+  return applyRevisioned(ctx, id, revision, (tx) =>
+    ctx.store.unbindClient({
+      tx,
+      id,
+      revision,
+      now,
+      actor: requestActor ?? ctx.actor,
+    }),
+  );
 }
 
 async function deleteHarness(
@@ -266,6 +366,10 @@ export function createHarnessService(deps: HarnessDeps): HarnessService {
       updateHarness(ctx, id, revision, input, requestActor),
     setEnabled: (id, revision, enabled, requestActor) =>
       setHarnessEnabled(ctx, id, revision, enabled, requestActor),
+    bindClient: (id, revision, binding, requestActor) =>
+      bindHarnessClient(ctx, id, revision, binding, requestActor),
+    unbindClient: (id, revision, requestActor) =>
+      unbindHarnessClient(ctx, id, revision, requestActor),
     delete: (id, revision) => deleteHarness(ctx, id, revision),
   };
 }
@@ -296,5 +400,29 @@ export function createHarnessRead(deps: { db: Db }): HarnessRead {
       const tags = await store.tagsFor(db, id);
       return toDetail(row, tags);
     },
+
+    async getByClientId(clientId): Promise<HarnessSummary | null> {
+      const row = await store.findByClientId(db, clientId);
+      if (row === null) return null;
+      const tags = await store.tagsFor(db, row.id);
+      return toSummary(row, tags);
+    },
+  };
+}
+
+/** 节点目录端口实现；组合根注入 scheduler。 */
+export function createHarnessNodeDirectory(deps: { db: Db }): NodeDirectory {
+  const store = createHarnessStore();
+  return {
+    isDispatchable: (clientId) => store.isDispatchable(deps.db, clientId),
+    listClientIds: () => store.listDispatchableClientIds(deps.db),
+  };
+}
+
+/** 执行面凭据解析；组合根注入执行端端点。 */
+export function createHarnessAuthenticator(deps: { db: Db }): ExecutorAuthenticator {
+  const store = createHarnessStore();
+  return {
+    resolveClientId: (token) => store.findClientIdByToken(deps.db, token),
   };
 }

@@ -47,6 +47,7 @@ function statusFor(error: AppError): number {
     case "name_conflict":
     case "revision_conflict":
     case "referenced":
+    case "binding_conflict":
     case "file_conflict":
       return 409;
     case "draft_expired":

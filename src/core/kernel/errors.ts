@@ -7,6 +7,7 @@ export type ErrorCode =
   | "name_conflict"
   | "revision_conflict"
   | "referenced"
+  | "binding_conflict"
   | "file_conflict"
   | "draft_expired"
   | "payload_too_large"
@@ -91,6 +92,25 @@ export class ReferencedError extends AppError {
     super("referenced", "资产仍被引用，不能删除", {
       details: { asset, references },
     });
+  }
+}
+
+/**
+ * 节点登记冲突：`clientId` 已被其他 Harness 绑定，或凭据已被其他节点使用。
+ * 凭据冲突不回显 token 值，避免凭据进入响应与日志。
+ */
+export class BindingConflictError extends AppError {
+  constructor(field: "clientId" | "clientToken", clientId?: string) {
+    const isClientId = field === "clientId";
+    super(
+      "binding_conflict",
+      isClientId
+        ? `clientId ${clientId ?? ""} 已被其他 Harness 绑定`
+        : "该 token 已被其他 Harness 使用",
+      {
+        details: isClientId ? { field, clientId } : { field },
+      },
+    );
   }
 }
 

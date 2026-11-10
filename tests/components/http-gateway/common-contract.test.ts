@@ -428,6 +428,7 @@ describe("B1 公共契约", () => {
     expect(keys(harnessList.body.items[0])).toEqual([
       "accessMode",
       "address",
+      "clientId",
       "concurrencyMax",
       "enabled",
       "health",
@@ -445,6 +446,8 @@ describe("B1 公共契约", () => {
     expect(keys(harnessDetail.body)).toEqual([
       "accessMode",
       "address",
+      "clientId",
+      "clientToken",
       "concurrencyMax",
       "createdAt",
       "description",

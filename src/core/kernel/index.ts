@@ -1,5 +1,6 @@
 export {
   AppError,
+  BindingConflictError,
   DatabaseUnavailableError,
   DraftExpiredError,
   FileConflictError,
@@ -24,11 +25,13 @@ export {
 export type { Page, PageQuery } from "./pagination.ts";
 export type {
   Clock,
+  ExecutorAuthenticator,
   ExpertStatusReader,
   FileData,
   FileStat,
   FileStore,
   IdGenerator,
+  NodeDirectory,
   Reference,
   ReferenceGuard,
   ReferenceOwner,

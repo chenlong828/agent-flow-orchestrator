@@ -9,6 +9,7 @@ export const HARNESS_WRITE_FIELDS = [
   "tags",
 ] as const;
 export const HARNESS_CREATE_FIELDS = [...HARNESS_WRITE_FIELDS, "enabled"] as const;
+export const HARNESS_CLIENT_FIELDS = ["clientId", "token"] as const;
 export const TOOL_WRITE_FIELDS = [
   "name",
   "kind",

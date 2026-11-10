@@ -20,6 +20,20 @@ export type ExpertStatusReader = {
   statuses(expertIds: string[]): Promise<Record<string, boolean>>;
 };
 
+/** 执行节点目录：client 节点是否可接任务。由 CMP-harness 实现，组合根注入 scheduler。 */
+export type NodeDirectory = {
+  /** 节点存在、已绑定 clientId 且 enabled；未知 clientId 返回 false。 */
+  isDispatchable(clientId: string): Promise<boolean>;
+  /** 已绑定且 enabled 的 clientId；启动交集校验与排障用。 */
+  listClientIds(): Promise<string[]>;
+};
+
+/** 执行面 Bearer 凭据解析：token → clientId。由 CMP-harness 实现，执行端端点使用。 */
+export type ExecutorAuthenticator = {
+  /** 未知 token 或未绑定节点返回 null；不区分「凭据不存在」与「节点已解绑」。 */
+  resolveClientId(token: string): Promise<string | null>;
+};
+
 /** 引用检查端口，由 catalog 实现，组合根注入领域删除服务。 */
 export type ReferenceGuard = {
   check(owner: ReferenceOwner, id: string): Promise<Reference[]>;
