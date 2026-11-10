@@ -1,13 +1,13 @@
 ---
-layer: works
+layer: history
 module: global
-status: active
+status: frozen
 updated: 2026-11-10
 ---
 
 # 评审：执行容错语义提议（调度器侧裁决）
 
-> 对象：`agent-flow-client/docs/works/2026-11-10-execution-semantics-proposal/proposal.md`（219 行，2026-11-10）。
+> 对象：`agent-flow-client/docs/history/works/2026-11-10-execution-semantics-proposal/proposal.md`（219 行，2026-11-10）。
 > 契约基线：`agent-flow-client/docs/design/contracts/executor-http-v1.md`（v1 frozen，`protocolVersion = 2026-11-07.1`）。
 > 评审级：**P1**（改动执行语义与调度器派发职责）。裁决档位见 `arch-design-spec` 第 8 步。
 

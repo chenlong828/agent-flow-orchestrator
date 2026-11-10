@@ -1,7 +1,7 @@
 ---
-layer: works
+layer: history
 module: global
-status: closed
+status: frozen
 updated: 2026-11-10
 ---
 
@@ -26,7 +26,7 @@ updated: 2026-11-10
 |---|---|
 | 条款级验证矩阵与偏离清单 | [`verification.md`](verification.md) |
 | 可复跑验证桩与输出 | [`harness/verify.ts`](harness/verify.ts)、[`harness/run-output.txt`](harness/run-output.txt) |
-| 需契约侧决定的 3 项 | [`plan/open-questions.md`](../../plan/open-questions.md) `OQ-12`…`OQ-14` |
+| 需契约侧决定的 3 项 | [`plan/open-questions.md`](../../../plan/open-questions.md) `OQ-12`…`OQ-14` |
 | 需 client 侧修复的 2 项 | 同表 `OQ-15`、`OQ-16` |
 | 契约工序收口 | [`2026-11-10-executor-contract-v2/result.md`](../2026-11-10-executor-contract-v2/result.md) |
 

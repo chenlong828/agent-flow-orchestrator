@@ -14,6 +14,8 @@ docs/
 │   └── open-questions.md
 ├── design/                                 ← 真相：系统现在是什么
 │   ├── architecture.md
+│   ├── contracts/
+│   │   └── executor-http-v2.md             ← 执行面契约（跨项目 REST 契约，调度器侧权威）
 │   ├── components/
 │   │   ├── kernel/spec.md
 │   │   ├── config/spec.md
@@ -46,7 +48,7 @@ docs/
 ├── playbook/                               ← 方法：同类问题怎么判断（项目本地，待技能合并）
 │   ├── backend-contract-boundaries.md
 │   └── code-health-rules.md
-├── works/                                  ← 执行：正在做什么（4 份契约相关工序 + 接口验证已收口待归档；client-boundary 仍在办）
+├── works/                                  ← 执行：正在做什么（仅 client-boundary 在办；契约相关 5 份工序已归档）
 └── history/                                ← 记忆：怎么走到这里（冻结只读）
     ├── decisions/                          ← 整篇决策记录，按日期命名
     └── works/                              ← 已归档工序，按日期命名
@@ -57,6 +59,7 @@ docs/
 - `requirements/`：一卡一文件 `REQ-0001-<slug>.md`，只回答「为什么做」；
 - `design/scenarios/`：`<领域>/<价值流>/<场景>/scenario.md`，业务功能树按需建立；专家、Skill 与工作流定义的场景与生成索引已存在；
 - `design/components/` 与 `design/scenarios/` 是**按文档类型分的兄弟目录**：前者是单组件规格，后者是跨组件运行序；`architecture.md` 是系统视图。三者不混放，也不因为“一切皆组件”而扁平化。
+- `design/contracts/`：跨项目 REST 契约（`executor-http-v2`）。放在 design 而不是 works，是因为契约是现行真相、会被另一个项目引用；client 仓库保留同构副本，冲突时以本仓库为准。这是 `doc-layout-spec` 的项目本地扩展，上游合并前以本段为准。
 - `works/`：一级只有工序目录 `YYYY-MM-DD-<短名>/`，含 `brief.md`，收口后补 `result.md` 再整目录归档。
 - `playbook/`：方法层，一份 playbook 对应一类可复用的设计判断；`status` 为 `draft / current / deprecated`，废弃后移入 `history/playbooks/`。不复制组件契约，强制规则应升级到技能。
 
@@ -75,16 +78,17 @@ docs/
 8. [`design/components/kernel/spec.md`](design/components/kernel/spec.md) 与 [`config/spec.md`](design/components/config/spec.md) —— 共享错误/分页/端口，以及 TOML 启动配置
 9. [`design/components/http-gateway/spec.md`](design/components/http-gateway/spec.md) —— 对外 REST 契约；运行时 `/openapi.yaml` 与 Swagger UI `/docs` 由 `CMP-http-gateway` 直接提供；外部项目若接入按此消费
 10. [`design/components/workflow/spec.md`](design/components/workflow/spec.md) —— `CMP-workflow` 的聚合、图保存/校验、DSL 与专家引用投影
-11. [`history/works/2026-10-28-workflow-definition/result.md`](history/works/2026-10-28-workflow-definition/result.md) —— B3 工作流定义实现结果与验证记录
-12. [`playbook/backend-contract-boundaries.md`](playbook/backend-contract-boundaries.md) —— 后端聚合写、列表读模型与 BFF 边界的可复用判定；与现行规格冲突时以规格为准
-13. [`history/works/2026-10-24-db-backend-infra/result.md`](history/works/2026-10-24-db-backend-infra/result.md) —— B1 实现结果、验证命令与偏差（已归档，历史证据，不作设计依据）
-14. [`history/works/2026-10-25-api-swagger/result.md`](history/works/2026-10-25-api-swagger/result.md) —— Swagger UI、OpenAPI 端点与验证结果（已归档）
-15. [`history/works/2026-10-25-runtime-openapi-export/result.md`](history/works/2026-10-25-runtime-openapi-export/result.md) —— OpenAPI 资产移入 HTTP 组件，以及方法/字段说明补齐结果（已归档）
-16. [`history/works/2026-10-25-scenario-index-pilot/result.md`](history/works/2026-10-25-scenario-index-pilot/result.md) —— 首个场景索引试点、生成器与校验结果（已归档）
-17. [`history/decisions/2026-10-23-project-init.md`](history/decisions/2026-10-23-project-init.md) —— 初始化时的取舍与被否决方案
-18. [`history/decisions/2026-10-25-project-boundary-and-open-questions.md`](history/decisions/2026-10-25-project-boundary-and-open-questions.md) —— 仅 HTTP API、无 CLI/库/产品 UI，以及早期开放问题归档
-19. [`history/decisions/2026-10-25-playbook-method-layer.md`](history/decisions/2026-10-25-playbook-method-layer.md) —— `playbook/` 方法层、首份 playbook 的范围与上游技能延迟合并
-20. [`playbook/code-health-rules.md`](playbook/code-health-rules.md) —— 代码健康规则的阈值、级别、基线策略与 agent 反馈闭环
+11. [`design/contracts/executor-http-v2.md`](design/contracts/executor-http-v2.md) —— 执行面契约 v2：三端点、at-least-once、客户端承诺与调度器职责；接口一致性验证与偏离清单见 [`history/works/2026-11-10-executor-contract-verification/verification.md`](history/works/2026-11-10-executor-contract-verification/verification.md)
+12. [`history/works/2026-10-28-workflow-definition/result.md`](history/works/2026-10-28-workflow-definition/result.md) —— B3 工作流定义实现结果与验证记录
+13. [`playbook/backend-contract-boundaries.md`](playbook/backend-contract-boundaries.md) —— 后端聚合写、列表读模型与 BFF 边界的可复用判定；与现行规格冲突时以规格为准
+14. [`history/works/2026-10-24-db-backend-infra/result.md`](history/works/2026-10-24-db-backend-infra/result.md) —— B1 实现结果、验证命令与偏差（已归档，历史证据，不作设计依据）
+15. [`history/works/2026-10-25-api-swagger/result.md`](history/works/2026-10-25-api-swagger/result.md) —— Swagger UI、OpenAPI 端点与验证结果（已归档）
+16. [`history/works/2026-10-25-runtime-openapi-export/result.md`](history/works/2026-10-25-runtime-openapi-export/result.md) —— OpenAPI 资产移入 HTTP 组件，以及方法/字段说明补齐结果（已归档）
+17. [`history/works/2026-10-25-scenario-index-pilot/result.md`](history/works/2026-10-25-scenario-index-pilot/result.md) —— 首个场景索引试点、生成器与校验结果（已归档）
+18. [`history/decisions/2026-10-23-project-init.md`](history/decisions/2026-10-23-project-init.md) —— 初始化时的取舍与被否决方案
+19. [`history/decisions/2026-10-25-project-boundary-and-open-questions.md`](history/decisions/2026-10-25-project-boundary-and-open-questions.md) —— 仅 HTTP API、无 CLI/库/产品 UI，以及早期开放问题归档
+20. [`history/decisions/2026-10-25-playbook-method-layer.md`](history/decisions/2026-10-25-playbook-method-layer.md) —— `playbook/` 方法层、首份 playbook 的范围与上游技能延迟合并
+21. [`playbook/code-health-rules.md`](playbook/code-health-rules.md) —— 代码健康规则的阈值、级别、基线策略与 agent 反馈闭环
 
 ## 维护纪律（速记）
 

@@ -1,7 +1,7 @@
 ---
-layer: works
+layer: history
 module: global
-status: closed
+status: frozen
 updated: 2026-11-10
 ---
 
@@ -9,7 +9,7 @@ updated: 2026-11-10
 
 ## 背景
 
-client 侧提交《提议：Agent 执行任务的容错语义与卡死处理》（`agent-flow-client/docs/works/2026-11-10-execution-semantics-proposal/proposal.md`，2026-11-10），请调度器侧裁决 §9 的 Q1–Q8。
+client 侧提交《提议：Agent 执行任务的容错语义与卡死处理》（`agent-flow-client/docs/history/works/2026-11-10-execution-semantics-proposal/proposal.md`，2026-11-10），请调度器侧裁决 §9 的 Q1–Q8。
 
 产品前提已在对话中明确：client 跑的是 **Agent 智能体分析任务**，容错大——中断后工作区留有中间分析与知识落盘，重跑时 agent 能读到痕迹并自行决定续跑或重来。因此调度器的重点是**安排活儿**（派发、容量、卡死回收、重试节奏），而不是交易类系统的 exactly-once。这一定性构成本次评审的判据。
 

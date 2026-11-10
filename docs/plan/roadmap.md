@@ -27,6 +27,8 @@ updated: 2026-11-02
 
 ## 近期完成
 
+- `2026-11-10-executor-contract-v2` 及配套评审：执行面契约 v2 收口，正文移入 [`design/contracts/executor-http-v2.md`](../design/contracts/executor-http-v2.md)。client 已按契约完成实现；调度器侧用桩服务做了 57 项接口断言（55 通过），2 项 client 偏离（总超时错误码、技能包摘要不匹配未重试）与 2 项契约边界（`C-05` 终止范围、400 双语义）等共 8 项转 [`open-questions.md`](open-questions.md) `OQ-12`–`OQ-19`。结论见 [`result.md`](../history/works/2026-11-10-executor-contract-verification/result.md)，验证报告见 [`verification.md`](../history/works/2026-11-10-executor-contract-verification/verification.md)。`2026-11-05-scheduler-contract-review`、`2026-11-07-client-architecture-review`、`2026-11-10-execution-semantics-review` 的对象均已被 v2 替换或吸收，同期收口归档。
+
 - `2026-10-30-quality-refactor`：代码质量基线从 80 条违规降到 0，组件与 service/store 工厂完成结构拆分；迁移历史拍扁为单一 `0001_baseline.sql`。`bun run check` 273 pass、`quality:gate` 通过。结论见 [`result.md`](../history/works/2026-10-30-quality-refactor/result.md)。
 - `2026-10-30-workflow-contract-boundary`：工作流契约边界收敛——创建必须提交合法图，拓扑/绑定错误阻断写入，`layout` / `viewport` 归前端并透明持久化；评审 blocker 0 / decision 3 / hold 0。结论见 [`result.md`](../history/works/2026-10-30-workflow-contract-boundary/result.md)。
 - `2026-10-29-workflow-viewport`：画布视口作为 `WorkflowGraph.viewport` 随当前定义保存，详情、DSL 往返与复制均保留；不新增表、列或端点。结论见 [`result.md`](../history/works/2026-10-29-workflow-viewport/result.md)。
@@ -42,4 +44,4 @@ updated: 2026-11-02
 - `2026-10-28-workflow-definition`：B3 工作流定义已实现——三张表、`CMP-workflow`、catalog/expert/kernel 增量、10 个 HTTP 端点、OpenAPI 与契约测试；B4 运行/实例与 UI 未做。结论见 [`result.md`](../history/works/2026-10-28-workflow-definition/result.md)。
 - `2026-10-25-scenario-index-pilot`：建立首个场景「智能体能力资产 / 专家能力定义与装配 / 专家定义与装配管理」，分配 `TC-EXP-001`～`TC-EXP-004`，新增场景索引生成器与 `docs:index` / `docs:check`。场景保持 `designed`，未宣称完整 CRUD 验收。结论见 [`result.md`](../history/works/2026-10-25-scenario-index-pilot/result.md)。
 - 2026-11-02：`docs/works/` 中已收口的 `2026-10-25-scenario-index-pilot`、`2026-10-26-skill-contract-v2`、`2026-10-28-skill-package`、`2026-10-29-tech-debt-cleanup`、`2026-10-29-workflow-viewport`、`2026-10-30-workflow-contract-boundary`、`2026-10-24-agentflow-execution-concept` 已整目录归档到 `history/works/`，frontmatter 改为 `frozen`；其中概念工序原在 result 中记为「不归档」，本次按 `doc-layout-spec` 生命周期统一归档，失效说明见其 result。归档件只作历史证据，不作设计依据。
-- 后续不预置 M2/M4 的答案；实际运行需求出现时再启动对应工序。B1+B3 覆盖控制面资产注册与工作流定义，B4 运行实例仍未开始。早期开放问题已关闭；当前只有 6 项 hold，见 [`open-questions.md`](open-questions.md)。
+- 后续不预置 M2/M4 的答案；实际运行需求出现时再启动对应工序。B1+B3 覆盖控制面资产注册与工作流定义；执行面契约 v2 已冻结并由 client 实现，调度器侧 executor 端点（`P-01`–`P-03` + 任务表）仍是 P1 待立工序，B4 运行实例未开始。当前有 6 项 hold 与 8 项待定（`OQ-12`–`OQ-19`），见 [`open-questions.md`](open-questions.md)。

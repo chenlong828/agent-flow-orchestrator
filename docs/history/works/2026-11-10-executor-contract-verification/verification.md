@@ -1,16 +1,16 @@
 ---
-layer: works
+layer: history
 module: global
-status: active
+status: frozen
 updated: 2026-11-10
 ---
 
 # 验证：executor-http-v2 接口一致性（调度器侧发起）
 
-> 契约权威：本仓库 [`design/contracts/executor-http-v2.md`](../../design/contracts/executor-http-v2.md)（`protocolVersion = 2`）。
+> 契约权威：本仓库 [`design/contracts/executor-http-v2.md`](../../../design/contracts/executor-http-v2.md)（`protocolVersion = 2`）。
 > 被验证实现：`agent-flow-client`（只读），提交 `e047e0a` + `4c8f8b0`。
 > 验证脚本：[`harness/verify.ts`](harness/verify.ts)；完整输出：[`harness/run-output.txt`](harness/run-output.txt)。
-> 复跑：`bun run docs/works/2026-11-10-executor-contract-verification/harness/verify.ts`。
+> 复跑：`bun run docs/history/works/2026-11-10-executor-contract-verification/harness/verify.ts`。
 
 ## 1. 结论
 

@@ -10,7 +10,7 @@ protocolVersion: 2
 # 执行面契约 v2：任务下发与结果回收
 
 > 权威在本文件（调度器侧）。client 仓库的现行副本：`agent-flow-client/docs/design/contracts/executor-http-v2.md`。
-> 状态：client 已按本契约实现（2026-11-10，`e047e0a`）；接口一致性与偏离见 `docs/works/2026-11-10-executor-contract-verification/verification.md`。
+> 状态：client 已按本契约实现（2026-11-10，`e047e0a`）；接口一致性与偏离见 `docs/history/works/2026-11-10-executor-contract-verification/verification.md`。
 > v1（`executor-http-v1.md`，`protocolVersion = 2026-11-07.1`）已由本版替换，不再作为设计依据。
 > 前提：调度器侧对本契约尚无实现（2026-11-10 核实），因此不做 v1 兼容，直接替换。
 

@@ -1,17 +1,17 @@
 ---
-layer: works
+layer: history
 module: global
-status: active
+status: frozen
 updated: 2026-11-06
 ---
 
 # 契约评审：执行面接口提案 v0.1 → v0.2（调度器侧视角）
 
-> 对象：[`agent-flow-client/docs/works/2026-11-04-scheduler-contract-proposal/proposal.md`](../../../../agent-flow-client/docs/works/2026-11-04-scheduler-contract-proposal/proposal.md)（v0.1 997 行 2026-11-04；v0.2 于 2026-11-05 修订）。
+> 对象：[`agent-flow-client/docs/works/2026-11-04-scheduler-contract-proposal/proposal.md`](../../../../../agent-flow-client/docs/history/works/2026-11-04-scheduler-contract-proposal/proposal.md)（v0.1 997 行 2026-11-04；v0.2 于 2026-11-05 修订）。
 >
 > 评审级：**P1**（契约冻结输入）。裁决档位定义见 `arch-design-spec` 第 8 步。
 >
-> 材料：提案全文 §1–§17；client 侧同工序 `review.md`（其逐条裁决）；本仓库 [`boundary-design.md`](../2026-11-03-client-boundary/boundary-design.md)；client 侧 `docs/design/architecture.md` §1/§4.3/§6/§9/§11、`CMP-gateway` §2–§3、`CMP-assets` §1、`CMP-observability` §8、`CMP-cli` §2.4（只读对照）；观测面提案 `docs/works/2026-11-06-observability-http/proposal.md`。
+> 材料：提案全文 §1–§17；client 侧同工序 `review.md`（其逐条裁决）；本仓库 [`boundary-design.md`](../../../works/2026-11-03-client-boundary/boundary-design.md)；client 侧 `docs/design/architecture.md` §1/§4.3/§6/§9/§11、`CMP-gateway` §2–§3、`CMP-assets` §1、`CMP-observability` §8、`CMP-cli` §2.4（只读对照）；观测面提案 `docs/works/2026-11-06-observability-http/proposal.md`。
 >
 > **复核（2026-11-06）**：v0.2 已修订。四条 Blocker 全部关闭，五条 Decision now 与七条 Hold 全部按建议落地；复核新增 2 条 Decision now、4 条 Hold（§8）。裁决收窄为「**有条件通过（条件仅剩 2 条一句话级 Decision now）**」。新增的只读观测 HTTP P1 单列 §9。
 >
