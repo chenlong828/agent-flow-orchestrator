@@ -10,7 +10,7 @@ updated: 2026-11-10
 
 > 生成物，不手改。修改场景后运行 `bun run docs:index`；校验运行 `bun run docs:check`。
 
-共 11 个场景。
+共 12 个场景。
 
 ## 智能体能力资产
 
@@ -46,3 +46,4 @@ updated: 2026-11-10
 | [SCN-0203 执行面技能包供给](workflow-orchestration/execution-scheduling/executor-skill-package-supply/scenario.md) | draft | [scenario.md#3 运行序](workflow-orchestration/execution-scheduling/executor-skill-package-supply/scenario.md#3-运行序) | 待实现 | [docs/design/components/http-gateway/spec.md#4.3 执行面端点](../components/http-gateway/spec.md#43-执行面端点)<br>[docs/design/components/skill/spec.md#3.3 编排面制品供给](../components/skill/spec.md#33-编排面制品供给)<br>[docs/design/components/kernel/spec.md#3.6 执行面制品端口](../components/kernel/spec.md#36-执行面制品端口) | 待实现 | 待实现 |
 | [SCN-0204 执行面停止与取消](workflow-orchestration/execution-scheduling/executor-control-signals/scenario.md) | draft | [scenario.md#3 运行序](workflow-orchestration/execution-scheduling/executor-control-signals/scenario.md#3-运行序) | 待实现 | [docs/design/components/scheduler/spec.md#4 状态机与不变量](../components/scheduler/spec.md#4-状态机与不变量)<br>[docs/design/components/http-gateway/spec.md#4.3 执行面端点](../components/http-gateway/spec.md#43-执行面端点)<br>[docs/design/components/instance/spec.md#4 状态机与不变量](../components/instance/spec.md#4-状态机与不变量) | 待实现 | 待实现 |
 | [SCN-0205 执行面协议版本与凭据闸门](workflow-orchestration/execution-scheduling/executor-protocol-gate/scenario.md) | draft | [scenario.md#3 运行序](workflow-orchestration/execution-scheduling/executor-protocol-gate/scenario.md#3-运行序) | 待实现 | [docs/design/components/http-gateway/spec.md#4.3 执行面端点](../components/http-gateway/spec.md#43-执行面端点)<br>[docs/design/components/http-gateway/spec.md#3.3 错误体](../components/http-gateway/spec.md#33-错误体)<br>[docs/design/components/kernel/spec.md#3.1 错误](../components/kernel/spec.md#31-错误) | 待实现 | 待实现 |
+| [SCN-0206 执行节点登记与派发门禁](workflow-orchestration/execution-scheduling/executor-node-registry/scenario.md) | draft | [scenario.md#3 运行序](workflow-orchestration/execution-scheduling/executor-node-registry/scenario.md#3-运行序) | 待实现 | [docs/design/components/harness/spec.md#3.3 节点目录与在线状态口径](../components/harness/spec.md#33-节点目录与在线状态口径)<br>[docs/design/components/http-gateway/spec.md#4.1 业务端点](../components/http-gateway/spec.md#41-业务端点)<br>[docs/design/components/scheduler/spec.md#4.8 节点可用性与派发门禁](../components/scheduler/spec.md#48-节点可用性与派发门禁) | 待实现 | 待实现 |

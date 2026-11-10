@@ -206,7 +206,24 @@ type SkillPackageSource = {
 - `currentForSkill` 在 Skill 不存在时抛 `NotFoundError`，包缺失时抛 `PackageUnavailableError`；`describe` 只区分「有/无」，不抛包损坏。
 - 端口不含 HTTP 语义（状态码、头部名、304 判定）；条件请求由 `CMP-http-gateway` 用 `etag` 比较后决定。
 
-### 3.7 方法契约
+### 3.7 执行节点目录端口
+
+```ts
+/** 执行节点目录：client 节点是否可接任务。由 CMP-harness 实现，组合根注入 scheduler。 */
+type NodeDirectory = {
+  /** 节点存在、已绑定 clientId 且 enabled；未知 clientId 返回 false。 */
+  isDispatchable(clientId: string): Promise<boolean>;
+  /** 已绑定且 enabled 的 clientId；启动交集校验与排障用。 */
+  listClientIds(): Promise<string[]>;
+};
+```
+
+- 端口定义在 kernel，实现在 `CMP-harness` 的读契约之上；`scheduler` 只依赖本端口，不导入 Harness 组件。
+- `isDispatchable` 只回答「节点是否接活」，不回答实例是否可派发；实例归属仍由 `CMP-instance` 判定。
+- 端口不含在线状态：在线/离线/满载由 `CMP-scheduler` 的 presence 观测派生，`catalog` 组合展示（见 `harness` §3.3）。
+- 端口不含 HTTP 语义；错误只抛 `DatabaseUnavailableError`（读库失败）。
+
+### 3.8 方法契约
 
 | 方法 | 目的 | 输入 | 输出 | 错误 | 说明 |
 |---|---|---|---|---|---|
@@ -222,6 +239,8 @@ type SkillPackageSource = {
 | `SkillPackageSource.currentForSkill` | 取当前包引用 | `skillId` | `SkillPackageRef` | `NotFoundError`、`PackageUnavailableError` | 不读整包内容 |
 | `SkillPackageSource.describe` | 解析包引用 | `packageId` | `SkillPackageRef \| null` | 无 | 未知返回 null |
 | `SkillPackageSource.open` | 取包字节流 | `packageId` | `{ref, stream}` | `PackageUnavailableError` | 由 `skill` 实现；流不经过业务内存 |
+| `NodeDirectory.isDispatchable` | 节点是否可接活 | `clientId` | `boolean` | `DatabaseUnavailableError` | 由 `harness` 实现；`enabled` + 已绑定 |
+| `NodeDirectory.listClientIds` | 可派发节点清单 | 无 | `string[]` | `DatabaseUnavailableError` | 启动交集校验用 |
 
 ## 4. 依赖与边界
 
@@ -245,6 +264,7 @@ bunx tsc --noEmit
 | 引用端口 | 空/非空引用返回结构稳定，领域可用假实现替换 |
 | 存储端口 | `put/get/head/list/delete/move` 的 key 约束、幂等与流语义稳定，领域可用假实现替换 |
 | 制品端口 | `currentForSkill`/`describe`/`open` 的不可变与错误语义稳定，可用假实现替换 |
+| 节点目录端口 | `isDispatchable`/`listClientIds` 的语义稳定，可用假实现替换；未知 client 返回 `false`/`[]` |
 | 依赖边界 | `kernel` 不导入 `platform`/领域/`catalog`/`http-gateway` |
 
 ## 6. 预算

@@ -3,7 +3,7 @@ layer: design
 module: catalog
 status: current
 component: CMP-catalog
-updated: 2026-11-02
+updated: 2026-11-10
 ---
 
 # `CMP-catalog` 组件规格
@@ -18,6 +18,7 @@ updated: 2026-11-02
 
 - 无表；只读投影：资产列表项、资产详情、引用摘要、专家装配。
 - 派生计数查询时计算；不落可写列。
+- Harness 的 `health` / `lastHeartbeatAt` 是组合派生值：读 `SchedulerPresenceRead` 后按 [`CMP-harness` §3.3](../harness/spec.md) 的口径覆盖，不落库。
 
 ## 3 公共契约
 
@@ -202,8 +203,8 @@ type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
 
 | 方法 | 目的 | 输入 | 输出 | 错误 | 读源 |
 |---|---|---|---|---|---|
-| `listHarnesses` | Harness 列表 | `HarnessQuery` | `Page<HarnessListItem>` | `ValidationError` | `HarnessRead.list` + `ToolRead.listByHarness` |
-| `getHarness` | Harness 详情 | `id` | `HarnessDetailView` | `NotFoundError` | `HarnessRead.get` + `ToolRead.listByHarness` |
+| `listHarnesses` | Harness 列表 | `HarnessQuery` | `Page<HarnessListItem>` | `ValidationError` | `HarnessRead.list` + `ToolRead.listByHarness` + `SchedulerPresenceRead.presence`（派生状态） |
+| `getHarness` | Harness 详情 | `id` | `HarnessDetailView` | `NotFoundError` | `HarnessRead.get` + `ToolRead.listByHarness` + `SchedulerPresenceRead.presence`（派生状态） |
 | `listTools` | 工具列表 | `ToolQuery` | `Page<ToolListItem>` | `ValidationError` | `ToolRead.list` + `HarnessRead.get` + `ExpertRead.listExpertsUsingTool` |
 | `getTool` | 工具详情 | `id` | `ToolDetailView` | `NotFoundError` | `ToolRead.get` + `HarnessRead.get` + `ExpertRead.listExpertsUsingTool` |
 | `listToolsByHarness` | Harness 下工具引用 | `harnessId` | `Reference[]` | 无 | `ToolRead.listByHarness` |
@@ -228,7 +229,7 @@ type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
 
 | 投影 | 来源 |
 |---|---|
-| Harness 列表/详情 | `HarnessRead` + `ToolRead.listByHarness` |
+| Harness 列表/详情 | `HarnessRead` + `ToolRead.listByHarness` + `SchedulerPresenceRead.presence`（派生 `health`/`lastHeartbeatAt`） |
 | 工具列表/详情 | `ToolRead` + `HarnessRead.get`（名称）+ `ExpertRead.listExpertsUsingTool` |
 | Skill 列表/详情 | `SkillRead`（列表摘要含 `description`；详情含 `body`/`files`）+ `ExpertRead.listExpertsUsingSkill` |
 | Skill 编排文档 | `SkillRead.getDocument`（原样透传；不做跨资产组合） |
@@ -245,13 +246,14 @@ type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
 
 ## 5 依赖与边界
 
-- 允许：`harness`、`tool`、`skill`、`expert`、`workflow` 的公开读契约；`kernel` 的错误、分页、`ReferenceGuard` 契约。
+- 允许：`harness`、`tool`、`skill`、`expert`、`workflow` 的公开读契约；`scheduler` 的 `SchedulerPresenceRead`（仅 Harness 派生状态）；`kernel` 的错误、分页、`ReferenceGuard` 契约。
 - 禁止：写服务、store、`Bun.sql`、HTTP 类型、其他组件的内部类型。
 - `http-gateway` 只调用本组件的读契约与领域写服务，不直接导入领域 store。
 
 ## 6 验证
 
 - 组合：每个列表/详情字段完整；跨组件名称/计数正确；空集合返回空数组而非 `null`。
+- 节点状态：Harness 列表/详情的 `health`/`lastHeartbeatAt` 按 `SchedulerPresenceRead` 派生四类值（`unknown`/`online`/`overloaded`/`offline`）；未绑定 `clientId` 的 Harness 恒为 `unknown`；presence 读失败时降级 `unknown` 并记 warning。
 - 引用：Harness 被工具引用、工具/Skill 被专家引用；删除前引用列表与详情一致。
 - 端口：`ReferenceGuard` 对 Harness/工具/Skill/专家分别返回正确引用；专家引用项 `type="workflow"`；无引用返回 `[]`。
 - 工作流：列表/详情透传；专家 `refCount` 与 `WorkflowRead.countByExperts` 一致。

@@ -122,6 +122,13 @@ type TaskError = {
 
 type ResultAck = { taskId: string; accepted: boolean };
 
+type ClientPresenceView = {
+  clientId: string;
+  lastPollAt: string | null;   // 最近一次 poll；从未 poll 为 null
+  free: number | null;         // 最近一次上报的可用槽位
+  running: number;             // 当前在跑任务数（dispatched 未结算）
+};
+
 type TaskSnapshot = {
   taskId: string;
   instanceId: string;
@@ -156,6 +163,11 @@ type SchedulerService = {
   /** 排障与验收读口；不进入对外 REST 契约。 */
   inspect(taskId: string): Promise<TaskSnapshot>;
 };
+
+/** 节点存在性读契约；供 catalog 派生节点在线状态（harness §3.3）。 */
+type SchedulerPresenceRead = {
+  presence(clientIds: string[]): Promise<ClientPresenceView[]>;
+};
 ```
 
 ### 3.2 方法契约
@@ -168,6 +180,7 @@ type SchedulerService = {
 | `requestStop` | 置位停止电平 | `clientId` | `void` | 无 | 幂等 |
 | `cancelInstances` | 取消实例任务 | `instanceIds` | `{requested}` | `ValidationError` | 幂等；按实例去重 |
 | `inspect` | 读任务快照 | `taskId` | `TaskSnapshot` | `TaskNotFoundError` | 只读 |
+| `presence` | 读 client 观测 | `clientIds[]` | `ClientPresenceView[]` | `DatabaseUnavailableError` | 只读；未观测过的 client 返回 `lastPollAt=null`、`free=null`、`running=0` |
 
 - 错误类型定义在 [`CMP-kernel`](../kernel/spec.md)；`TaskNotFoundError` 对应 `404 task_not_found`，与「任务不存在」同义，用于 `P-02` 与未知 `taskId`。
 - `enqueue` 与 `poll` 的入参使用领域类型，不出现 HTTP 头、协议版本或 DTO 字段名；`CMP-http-gateway` 负责映射。
@@ -274,18 +287,34 @@ type SkillSet = { digest: string; packages: SkillPackageRef[] };
 - 实例首次派发时绑定 `clientId`（以 `CMP-instance` 登记为准），之后该实例的任务只发给该 client；`S-02` 的重派不跨 client。跨 client 改派需要运维在 `CMP-instance` 显式改绑（另立管理面，当前不做）。
 - `inspect` 只读任务快照，供排障、验收与后续只读面使用；`executor-http-v2` §12.4 的只读状态端点仍未定，不在本组件新增对外端点。
 
+### 4.8 节点可用性与派发门禁
+
+派发新任务前依次判定：
+
+1. 实例可用：`InstanceService.isDispatchable(instanceId, clientId)`（实例 `active` 且绑定该 client）。
+2. 节点可用：`NodeDirectory.isDispatchable(clientId)`（`CMP-harness` 中已绑定该 `clientId` 且 `enabled`）。
+3. 任一不满足 → 不派发，任务留在 `queued`；不报错、不消耗 `attempt`。
+
+- **节点停用（`enabled=false`）**：不派发新任务；在跑任务继续跑完；不向 client 下发 `stop`（`stop` 只由 `requestStop` 触发）。与实例 `blocked` 的区别：`blocked` 是执行失败兜底，会把同实例任务结算为失败；停用是管理员意图，只停止新增派发。
+- **启动交集校验**：组合根取 `Config.executorClients`（token → `clientId`）与 `NodeDirectory.listClientIds()` 求交；只有交集内的 `clientId` 能通过鉴权并被派发。
+  - 有 token 无节点（或节点停用）：鉴权通过，但**不派发**（空批、不消耗 `attempt`），启动时记一条 warning；不返回 `401`，避免 client 因管理动作被踢下线。
+  - 未知 token：`401 unauthorized`（client 停止并退出，契约 §4.1）。
+  - 有节点无 token：无法认证，不派发。
+  - 校验不在启动期读库阻断（节点目录允许后补），失败只记日志。
+- **presence 读**：`SchedulerPresenceRead.presence` 返回最近 poll 时间、最近上报 `free` 与在跑数；`catalog` 按 [`CMP-harness` §3.3](../harness/spec.md) 的口径派生在线状态。presence 是进程内观测，调度器重启后到首次 poll 前为 `null`（展示为 `unknown`）。
+
 ## 5 依赖与边界
 
 允许依赖：
 
 - `CMP-instance` 的读契约（`get` / `isDispatchable` / 绑定信息）；
-- `CMP-kernel` 的 `SkillPackageSource` 端口（冻结技能集时解析包引用）、`Clock`、`IdGenerator`、错误类型、分页类型；
+- `CMP-kernel` 的 `SkillPackageSource` 端口（冻结技能集时解析包引用）、`NodeDirectory` 端口（派发前校验节点可用）、`Clock`、`IdGenerator`、错误类型、分页类型；
 - `CMP-platform` 的 `Db`（事务与查询）。
 
 禁止依赖：
 
 - `CMP-http-gateway`、`CMP-catalog`、写服务；在组件内拼 HTTP 响应或 DTO；
-- 直接读写 `instance` 表、`skill` 表或存储根；调用 client（调度器不发起任何执行面 HTTP 请求）；
+- 直接读写 `instance` 表、`harness` 表、`skill` 表或存储根；调用 client（调度器不发起任何执行面 HTTP 请求）；
 - 编排/工作流组件；fan-out 规划与 prompt 组装。
 
 组合根注入：`SchedulerService` 由入口创建，注入 `Db`、`InstanceService`、`SkillPackageSource` 实现与 `Config` 的执行面参数；`http-gateway` 只调用公开方法。
@@ -304,6 +333,8 @@ type SkillSet = { digest: string; packages: SkillPackageRef[] };
 | `S-08` | 首份 `accepted=true`、第二份 `accepted=false`；未知 `taskId` → `TaskNotFoundError`；旧副本先到结果被接受 |
 | 重试策略 | 上表每类 `status`/`class`/`code` 各一例；`taskMaxAttempts` 用尽后 `done(failed)`；退避期不派发 |
 | 控制 | `stop` 后 `tasks` 为空且 `stop=true`；取消后 `cancelInstances` 持续到结算；重复请求幂等 |
+| 节点门禁 | 节点未绑定/停用 → 不派发且 `attempt` 不变；节点恢复后继续派发；在跑任务在停用后仍完成 |
+| presence | 未 poll 过返回 `null`；poll 后返回时间、`free`、在跑数；重启后回到 `null` 直到首次 poll |
 | 长轮询 | 无任务挂起到 `holdMs` 返回空；`enqueue` 唤醒等待者；`nextPollAfterMs=0` |
 | 架构 | 只依赖 `instance` 读契约、`kernel`、`platform`；无 HTTP 类型；无跨组件 store 导入 |
 

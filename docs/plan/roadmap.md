@@ -26,7 +26,7 @@ updated: 2026-11-10
 | 工序 | 级别 | 范围 | 状态 |
 |---|---|---|---|
 | [`2026-11-10-scheduler-layer-design`](../works/2026-11-10-scheduler-layer-design/brief.md) | P1 | 按 `executor-http-v2` 定调度器侧组件切分、执行面场景与组件规格；不写实现 | 设计已落盘，待用户最终确认（P1 人工门） |
-| [`2026-11-10-harness-node-registry`](../works/2026-11-10-harness-node-registry/brief.md) | P2 | Harness 作为 client 节点目录（方向 A）：8 个子决策的方案对比、推荐组合与分期；本轮不落规格 | 方案对比已落盘，待用户选择子决策 |
+| [`2026-11-10-harness-node-registry`](../works/2026-11-10-harness-node-registry/brief.md) | P2 | Harness 作为 client 节点目录（方向 A）：方案对比 + 第一期组件规格增量、`SCN-0206`、决策记录；不写实现 | 设计已落盘，待 P2 最终确认后立实现工序 |
 - M2 只产出裁定与规格，不写实现代码；M2 是 P1，人参与切分与契约评审后才可编码。
 - 无用户旅程的技术债 / 文档活走旁路，不进 `requirements/`。
 - B1 是基础设施工序（无 UI 改动；UI 为独立项目），按旁路处理，不建 `REQ`/`SCN`，`brief.md` 为锚点；追溯方式已在 `implementation-plan.md` §9 落为默认旁路。

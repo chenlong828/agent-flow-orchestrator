@@ -138,6 +138,13 @@ enroll ──▶ active ──block──▶ blocked ──unblock──▶ acti
 | `S-06` 同容器技能集一致 | 由 `CMP-scheduler` 按 `instanceId` 聚合同实例在飞任务得出，本组件不存 digest |
 | 实例不可用（`OQ-21`） | 契约仍无上报载体；本组件 `blocked` 是调度器侧兜底，恢复由运维触发 |
 
+### 4.4 节点停用与实例回收
+
+- 节点（Harness）`enabled=false` **不改变实例状态**：实例仍 `active`，只是调度器不再往该 client 派发新任务；在跑任务继续。
+- 回收顺序（运维）：停用节点 → 经调度器取消该 client 在跑实例的任务、结算排队任务 → `instance.retire` → 按 `instanceId` 回收工作区。实例不主动感知节点，避免 `instance → harness` 的同层读依赖。
+- 节点解绑（`unbindClient`）与停用同等：不派发；实例保留，等节点重新绑定后恢复。
+- 实例与节点的关联只靠 `clientId`：`listByClient` 是回收时反查实例的入口。
+
 ## 5 依赖与边界
 
 允许依赖：

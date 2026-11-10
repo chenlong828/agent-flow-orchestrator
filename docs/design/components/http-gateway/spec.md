@@ -95,6 +95,7 @@ updated: 2026-11-10
 | 400 | `validation_error` | 字段缺失/类型错误/枚举非法/范围越界/请求体未知字段/路径非法/`If-Match` 格式非法 |
 | 404 | `not_found` | 资源或引用目标不存在；草稿已清理 |
 | 409 | `name_conflict` | 名称大小写不敏感重复 |
+| 409 | `binding_conflict` | Harness 绑定执行节点时 `clientId` 已被其他 Harness 占用；`details.clientId` |
 | 409 | `revision_conflict` | `If-Match`/baseRevision 与当前 revision 不一致 |
 | 409 | `referenced` | 删除时仍有引用；`details.references` 非空 |
 | 409 | `file_conflict` | 草稿附件改名目标已存在；`details.path`、`newPath` |
@@ -115,7 +116,7 @@ updated: 2026-11-10
 
 ## 4 端点总表
 
-47 个产品业务端点（B1 37 个 + B3 工作流 10 个）；`/healthz` 单独列在 §4.2；执行面 3 个端点见 §4.3，不计入产品业务端点；开发者文档端点见 §4.4，不计入业务端点。
+48 个产品业务端点（B1 38 个 + B3 工作流 10 个）；`/healthz` 单独列在 §4.2；执行面 3 个端点见 §4.3，不计入产品业务端点；开发者文档端点见 §4.4，不计入业务端点。
 
 ### 4.1 业务端点
 
@@ -128,6 +129,7 @@ updated: 2026-11-10
 | `API-05` | PATCH | `/harnesses/{id}/enabled` | `UC-B1-01` | 启用/停用 | 200 详情 |
 | `API-06` | DELETE | `/harnesses/{id}` | `UC-B1-01` | 删除；被工具引用则 409 | 204 |
 | `API-07` | GET | `/harnesses/{id}/references` | `UC-B1-06` | 查询引用工具 | 200 引用页 |
+| `API-41` | PATCH | `/harnesses/{id}/client` | `UC-B1-01` | 绑定/解绑执行节点（`clientId`） | 200 详情 |
 | `API-08` | GET | `/tools` | `UC-B1-02` | 工具列表/检索 | 200 列表 |
 | `API-09` | GET | `/tools/{id}` | `UC-B1-02` | 工具详情 | 200 详情 |
 | `API-10` | POST | `/tools` | `UC-B1-02` | 创建工具 | 201 + Location |
@@ -241,8 +243,9 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 | `address` | string | 接入地址 |
 | `accessMode` | `agent` / `ssh` / `container_registry` | 接入方式 |
 | `enabled` | boolean | 启停 |
-| `health` | `unknown` / `online` / `offline` / `overloaded` | 运行时只读 |
-| `lastHeartbeatAt` | string \| null | 运行时只读 |
+| `health` | `unknown` / `online` / `offline` / `overloaded` | 派生只读：由 `catalog` 按调度器观测派生（`harness` §3.3） |
+| `lastHeartbeatAt` | string \| null | 派生只读：最近一次 poll 时间；从未 poll 为 `null` |
+| `clientId` | string \| null | 绑定的执行节点；`null` = 未登记；只经 `API-41` 修改 |
 | `concurrencyMax` | number | ≥1 |
 | `queuePolicy` | `fifo` / `priority` | 排队策略 |
 | `tags` | string[] | 能力标签，有序 |
@@ -269,6 +272,9 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 
 - `POST` 可带 `enabled`（默认 `true`）；`PUT` 不带 `enabled`，启停走 `API-05`。
 - `POST` 默认 `health=unknown`、`lastHeartbeatAt=null`；两者不可写。
+- `POST` / `PUT` **不接受 `clientId`**（未知字段 400）；绑定/解绑只走 `API-41`。
+
+**绑定/解绑请求 `HarnessClientBinding`**：`{clientId: string | null}`；`clientId` 非空时 1–64 字、不含空白与控制字符；`null` 表示解绑。成功返回 `HarnessDetail`（含派生状态）。
 
 ### 5.2 工具
 
@@ -583,6 +589,7 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 | `API-05` | `harness.setEnabled` + `catalog.getHarness` |
 | `API-06` | `harness.delete` |
 | `API-07` | `catalog.referencesForHarness` |
+| `API-41` | `harness.bindClient` / `harness.unbindClient` + `catalog.getHarness` |
 | `API-08` | `catalog.listTools` |
 | `API-09` | `catalog.getTool` |
 | `API-10` | `tool.create` + `catalog.getTool` |
@@ -696,6 +703,7 @@ B1/B3 不提供的页面动作：Harness 连接测试/心跳刷新、工具调�
 - Skill 草稿：建草稿（空/已有）、文件清单顺序、上传/覆盖/改名/删除、`SKILL.md` 保留、路径穿越、TTL 过期、取消、多草稿并存。
 - Skill 保存：新建/更新、`If-Match` 缺失/非法/旧值、名称冲突、版本进位、`SKILL.md` 超限、文件/总量超限、打包失败、数据库失败、成功后草稿 404。
 - 删除：Harness 被工具引用、工具/Skill 被专家引用、专家被工作流引用；无引用 204。
+- 节点目录：绑定成功回读 `clientId`；同 `clientId` 被第二个 Harness 绑定 409 `binding_conflict`；解绑幂等；缺 `If-Match` 428；`POST`/`PUT` 带 `clientId` 返回 400。
 - 装配：重复目标、目标不存在、旧 `revision`、顺序回读；聚合保存的省略/替换/清空语义。
 - 工作流：列表/详情、复制后缀、图保存/校验、DSL JSON/YAML、导入缺失专家、revision 冲突、validate 404。
 - 契约快照：响应字段集合与 DTO 表一致；新增字段必须更新本文。
@@ -713,7 +721,8 @@ B1/B3 不提供的页面动作：Harness 连接测试/心跳刷新、工具调�
 
 - 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 36 KB；OpenAPI 运行时资产约 85 KB、Swagger UI 静态资源约 2.14 MB，均单独计量，不计入组件预算。
 - 单独验证命令：`bun test tests/components/http-gateway`。
-- 文档入口：启动后访问 `/docs`；机器可读契约：`/openapi.yaml`。OpenAPI 资产随组件发布，覆盖 47 个业务 operation 与 Skill 包/草稿、工作流定义 DTO。
+- 文档入口：启动后访问 `/docs`；机器可读契约：`/openapi.yaml`。OpenAPI 资产随组件发布，覆盖 48 个业务 operation 与 Skill 包/草稿、工作流定义 DTO。
+- `API-41`（Harness 节点绑定）与 Harness 派生态状态为 2026-11-10 节点目录设计新增，**尚未实现**；实现时直接改基线表结构，不做数据迁移（演示数据可丢弃）。
 - 执行面 3 个端点（`EXE-01`–`EXE-03`）为 2026-11-10 调度层设计新增，**尚未实现**；实现工序随 `CMP-scheduler`/`CMP-instance` 落地，落地前执行面路由不存在、产品端点行为不变。
 - 当前状态：`current`；B1 资产端点与 B3 工作流定义端点均已实现，运行时 OpenAPI 为 31 个 path、48 个 operation（含 `/healthz`）；B3 验证记录见 [工作流工序 result.md](../../../history/works/2026-10-28-workflow-definition/result.md)。
 

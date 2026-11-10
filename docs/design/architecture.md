@@ -16,7 +16,7 @@ updated: 2026-11-10
 2. 外部契约只有 **REST API `/api/v1`**；本仓库不提供 CLI、库或产品 UI。UI 是独立项目，若接入只按契约调用；双方互不进入对方项目改代码。Swagger UI 仅作为开发者文档，不是产品界面。
 3. 内部契约按同一原则逐层收窄：函数/类 → 组件 → 模块 → 进程/项目；每层只通过公开契约交互，不越过边界读写对方内部。
 4. 每个组件只有一个主目标；数据只有一个写入口；读模型通过公开读契约组合。
-5. 37 个 B1 业务端点 + 10 个 B3 工作流端点 = 47 个产品业务端点；执行面另有 3 个端点（`/api/v1/executor/*`，`planned`，不计入产品端点）；另有 `/healthz` 与开发者文档端点 `/docs`、`/docs/*`、`/openapi.yaml`，不计入业务端点。
+5. 38 个 B1 业务端点 + 10 个 B3 工作流端点 = 48 个产品业务端点；执行面另有 3 个端点（`/api/v1/executor/*`，`planned`，不计入产品端点）；另有 `/healthz` 与开发者文档端点 `/docs`、`/docs/*`、`/openapi.yaml`，不计入业务端点。
 
 ## 2 契约边界原则
 
@@ -51,18 +51,19 @@ updated: 2026-11-10
 | `CMP-kernel` | 定义共享错误、分页、引用检查端口、时钟/ID 端口与文件存储端口 | 无 | 无 |
 | `CMP-config` | 合并 TOML 与进程环境，校验并产出启动 `Config`（含存储根/TTL） | 无 | Bun TOML、文件系统 |
 | `CMP-platform` | 提供数据库连接/事务、迁移、ID/时钟实现、健康检查、测试库与文件存储适配 | `schema_migrations`；存储根适配（无业务语义） | `kernel`、Bun、PostgreSQL |
-| `CMP-harness` | 维护 Harness 聚合的生命周期、标签与不变量 | `harness`、`harness_tag` | `platform`、`kernel` |
+| `CMP-harness` | 维护 Harness 聚合的生命周期、标签与不变量；作为执行节点目录（`client_id` 绑定、`NodeDirectory` 端口实现） | `harness`、`harness_tag` | `platform`、`kernel` |
 | `CMP-tool` | 维护工具聚合、参数与 Harness 归属 | `tool`、`tool_param` | `platform`、`kernel` |
 | `CMP-skill` | 维护 Skill brief、包指针、草稿生命周期、`SKILL.md` 与整包读取 | `skill_category`（只读种子）、`skill`、`skill_tag`、`skill_draft`；`packages/`、`drafts/` | `platform`、`kernel` |
 | `CMP-expert` | 维护专家聚合、五区、有序装配与引用 | `expert`、`expert_persona`、`expert_skill`、`expert_tool`、`expert_ref` | `platform`、`kernel` |
 | `CMP-workflow` | 维护工作流聚合、唯一当前定义、图校验与专家引用投影 | `workflow`、`workflow_definition`、`workflow_expert_ref` | `platform`、`kernel` |
-| `CMP-catalog` | 组合跨资产的列表/详情/文档/整包/引用只读投影，并实现 `ReferenceGuard` | 无 | 四类资产与工作流的公开读契约、`kernel` |
+| `CMP-catalog` | 组合跨资产的列表/详情/文档/整包/引用只读投影，并实现 `ReferenceGuard`；Harness 节点状态按调度器 presence 派生 | 无 | 四类资产与工作流的公开读契约、`scheduler` 的 presence 读、`kernel` |
 | `CMP-scheduler` | 维护执行面任务列表（`queued`/`dispatched`/`done`）、派发裁决、重派与结果接受 | `task`、`task_attempt` | `instance`（读）、`kernel`（`SkillPackageSource` 端口）、`platform` |
 | `CMP-instance` | 维护执行实例：工作区路径、client 绑定与可用性状态 | `instance` | `platform`、`kernel` |
 | `CMP-http-gateway` | 把 HTTP 请求翻译为用例调用、映射 DTO/错误，处理 multipart/下载，并托管开发者 API 文档；含执行面 `executor` 路由 | 无 | `catalog`、四类资产与工作流写服务、`scheduler`、`kernel`（`SkillPackageSource` 端口）、`platform`（健康检查）、Bun HTTP/流 API |
 
 - `CMP-scheduler` 与 `CMP-instance` 是执行面组件，状态 `planned`（2026-11-10 设计定稿，未实现）；其余 10 个组件状态 `current`。
 - 执行面端点 `EXE-01`–`EXE-03` 由 `CMP-http-gateway` 承载，契约权威是 [`contracts/executor-http-v2.md`](contracts/executor-http-v2.md)；组件落点见 [`components/scheduler/spec.md`](components/scheduler/spec.md) 与 [`components/instance/spec.md`](components/instance/spec.md)。
+- 节点目录（Harness 绑定 `clientId`、`NodeDirectory` 端口、Harness 派生在线状态）见 [`components/harness/spec.md`](components/harness/spec.md) §3.3、[`components/catalog/spec.md`](components/catalog/spec.md) §4。
 
 组件 ID 与目录：`CMP-*` 对应 `docs/design/components/<short-name>/spec.md`；任务表可用去掉 `CMP-` 的简称。`kernel`、`config`、`platform` 是三个独立组件；物理目录可用 `src/core/{kernel,config,platform}` 收口，但 `core` 只是容器，不是组件。
 
@@ -83,7 +84,7 @@ http-gateway
 scheduler
   ├── instance                  （读：get / isDispatchable / listDispatchable）
   ├── platform                  （Db、Clock、ID 实现）
-  └── kernel                    （SkillPackageSource 端口、错误类型）
+  └── kernel                    （SkillPackageSource 端口、NodeDirectory 端口、错误类型）
 
 instance
   ├── platform                  （Db、Clock、ID 实现）
@@ -91,6 +92,7 @@ instance
 
 catalog
   ├── harness / tool / skill / expert / workflow（公开读）
+  ├── scheduler                 （读：presence，用于 Harness 派生节点状态）
   └── kernel                    （Reference、错误、分页）
 
 harness / tool / expert / workflow
@@ -111,10 +113,12 @@ config
   └── 无外部依赖（Bun TOML/文件 API）
 ```
 
-- 依赖方向只能向下：`http-gateway` → `catalog`/领域写服务/`scheduler`/`platform`（健康检查）/`kernel`；`scheduler` → `instance`（读契约）/`platform`/`kernel`；`instance` → `platform`/`kernel`；`catalog` → 领域读契约/`kernel`；领域 → `platform`/`kernel`；`platform` → `kernel`；`main`/脚本 → `config`/`platform`；`config`/`kernel` → 无外部依赖。
+- 依赖方向只能向下：`http-gateway` → `catalog`/领域写服务/`scheduler`/`platform`（健康检查）/`kernel`；`scheduler` → `instance`（读契约）/`platform`/`kernel`；`instance` → `platform`/`kernel`；`catalog` → 领域读契约/`scheduler`（presence 读）/`kernel`；领域 → `platform`/`kernel`；`platform` → `kernel`；`main`/脚本 → `config`/`platform`；`config`/`kernel` → 无外部依赖。
 - 禁止：领域组件互相导入写服务或 store；`http-gateway` 直接导入 store 或 `FileStore`；`catalog` 直接写表；循环依赖；同层横向写调用；`scheduler`/`instance` 互相写对方表；`instance` 导入 `scheduler`。
 - `scheduler` 只在读侧依赖 `instance`：取 `workspacePath`、判定可派发、实例失败时 `block`；`instance` 不知道任务与派发。
 - `ReferenceGuard` 端口定义在 `kernel`，`catalog` 实现；领域删除服务只依赖端口，不依赖 `catalog` 类型。组合根负责注入。
+- `NodeDirectory` 端口定义在 `kernel`，`harness` 实现；`scheduler` 派发前只依赖端口。`catalog` 通过 `scheduler` 的 presence 读派生 Harness 在线状态，`harness` 不感知 `scheduler`。
+- Harness 的 `client_id` 是执行节点绑定（可空、唯一），是节点目录的唯一写入口（`bindClient`/`unbindClient`）；`health`/`last_heartbeat_at` 列保留但不再作为权威。
 - `FileStore` 端口定义在 `kernel`，`platform` 实现；`skill` 只依赖端口，不直接使用 Bun 文件 API；组合根把存储根与适配器注入 `skill`。
 - `catalog` 不拥有表，不执行写操作；只通过领域公开读契约读数据。
 - `http-gateway` 不执行 SQL，不实现业务规则；只校验传输层形状、调用契约、映射错误；multipart 只解析传输，不解释包结构；文档子模块只读本地静态资源，不新增依赖边。
@@ -127,7 +131,7 @@ config
 | `CMP-kernel` | 无 | 无，只定义类型与端口 |
 | `CMP-config` | 无 | 无，只持有启动配置 |
 | `CMP-platform` | `schema_migrations`；文件存储适配（无业务语义） | 迁移执行器；存储适配器 |
-| `CMP-harness` | `harness`、`harness_tag` | Harness 服务 |
+| `CMP-harness` | `harness`（含节点绑定 `client_id`）、`harness_tag` | Harness 服务（含 `bindClient`/`unbindClient`） |
 | `CMP-tool` | `tool`、`tool_param` | 工具服务 |
 | `CMP-skill` | `skill_category`（种子只读）、`skill`、`skill_tag`、`skill_draft`；`packages/`、`drafts/` | Skill 服务 |
 | `CMP-expert` | `expert`、`expert_persona`、`expert_skill`、`expert_tool`、`expert_ref` | 专家服务 |
@@ -145,7 +149,7 @@ config
 ## 6 外部 REST 契约
 
 - 基础路径：`/api/v1`；健康检查：`/healthz`（不在 `/api/v1` 下）。
-- 47 个产品业务端点：B1 37 个（Harness 7、工具 6、Skill 15、专家 9）+ B3 工作流 10 个；执行面另有 3 个端点（`EXE-01`–`EXE-03`，`planned`），不计入产品端点，语义权威为 [`contracts/executor-http-v2.md`](contracts/executor-http-v2.md)。
+- 48 个产品业务端点：B1 38 个（Harness 8、工具 6、Skill 15、专家 9）+ B3 工作流 10 个；执行面另有 3 个端点（`EXE-01`–`EXE-03`，`planned`），不计入产品端点，语义权威为 [`contracts/executor-http-v2.md`](contracts/executor-http-v2.md)。
 - 开发者文档：Swagger UI `/docs`、静态资源 `/docs/*`、OpenAPI `/openapi.yaml`；OpenAPI 资产由 `CMP-http-gateway` 直接提供，不在 `docs/` 维护设计副本；不计入业务端点，不写入 OpenAPI `paths`。
 - 契约明细：方法、路径、查询参数、请求/响应 DTO、错误码、并发头、删除引用列表，全部在 [`components/http-gateway/spec.md`](components/http-gateway/spec.md)。
 - 外部 UI 页面映射（参考）：Harness 页、工具页、Skill 页、专家页、工作流页；本仓库无 Key/工作区/实例/看板端点。
@@ -181,7 +185,7 @@ config
 ## 10 实施状态
 
 - 当前 10 个 `current` 组件 + 2 个 `planned` 组件（`CMP-scheduler`、`CMP-instance`）、16 张表（执行面表未建）、1 个只向前基线迁移（`0001_baseline.sql`）；REST 47 个产品业务端点 + `/healthz`；执行面 3 个端点待实现。
-- B1 资产注册中心与 B3 工作流定义已实现并通过验证；执行面调度层（`executor-http-v2` 的 `P-01`–`P-03` + `S-01`–`S-08`）已设计完成、未实现；B2 Key/工作区、B4 实例/看板、ACP 执行模型未实现。
+- B1 资产注册中心与 B3 工作流定义已实现并通过验证；节点目录（`API-41` + `harness.client_id` + 派生状态）已设计、未实现；执行面调度层（`executor-http-v2` 的 `P-01`–`P-03` + `S-01`–`S-08`）已设计完成、未实现；B2 Key/工作区、B4 实例/看板、ACP 执行模型未实现。
 - Skill 包形态 v2 已落地：草稿/保存/下载与 `GET /skills/{id}/document`；不再提供 `POST /skills`、`PUT /skills/{id}`。
 - `ReferenceGuard` 按端口方案实现：端口在 `kernel`，由 `catalog` 实现，领域删除服务经组合根注入。
 - 组件状态均为 `current`；历史实现见 [`result.md`](../history/works/2026-10-24-db-backend-infra/result.md)（归档件，仅作追溯）。

@@ -32,16 +32,16 @@ level: P2
 
 | 交付物 | 状态 |
 |---|---|
-| [`node-registry-options.md`](node-registry-options.md)：8 个子决策的选项、代价、推荐与影响面 | 本轮 |
-| 子决策确认后：组件规格增量（harness/instance/scheduler/config）、迁移方案、场景卡 | 下一轮 |
-| 决策记录（落 `history/decisions/`） | 确认后 |
+| [`node-registry-options.md`](node-registry-options.md)：8 个子决策的选项、代价、推荐与影响面 | 完成（推荐组合已采纳） |
+| 组件规格增量（harness/kernel/catalog/scheduler/instance/http-gateway/architecture）、场景 `SCN-0206`、决策记录 | 完成 |
+| 决策记录（落 `history/decisions/`） | 完成 |
 
 ## 4 任务表
 
 | ID | 类型 | 组件 | 状态 | 出口 |
 |---|---|---|---|---|
 | `T-NODE-01` | design | `CMP-harness`、`CMP-instance`、`CMP-scheduler`、`CMP-config` | 进行中 | 子决策对比与推荐组合 |
-| `T-NODE-02` | design | 同上 | 待确认 | 按用户选择落组件规格增量与迁移方案 |
+| `T-NODE-02` | design | 同上 | 完成 | 按用户选择落组件规格增量、场景与决策记录；无迁移（演示数据） |
 | `T-NODE-03` | change | 同上 | 待排 | 实现（P2；若引入调度器写 Harness 则升 P1） |
 
 ## 5 验收标准（本轮）
@@ -51,6 +51,7 @@ level: P2
 3. 「在线状态」有明确的数据所有权与推导口径，不出现第二真相。
 4. 迁移与兼容影响（表、DTO、OpenAPI、UI 消费）写清；不做的事写清。
 
-## 6 待确认
+## 6 裁决
 
-`node-registry-options.md` §4 的推荐组合（`N-01`–`N-08`），以及是否分期（先字段与派发校验、后凭据轮换与容量告警）。
+- 2026-11-10 用户采纳 `node-registry-options.md` §4 推荐组合（`N-01`–`N-08`），只做第一期；**不做迁移**（内部为演示数据，可丢弃，直接改基线）。
+- 设计落点见 [`result.md`](result.md) §3；实现工序 `T-NODE-03` 待 P2 最终确认后另立。
