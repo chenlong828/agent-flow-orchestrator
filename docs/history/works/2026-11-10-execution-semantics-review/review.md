@@ -150,7 +150,7 @@ Q1–Q8 的逐条答复见 §3。其中 Q1、Q6、Q7 直接采纳；Q2、Q3 采�
 
 **调度器侧行为（机械，无新概念）**
 
-1. 记每实例的在飞 attempt 数；`claim` 只在 `inFlight < maxConcurrentPerInstance` 时派发，不超卖（`SCH-16` 已有此要求，只是单位从「实例」换成「槽」）。
+1. 记每个实例已下发未结算的 attempt 数；`claim` 只在 `inFlight < maxConcurrentPerInstance` 时派发，不超卖（`SCH-16` 已有此要求，只是单位从「实例」换成「槽」）。
 2. 槽位在 attempt 终态（`settled` 上报成功、`late_result`、租约过期）时释放。释放规则与现有租约生命周期一致，不需要新状态。
 3. 不关心 attempt 写什么、写到哪；不做写域校验，也不下发分支路径。
 
