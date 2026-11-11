@@ -35,7 +35,7 @@ decision: 2026-11-10-executor-client-token
 - `harness` 表：+`client_token`（可空唯一）+ 表级 check；`client_id`、`client_token` 两个唯一索引。
 - `CMP-harness`：`bindClient` 输入扩为 `{clientId, token}`；`HarnessSummary.clientId`、`HarnessDetail.clientToken`；实现 `ExecutorAuthenticator`。
 - `CMP-kernel`：+`ExecutorAuthenticator` 端口；`binding_conflict` 语义扩到节点登记。
-- `CMP-http-gateway`：`API-41` 请求体加 `token`；`HarnessDetail` 加 `clientToken`；产品端点 48 → 49；`openapi.yaml` 同步。
+- `CMP-http-gateway`：`API-41` 请求体加 `token`；`HarnessDetail` 加 `clientToken`；产品端点 47 → 48（`API-41` 落地），`openapi.yaml` operation 48 → 49（含 `/healthz`）、`x-api-count` 47 → 48。
 - `CMP-config`：删除 `executorClients`；`[executor]` 只留重试参数。
 - `CMP-scheduler`：鉴权改走 `ExecutorAuthenticator`，删除启动交集校验。
 - 场景 `SCN-0206` 增补登记/轮换/解绑与 `401` 失败路径；`OQ-23` 关闭。

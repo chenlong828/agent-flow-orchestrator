@@ -49,7 +49,7 @@ bun run quality:report                                     # 违规统计
 | 凭据不再走配置 | [`config/spec.md`](../../design/components/config/spec.md) §3.1–§3.2、§7 |
 | 鉴权改走 `ExecutorAuthenticator`、删除启动交集 | [`scheduler/spec.md`](../../design/components/scheduler/spec.md) §4.8、§5 |
 | 登记/轮换/解绑与 401 路径 | [`SCN-0206`](../../design/scenarios/workflow-orchestration/execution-scheduling/executor-node-registry/scenario.md) |
-| 端点计数 49、实施状态 | [`architecture.md`](../../design/architecture.md) §1、§6、§10 |
+| 端点计数 48、实施状态 | [`architecture.md`](../../design/architecture.md) §1、§6、§10 |
 | 凭据落库决策、风险与复试条件 | [`2026-11-10-executor-client-token.md`](../../history/decisions/2026-11-10-executor-client-token.md) |
 
 ## 4 未完成与待办

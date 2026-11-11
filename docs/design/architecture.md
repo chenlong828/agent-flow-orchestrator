@@ -16,7 +16,7 @@ updated: 2026-11-11
 2. 外部契约只有 **REST API `/api/v1`**；本仓库不提供 CLI、库或产品 UI。UI 是独立项目，若接入只按契约调用；双方互不进入对方项目改代码。Swagger UI 仅作为开发者文档，不是产品界面。
 3. 内部契约按同一原则逐层收窄：函数/类 → 组件 → 模块 → 进程/项目；每层只通过公开契约交互，不越过边界读写对方内部。
 4. 每个组件只有一个主目标；数据只有一个写入口；读模型通过公开读契约组合。
-5. 39 个 B1 业务端点 + 10 个 B3 工作流端点 = 49 个产品业务端点；执行面另有 3 个端点（`/api/v1/executor/*`，已实现，不计入产品端点）；另有 `/healthz` 与开发者文档端点 `/docs`、`/docs/*`、`/openapi.yaml`，不计入业务端点。
+5. 38 个 B1 业务端点 + 10 个 B3 工作流端点 = 48 个产品业务端点；执行面另有 3 个端点（`/api/v1/executor/*`，已实现，不计入产品端点）；另有 `/healthz` 与开发者文档端点 `/docs`、`/docs/*`、`/openapi.yaml`，不计入业务端点。
 
 ## 2 契约边界原则
 
@@ -149,7 +149,7 @@ config
 ## 6 外部 REST 契约
 
 - 基础路径：`/api/v1`；健康检查：`/healthz`（不在 `/api/v1` 下）。
-- 49 个产品业务端点：B1 39 个（Harness 9、工具 6、Skill 15、专家 9）+ B3 工作流 10 个；执行面另有 3 个端点（`EXE-01`–`EXE-03`，已实现），不计入产品端点，语义权威为 [`contracts/executor-http-v2.md`](contracts/executor-http-v2.md)。
+- 48 个产品业务端点：B1 38 个（Harness 8、工具 6、Skill 15、专家 9）+ B3 工作流 10 个；执行面另有 3 个端点（`EXE-01`–`EXE-03`，已实现），不计入产品端点，语义权威为 [`contracts/executor-http-v2.md`](contracts/executor-http-v2.md)。
 - 开发者文档：Swagger UI `/docs`、静态资源 `/docs/*`、OpenAPI `/openapi.yaml`；OpenAPI 资产由 `CMP-http-gateway` 直接提供，不在 `docs/` 维护设计副本；不计入业务端点，不写入 OpenAPI `paths`。
 - 契约明细：方法、路径、查询参数、请求/响应 DTO、错误码、并发头、删除引用列表，全部在 [`components/http-gateway/spec.md`](components/http-gateway/spec.md)。
 - 外部 UI 页面映射（参考）：Harness 页、工具页、Skill 页、专家页、工作流页；本仓库无 Key/工作区/实例/看板端点。
@@ -184,7 +184,7 @@ config
 
 ## 10 实施状态
 
-- 当前 12 个 `active` 组件、19 张表、1 个只向前基线迁移（`0001_baseline.sql`）；REST 49 个产品业务端点 + `/healthz`；执行面 3 个端点已实现。
+- 当前 12 个 `active` 组件、19 张表、1 个只向前基线迁移（`0001_baseline.sql`）；REST 48 个产品业务端点 + `/healthz`；执行面 3 个端点已实现。
 - B1 资产注册中心与 B3 工作流定义已实现并通过验证；节点目录（`API-41` + `client_id`/`client_token` + `NodeDirectory`/`ExecutorAuthenticator` + 派生 `health`/`lastHeartbeatAt`）与执行面调度层（`P-01`–`P-03` + `S-01`–`S-08`）已实现；B2 Key/工作区、B4 实例/看板、ACP 执行模型未实现。
 - Skill 包形态 v2 已落地：草稿/保存/下载与 `GET /skills/{id}/document`；不再提供 `POST /skills`、`PUT /skills/{id}`。
 - `ReferenceGuard` 按端口方案实现：端口在 `kernel`，由 `catalog` 实现，领域删除服务经组合根注入。

@@ -17,7 +17,7 @@ level: P2
 
 - `agent-flow-client` 只调执行面三端点：`POST /api/v1/executor/poll`、`POST /api/v1/executor/tasks/{taskId}/result`、`GET /api/v1/executor/skill-packages/{packageId}`；
 - 本仓库已实现的 Harness 接口（`API-01`–`API-07`、`API-41`）是**管理面**，client 不会调用；两边的连接点只有一个：`API-41` 登记的 `clientId` + token，client 用同一枚 token 去调执行面三端点；
-- 执行面三端点（`EXE-01`–`EXE-03`）在本仓库**尚未实现**（`CMP-scheduler`/`CMP-instance` 为 `planned`），因此「登记 → poll → 执行 → 回报」的完整联调目前无法进行。
+- 执行面三端点（`EXE-01`–`EXE-03`）已于 `92135de` 实现（`CMP-scheduler`/`CMP-instance` 转 `active`），写计划时仍为 `planned`；实测见 [`result.md`](result.md)。
 
 现状基线（2026-11-11 实测，`3100` 端口）：
 
@@ -132,7 +132,7 @@ bun run src/cli.ts serve --config .config --log-level debug
 
 | 风险 | 影响 | 处理 |
 |---|---|---|
-| 执行面三端点未实现 | 联调只能到「连通性基线」；`serve` 会 400 退出 | 等调度层 P1 确认后立实现工序 |
+| 执行面三端点 | ~~未实现~~ 已实现（`92135de`）；联调按 `result.md` 实测执行 | `T-JD-02` 完成 |
 | 任务注入无正式入口（`OQ-22`/`OQ-24`） | 联调必须依赖开发脚本 | 本轮不新增端点；脚本放工序目录 |
 | 模型端点与凭据 | 真实执行需要可用 LLM 端点与额度，凭据不能入库 | 由用户在本机环境提供；联调用最小 prompt |
 | DSH 入口不在 PATH | client `serve` 起不来 | 用 `DSH_BIN` 指向本机构建；版本 `0.2.2-alpha.2` |

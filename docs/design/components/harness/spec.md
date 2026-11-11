@@ -197,5 +197,5 @@ Harness 是执行节点目录：`client_id` 绑定 `CMP-instance` 里实例所�
 
 - 保留 `health=overloaded` 枚举，用于外部界面的「高负载」展示；该值由派生口径产出，不由本组件写入。
 - `client_id`、`client_token`、`bindClient`/`unbindClient`、`NodeDirectory` 与 `ExecutorAuthenticator` 已实现（2026-11-10，见 [`history/decisions/2026-11-10-harness-node-registry.md`](../../../history/decisions/2026-11-10-harness-node-registry.md) 与 [`2026-11-10-executor-client-token.md`](../../../history/decisions/2026-11-10-executor-client-token.md)）；直接在基线加列，未做数据迁移。
-- `health` / `lastHeartbeatAt` 的派生读（§3.3）**未实现**：依赖 `CMP-scheduler` 的 `presence` 读，随调度层落地；当前对外仍返回列内历史值。
+- `health` / `lastHeartbeatAt` 的派生读（§3.3）已实现：由 `catalog` 组合 `CMP-scheduler` 的 `presence` 覆盖列值；本组件不写这两列。
 - `harness_tag` 不设业务数量上限，只做字段级长度与请求体校验。

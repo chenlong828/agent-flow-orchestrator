@@ -116,7 +116,7 @@ updated: 2026-11-10
 
 ## 4 端点总表
 
-49 个产品业务端点（B1 39 个 + B3 工作流 10 个）；`/healthz` 单独列在 §4.2；执行面 3 个端点见 §4.3，不计入产品业务端点；开发者文档端点见 §4.4，不计入业务端点。
+48 个产品业务端点（B1 38 个 + B3 工作流 10 个）；`/healthz` 单独列在 §4.2；执行面 3 个端点见 §4.3，不计入产品业务端点；开发者文档端点见 §4.4，不计入业务端点。`openapi.yaml` 的 `x-api-count` 统计本表的 48 个产品端点，不含 `/healthz`。
 
 ### 4.1 业务端点
 
@@ -194,6 +194,7 @@ updated: 2026-11-10
 - `P-01` 长轮询：网关把请求转给 `SchedulerService.poll` 并等待至多 `pollHoldMs`；请求体透传 `capacity`/`running`/`finished`，响应透传 `tasks`/`stop`/`cancelInstances`/`nextPollAfterMs`。
 - `P-03` 头部：`Content-Length`、`ETag`（来自 `SkillPackageRef.etag`）、`X-Checksum-Sha256`、`Cache-Control: private, max-age=3600`；`If-None-Match` 与 ETag 相等 → `304`，无响应体。`304` 只在客户端本地已有副本时有意义（`VR-01`，client 侧修复）。
 - `P-03` 的 `packageId` 与内容一一对应：Skill 保存新版本后旧 `packageId` 返回 `404`；包缺失/损坏返回 `500 package_unavailable`，不返回部分字节。
+- 经 BFF/反向代理转发时：请求头白名单必须放行 `authorization`、`x-executor-protocol`、`x-request-id`、`if-none-match`；代理超时必须大于 `pollHoldMs`（30s），否则长轮询会被代理提前切断。
 
 执行面错误映射（沿用 §3.3 信封，`code` 为稳定英文）：
 
@@ -734,10 +735,10 @@ B1/B3 不提供的页面动作：Harness 连接测试/心跳刷新、工具调�
 
 - 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 36 KB；OpenAPI 运行时资产约 85 KB、Swagger UI 静态资源约 2.14 MB，均单独计量，不计入组件预算。
 - 单独验证命令：`bun test tests/components/http-gateway`。
-- 文档入口：启动后访问 `/docs`；机器可读契约：`/openapi.yaml`。OpenAPI 资产随组件发布，覆盖 49 个业务 operation 与 Skill 包/草稿、工作流定义 DTO。
+- 文档入口：启动后访问 `/docs`；机器可读契约：`/openapi.yaml`。OpenAPI 资产随组件发布，覆盖 48 个产品业务 operation 与 `/healthz`（共 49 个 operation），以及 Skill 包/草稿、工作流定义 DTO。
 - `API-41`（Harness 节点登记）、`clientId`/`clientToken` 字段已实现，直接改基线表结构、未做数据迁移（演示数据可丢弃）。
-- 执行端三端点（§4.3）与 Harness 派生态 `health`/`lastHeartbeatAt` 仍未实现：前者随 `CMP-scheduler` 落地，后者依赖调度器 `presence` 读（`harness` §3.3），在此之前 `health` 仍返回列内历史值。
-- 执行面 3 个端点（`EXE-01`–`EXE-03`）已实现（2026-11-11，`src/components/http-gateway/routes/executor.ts`）；实现工序随 `CMP-scheduler`/`CMP-instance` 落地，落地前执行面路由不存在、产品端点行为不变。
+- 执行面 3 个端点（`EXE-01`–`EXE-03`，§4.3）已实现（2026-11-11，`src/components/http-gateway/routes/executor.ts`）。
+- Harness 派生态 `health`/`lastHeartbeatAt` 已实现：`catalog` 组合 `CMP-scheduler` 的 `presence` 读（`harness` §3.3），未绑定或未被观测时返回 `unknown`，观测不可用时降级 `unknown`，不伪造 `offline`。
 - 当前状态：`current`；B1 资产端点与 B3 工作流定义端点均已实现，运行时 OpenAPI 为 32 个 path、49 个 operation（含 `/healthz`）；B3 验证记录见 [工作流工序 result.md](../../../history/works/2026-10-28-workflow-definition/result.md)。
 
 ## 10 B1/B3 实现口径与剩余问题

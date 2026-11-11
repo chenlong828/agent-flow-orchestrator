@@ -18,7 +18,7 @@ updated: 2026-11-10
 
 - 无表；只读投影：资产列表项、资产详情、引用摘要、专家装配。
 - 派生计数查询时计算；不落可写列。
-- Harness 的 `health` / `lastHeartbeatAt` 是组合派生值：读 `SchedulerPresenceRead` 后按 [`CMP-harness` §3.3](../harness/spec.md) 的口径覆盖，不落库。该派生态尚未实现（依赖调度层 presence），当前 `health` 直接取 `HarnessRead` 的列值。
+- Harness 的 `health` / `lastHeartbeatAt` 是组合派生值：读 `SchedulerPresenceRead` 后按 [`CMP-harness` §3.3](../harness/spec.md) 的口径覆盖，不落库（实现在 `src/components/catalog/harness.ts`）。未绑定或未被观测时返回 `unknown`；presence 读不可用时降级 `unknown`，不伪造 `offline`。
 - `clientId` 原样透传 `HarnessSummary`；`clientToken` 只在详情视图透传（`HarnessRead.get`），列表视图不带凭据。
 
 ## 3 公共契约

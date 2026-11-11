@@ -12,6 +12,7 @@ info:
     `spec.md` 是契约权威版本；若两者冲突，以 `spec.md` 为准。
 
     通用约定：
+    - `x-api-count` 统计产品业务端点（48 个），不含 `/healthz`；本文件共 49 个 operation、32 个 path。
     - 请求/响应为 `application/json; charset=utf-8`；ID 为 UUIDv7；时间为 ISO-8601 UTC。
     - 列表响应为 `{items,total,limit,offset}`；`limit` 默认 50、上限 200。
     - 启停、删除、专家装配、工作流保存定义、已有 Skill 草稿保存需带 `If-Match: "<revision>"`；缺少为 428，旧版本为 409。工作流复制/导入/校验不需要 `If-Match`。
