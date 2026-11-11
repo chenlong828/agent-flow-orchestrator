@@ -9,9 +9,11 @@ level: P2
 
 # 工序：节点登记 × `agent-flow-client` 联调（计划）
 
+> 2026-11-11 更新：执行面三端点已于 `92135de` 实现，本文件的「前置未满足」判断已过期；实测结果见 [`result.md`](result.md)。
+
 ## 1 结论：可以联调，但分两层
 
-**可以，但不是现在就能跑完整链路。** 两边的接口边界是：
+**可以，但不是写计划时就能跑完整链路。** 两边的接口边界是：
 
 - `agent-flow-client` 只调执行面三端点：`POST /api/v1/executor/poll`、`POST /api/v1/executor/tasks/{taskId}/result`、`GET /api/v1/executor/skill-packages/{packageId}`；
 - 本仓库已实现的 Harness 接口（`API-01`–`API-07`、`API-41`）是**管理面**，client 不会调用；两边的连接点只有一个：`API-41` 登记的 `clientId` + token，client 用同一枚 token 去调执行面三端点；
@@ -33,8 +35,8 @@ level: P2
 
 | 条件 | 状态 | 说明 |
 |---|---|---|
-| 调度层 P1 设计确认 | **未满足** | `2026-11-10-scheduler-layer-design` 是 P1，文档已落、待用户最终确认；`EXE-01`–`EXE-03` 的实现不得在确认前开工 |
-| 执行面三端点 + 任务注入通道 | 未实现 | 需要 `SchedulerService`、`task`/`task_attempt` 表、`SkillPackageSource` 实现，以及一个「把任务放进队列」的入口（`OQ-22`/`OQ-24`） |
+| 调度层实现与收口 | 已实现（`92135de`） | `EXE-01`–`EXE-03` 已可用；P1 收口的用户确认仍待（见 `2026-11-11-scheduler-layer-implementation/result.md` §5） |
+| 任务注入通道 | 临时接缝 | 无对外启动端点（`OQ-22`）；联调用 [`tools/jd.ts`](tools/jd.ts) 直接调 `SchedulerService.enqueue` |
 | client 仓库可运行 | 满足 | `bun install` 后可跑 `serve`/`doctor`；DSH 用 `DSH_BIN=/Users/chenlong/agent/deepseek-harness/apps/cli/lib/bin.js`（node v26.8.1；本机无 PATH `dsh`） |
 | 模型端点与凭据 | 需用户提供 | client 通过环境变量读取（`AF_LLM_BASE_URL`、`AF_MODEL` 等）；凭据只进本地环境，不进仓库 |
 | 本仓库服务 | 满足 | `3100`（`config/local.toml`），`/healthz` 与 `/openapi.yaml` 已验证 |
@@ -50,7 +52,7 @@ level: P2
 3. 在 client 仓库建 `.config`（loopback 地址 + 同一 token + `max_concurrent`），跑 `doctor`：确认配置校验通过、`scheduler.url`/`scheduler.token` 两项为 pass；**不启动 `serve`**（会因 400 直接退出，没有信息增量）。
 4. 产出：联调基线记录（含「400 会被 client 判为 `unsupported_protocol`」这一注意事项）。
 
-### P1 前置实现（gated，另立工序）
+### P1 前置实现（已完成，`92135de`）
 
 按调度层设计实现执行面最小闭环，联调只依赖其中一部分：
 
@@ -141,7 +143,7 @@ bun run src/cli.ts serve --config .config --log-level debug
 
 | ID | 类型 | 范围 | 状态 | 出口 |
 |---|---|---|---|---|
-| `T-JD-01` | verify | 连通性基线：API-41 登记 + 三端点探测 + client `doctor` | 可开始 | 基线记录写入 `result.md` |
-| `T-JD-02` | change | 执行面三端点 + 任务注入脚本（另立实现工序） | 阻塞（P1 未确认） | `EXE-01`–`EXE-03` 可用，`SCN-0201`–`SCN-0203` 测试通过 |
-| `T-JD-03` | verify | `T-JD-01`–`T-JD-08` 真实联调 | 待 `T-JD-02` | 用例矩阵全部有结论 |
-| `T-JD-04` | docs | 联调报告与偏差清单 | 待 `T-JD-03` | `result.md` + 必要时 `open-questions.md` |
+| `T-JD-01` | verify | 连通性基线：API-41 登记 + 三端点探测 + client `doctor` | 完成 | 见 `result.md` §2 |
+| `T-JD-02` | change | 执行面三端点 + 任务注入脚本 | 完成（`92135de` + `tools/jd.ts`） | `EXE-01`–`EXE-03` 可用，执行面场景测试通过 |
+| `T-JD-03` | verify | `T-JD-01`–`T-JD-08` 真实联调 | 部分完成 | `result.md` §2：7 通过、`T-JD-05` 无外部触发面 |
+| `T-JD-04` | docs | 联调报告与偏差清单 | 完成 | `result.md`；`OQ-25` 记录 stop 触发面 |
