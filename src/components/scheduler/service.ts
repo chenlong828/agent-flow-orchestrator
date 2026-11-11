@@ -25,7 +25,7 @@ export type SchedulerHandle = SchedulerService & SchedulerPresenceRead;
 export function createScheduler(deps: SchedulerDeps): SchedulerHandle {
   const store = createSchedulerStore(deps.db);
   const waiters = createWaiters();
-  const tracker = createPresenceTracker(waiters);
+  const tracker = createPresenceTracker(waiters, deps.clock);
 
   return {
     enqueue: createEnqueueHandler(deps, store, waiters.notifyAll),

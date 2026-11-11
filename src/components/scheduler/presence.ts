@@ -1,3 +1,4 @@
+import type { Clock } from "../../core/kernel/index.ts";
 import { toIso } from "./mappers.ts";
 import type { ClientPresenceView } from "./types.ts";
 import type { Waiters } from "./waiters.ts";
@@ -13,14 +14,14 @@ export type PresenceTracker = ReturnType<typeof createPresenceTracker>;
 
 const IDLE: Presence = { lastPollAt: null, free: null, running: 0, stopRequested: false };
 
-export function createPresenceTracker(waiters: Waiters) {
+export function createPresenceTracker(waiters: Waiters, clock: Clock) {
   const map = new Map<string, Presence>();
 
   return {
     touch(clientId: string, free: number, running: number): Presence {
       const previous = map.get(clientId) ?? IDLE;
       const next: Presence = {
-        lastPollAt: new Date(),
+        lastPollAt: clock.now(),
         free,
         running,
         stopRequested: previous.stopRequested,
@@ -31,7 +32,7 @@ export function createPresenceTracker(waiters: Waiters) {
 
     markPolled(clientId: string): void {
       const current = map.get(clientId);
-      if (current !== undefined) current.lastPollAt = new Date();
+      if (current !== undefined) current.lastPollAt = clock.now();
     },
 
     get(clientId: string): Presence | undefined {
