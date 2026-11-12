@@ -6,6 +6,14 @@ import {
   resolveExecutorConfig,
   type ExecutorFileConfig,
 } from "./executor-config.ts";
+import {
+  parseArchive,
+  parseRun,
+  resolveArchiveConfig,
+  resolveRunConfig,
+  type ArchiveFileConfig,
+  type RunFileConfig,
+} from "./run-config.ts";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -19,6 +27,9 @@ export type Config = {
   skillDraftTtlHours: number;
   taskMaxAttempts: number;
   taskRetryDelayMs: number;
+  archiveRoot: string;
+  runDefaultTimeoutMs: number;
+  runMaxNodeVisits: number;
 };
 
 export type LoadConfigOptions = {
@@ -38,6 +49,8 @@ type FileConfig = {
     level?: LogLevel;
   };
   executor?: ExecutorFileConfig;
+  run?: RunFileConfig;
+  archive?: ArchiveFileConfig;
 };
 
 const DEFAULT_HOST = "127.0.0.1";
@@ -48,7 +61,7 @@ const DEFAULT_LOG_LEVEL: LogLevel = "info";
 const DEFAULT_SKILL_STORAGE_ROOT = ".local/skills";
 const DEFAULT_SKILL_DRAFT_TTL_HOURS = 24;
 const LOG_LEVELS: LogLevel[] = ["debug", "info", "warn", "error"];
-const TOP_LEVEL_KEYS = new Set(["server", "app", "log", "executor"]);
+const TOP_LEVEL_KEYS = new Set(["server", "app", "log", "executor", "run", "archive"]);
 const SERVER_KEYS = new Set(["host", "port"]);
 const APP_KEYS = new Set(["actor"]);
 const LOG_KEYS = new Set(["level"]);
@@ -193,6 +206,10 @@ function parseFile(raw: unknown, source: string): FileConfig {
   if (log !== undefined) config.log = log;
   const executor = parseExecutor(raw.executor, source, fail, assertKnownKeys);
   if (executor !== undefined) config.executor = executor;
+  const run = parseRun(raw.run, source, fail, assertKnownKeys);
+  if (run !== undefined) config.run = run;
+  const archive = parseArchive(raw.archive, source, fail, assertKnownKeys);
+  if (archive !== undefined) config.archive = archive;
   return config;
 }
 
@@ -228,6 +245,8 @@ function mergeFile(base: FileConfig, next: FileConfig): FileConfig {
     app: { ...(base.app ?? {}), ...(next.app ?? {}) },
     log: { ...(base.log ?? {}), ...(next.log ?? {}) },
     executor: { ...(base.executor ?? {}), ...(next.executor ?? {}) },
+    run: { ...(base.run ?? {}), ...(next.run ?? {}) },
+    archive: { ...(base.archive ?? {}), ...(next.archive ?? {}) },
   };
 }
 
@@ -307,6 +326,8 @@ function resolveEnvConfig(
     ...resolveServerConfig(env, file),
     ...resolveAppConfig(env, file),
     ...resolveExecutorConfig(env, file.executor, fail),
+    ...resolveRunConfig(env, file.run, fail),
+    ...resolveArchiveConfig(env, file.archive, fail),
   };
 }
 

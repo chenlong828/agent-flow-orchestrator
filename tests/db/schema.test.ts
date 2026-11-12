@@ -23,6 +23,9 @@ const BUSINESS_TABLES = [
   "instance",
   "task",
   "task_attempt",
+  "workflow_run",
+  "run_node",
+  "run_artifact",
 ];
 
 beforeAll(async () => {
@@ -34,7 +37,7 @@ afterAll(async () => {
 });
 
 describe("数据库结构", () => {
-  test("业务表恰好 19 张，另有 schema_migrations", async () => {
+  test("业务表恰好 22 张，另有 schema_migrations", async () => {
     const rows = await db.query<{ table_name: string }>(
       `select table_name from information_schema.tables
        where table_schema = 'public' and table_type = 'BASE TABLE'
@@ -44,11 +47,14 @@ describe("数据库结构", () => {
     expect(names).toEqual([...BUSINESS_TABLES, "schema_migrations"].sort());
   });
 
-  test("1 个迁移按顺序记录，分类参考数据为 4 条", async () => {
+  test("2 个迁移按顺序记录，分类参考数据为 4 条", async () => {
     const migrations = await db.query<{ version: string }>(
       "select version from schema_migrations order by version",
     );
-    expect(migrations.map((row) => row.version)).toEqual(["0001_baseline.sql"]);
+    expect(migrations.map((row) => row.version)).toEqual([
+      "0001_baseline.sql",
+      "0002_workflow_run.sql",
+    ]);
 
     const categories = await db.query<{ code: string; position: number }>(
       "select code, position from skill_category order by position",
@@ -125,6 +131,43 @@ describe("数据库结构", () => {
          and t.relname = 'skill_draft' and r.relname = 'skill'`,
     );
     expect(draftCascade).toEqual([{ delete_rule: "c" }]);
+  });
+
+  test("运行编排三表与活跃 run 唯一索引落库", async () => {
+    const tables = await db.query<{ table_name: string }>(
+      `select table_name from information_schema.tables
+       where table_schema = 'public'
+         and table_name in ('workflow_run', 'run_node', 'run_artifact')
+       order by table_name`,
+    );
+    expect(tables.map((row) => row.table_name)).toEqual([
+      "run_artifact",
+      "run_node",
+      "workflow_run",
+    ]);
+
+    const columns = await db.query<{ table_name: string; column_name: string }>(
+      `select table_name, column_name
+       from information_schema.columns
+       where table_schema = 'public' and table_name = 'workflow_run'
+         and column_name in ('state', 'outcome', 'archive_state', 'task_space_path')
+       order by column_name`,
+    );
+    expect(columns.map((row) => row.column_name)).toEqual([
+      "archive_state",
+      "outcome",
+      "state",
+      "task_space_path",
+    ]);
+
+    const index = await db.query<{ indexdef: string }>(
+      `select indexdef from pg_indexes
+       where schemaname = 'public' and indexname = 'workflow_run_active_instance_key'`,
+    );
+    expect(index).toHaveLength(1);
+    expect(index[0]?.indexdef).toContain("UNIQUE INDEX");
+    expect(index[0]?.indexdef).toContain("instance_id");
+    expect(index[0]?.indexdef).toContain("waiting_confirm");
   });
 
   test("工作流三表按冻结 schema 落库", async () => {

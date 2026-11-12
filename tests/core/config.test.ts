@@ -49,6 +49,9 @@ describe("CMP-config 默认值与文件覆盖", () => {
       skillDraftTtlHours: 24,
       taskMaxAttempts: 3,
       taskRetryDelayMs: 5000,
+      archiveRoot: ".local/archive",
+      runDefaultTimeoutMs: 1800000,
+      runMaxNodeVisits: 5,
     });
   });
 
@@ -78,6 +81,9 @@ describe("CMP-config 默认值与文件覆盖", () => {
       skillDraftTtlHours: 24,
       taskMaxAttempts: 3,
       taskRetryDelayMs: 5000,
+      archiveRoot: ".local/archive",
+      runDefaultTimeoutMs: 1800000,
+      runMaxNodeVisits: 5,
     });
   });
 
@@ -108,6 +114,9 @@ describe("CMP-config 默认值与文件覆盖", () => {
       skillDraftTtlHours: 48,
       taskMaxAttempts: 3,
       taskRetryDelayMs: 5000,
+      archiveRoot: ".local/archive",
+      runDefaultTimeoutMs: 1800000,
+      runMaxNodeVisits: 5,
     });
 
     expect(
@@ -131,6 +140,9 @@ describe("CMP-config 默认值与文件覆盖", () => {
       skillDraftTtlHours: 24,
       taskMaxAttempts: 3,
       taskRetryDelayMs: 5000,
+      archiveRoot: ".local/archive",
+      runDefaultTimeoutMs: 1800000,
+      runMaxNodeVisits: 5,
     });
   });
 
@@ -261,5 +273,88 @@ describe("CMP-config 校验与失败语义", () => {
       expect(error.source).toBe("env");
       expect(error.field).toBe("SKILL_DRAFT_TTL_HOURS");
     }
+  });
+});
+
+describe("CMP-config 运行编排参数", () => {
+  test("[run] 与 [archive] 从 TOML 读取并覆盖默认值", async () => {
+    const configDir = await tempConfigDir({
+      "default.toml": [
+        "[run]",
+        "default_timeout_ms = 600000",
+        "max_node_visits = 3",
+        "",
+        "[archive]",
+        'root = "/srv/archive"',
+      ].join("\n"),
+    });
+
+    expect(await loadConfig(options(configDir))).toMatchObject({
+      runDefaultTimeoutMs: 600000,
+      runMaxNodeVisits: 3,
+      archiveRoot: "/srv/archive",
+    });
+  });
+
+  test("环境变量覆盖 TOML，空值回退默认", async () => {
+    const configDir = await tempConfigDir();
+
+    expect(
+      await loadConfig(
+        options(configDir, {
+          RUN_DEFAULT_TIMEOUT_MS: "900000",
+          RUN_MAX_NODE_VISITS: "7",
+          ARCHIVE_ROOT: "/tmp/af-archive",
+        }),
+      ),
+    ).toMatchObject({
+      runDefaultTimeoutMs: 900000,
+      runMaxNodeVisits: 7,
+      archiveRoot: "/tmp/af-archive",
+    });
+
+    expect(
+      await loadConfig(
+        options(configDir, {
+          RUN_DEFAULT_TIMEOUT_MS: "",
+          RUN_MAX_NODE_VISITS: "",
+          ARCHIVE_ROOT: "",
+        }),
+      ),
+    ).toMatchObject({
+      runDefaultTimeoutMs: 1800000,
+      runMaxNodeVisits: 5,
+      archiveRoot: ".local/archive",
+    });
+  });
+
+  test("越界与非法值被拒绝，并带字段路径", async () => {
+    const configDir = await tempConfigDir();
+
+    const cases: Array<[Record<string, string>, string]> = [
+      [{ RUN_DEFAULT_TIMEOUT_MS: "999" }, "RUN_DEFAULT_TIMEOUT_MS"],
+      [{ RUN_DEFAULT_TIMEOUT_MS: "86400001" }, "RUN_DEFAULT_TIMEOUT_MS"],
+      [{ RUN_MAX_NODE_VISITS: "0" }, "RUN_MAX_NODE_VISITS"],
+      [{ RUN_MAX_NODE_VISITS: "21" }, "RUN_MAX_NODE_VISITS"],
+      [{ ARCHIVE_ROOT: "   " }, "ARCHIVE_ROOT"],
+    ];
+    for (const [env, field] of cases) {
+      const error = await loadConfig(options(configDir, env)).catch(
+        (caught) => caught,
+      );
+      expect(error).toBeInstanceOf(ConfigError);
+      expect(error.code).toBe("config_validation_error");
+      expect(error.field).toBe(field);
+    }
+  });
+
+  test("[run] / [archive] 的未知键被拒绝", async () => {
+    const configDir = await tempConfigDir({
+      "default.toml": "[run]\nunknown = 1\n",
+    });
+    const error = await loadConfig(options(configDir)).catch((caught) => caught);
+    expect(error).toBeInstanceOf(ConfigError);
+    expect(error.code).toBe("config_validation_error");
+    expect(error.field).toBe("run.unknown");
   });
 });
