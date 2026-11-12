@@ -1,7 +1,7 @@
 ---
 layer: works
 module: global
-status: active
+status: frozen
 updated: 2026-11-12
 procedure: 2026-11-12-dev-executor-self-enroll
 ---
@@ -49,7 +49,11 @@ blocker 0 / decision now 3（已落决策记录与规格）/ hold 4（`H-01`–`
 - 客户端未改，端到端只在 curl 层面验证；client 仓库按 [`client-proposal.md`](client-proposal.md) 实施后才算真正打通。
 - 未做：自动登记节点回收、地址刷新、enrollment 审批流（已被决策否决）。
 
-## 6 未决
+## 6 收口（2026-11-12）
+
+客户端已按 [`client-proposal.md`](client-proposal.md) 实现（client 仓库 `eec1485`：五个执行面端点统一带 `X-Client-Id` / `X-Client-Address`，新增 `[scheduler] client_id` 与 `allow_unauthenticated`，`doctor` 增加两项检查，用例 `TC-CLT-ENR-1`–`4`）。实测：节点以 `chenlong-mac-01` 自动登记、`health=online`，带技能包的 run 能正常派发执行。编排侧不再需要 `API-41` 人工登记即可接入新节点。
+
+## 7 未决
 
 - 自动登记节点的回收策略（`R-006`）。
 - 生产部署清单中的 `EXECUTOR_AUTH=on` 需要写进上线检查项（当前只记在决策与风险表）。
