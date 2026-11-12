@@ -27,7 +27,7 @@ updated: 2026-10-27
 5. **确认后才编码**：D01～D05 全部确认后，才按用例 × 组件拆实现任务。
 6. **两个独立项目**：`agent-flow-orchaster` 与 `agent-flow-ui` 互不进入对方项目改代码，只通过 REST 契约交互。
 
-## 3 设计阶段与确认门
+## 3 设计阶段与人工评审确认
 
 > 以下为设计阶段的流程记录；实施已完成，实际结果见 [`result.md`](result.md)。
 
@@ -215,7 +215,7 @@ updated: 2026-10-27
 ## 10 下一步（不在本工序）
 
 - 外部 UI 若接入，由该项目按 [`http-gateway/spec.md`](../../../design/components/http-gateway/spec.md) 与 [`openapi.yaml`](../../../../src/components/http-gateway/openapi.yaml) 自行做适配层/契约测试。
-- B2/B3/B4、ACP 执行模型与生产化事项另立工序，各自走确认门。
+- B2/B3/B4、ACP 执行模型与生产化事项另立工序，各自走人工评审确认。
 - 本工序结论与验证记录见 [`result.md`](result.md)。
 
 ## 11 实施结果摘要

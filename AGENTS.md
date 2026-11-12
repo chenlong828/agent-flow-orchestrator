@@ -14,13 +14,13 @@ AgentFlow 研发智能体工作流编排服务的编排侧：只提供 HTTP API�
 
 ## 技能（已安装于 `.agents/skills/`）
 
-来源：`~/skills/af-dev-skill` v0.1（2026-10-23 整目录复制）。默认不手改正文，升级 = 覆盖同名目录，并在 `docs/history/decisions/` 记一条；2026-10-29 起本地试行「评审四档裁决」改动，与上游 v0.1 分叉，记录见 [`docs/history/decisions/2026-10-29-review-verdict-pilot.md`](docs/history/decisions/2026-10-29-review-verdict-pilot.md)，试点收口后决定回灌上游或回滚。
+来源：`~/skills/af-dev-skill` v0.1（2026-10-23 整目录复制）。默认不手改正文，升级 = 覆盖同名目录，并在 `docs/history/decisions/` 记一条；2026-10-29 起本地试行「评审四档裁决」改动，与上游 v0.1 分叉，记录见 [`docs/history/decisions/2026-10-29-review-verdict-pilot.md`](docs/history/decisions/2026-10-29-review-verdict-pilot.md)，试点收口后决定回灌上游或回滚。2026-11-11 起另有「人工评审确认」术语统一，记录见 [`docs/history/decisions/2026-11-11-review-confirmation-terminology.md`](docs/history/decisions/2026-11-11-review-confirmation-terminology.md)。
 
 | 技能 | 何时加载 |
 |---|---|
 | `req-scenario-spec` | 录需求、定场景、拆任务、多对话交接 |
 | `design-before-coding` | 任何写 / 改代码前的组件级设计 |
-| `arch-design-spec` | 动组件切分、公共契约、schema、数据所有权、分层依赖、热路径；定 P0–P3 与人工确认门；评审裁决与冻结（四档） |
+| `arch-design-spec` | 动组件切分、公共契约、schema、数据所有权、分层依赖、热路径；定 P0–P3 与人工评审确认；评审裁决与冻结（四档） |
 | `dev-execution-spec` | 动手到交付：模糊先问、验收、提交、工作区卫生；交付前裁决与合并门 |
 | `doc-layout-spec` | 新建 / 移动 / 归档文档，核对文档树 |
 
@@ -34,7 +34,7 @@ AgentFlow 研发智能体工作流编排服务的编排侧：只提供 HTTP API�
 
 ## 门禁与纪律
 
-- 改动级别与人工确认门按 `arch-design-spec` 的 P0–P3 执行；未达到对应级别的要求，停在设计与确认，不抢先动手。
+- 改动级别与人工评审确认按 `arch-design-spec` 的 P0–P3 执行；未达到对应级别的要求，停在设计与确认，不抢先动手。
 - 技术栈 D0 已定 Bun + PostgreSQL；运行形态与 ACP 执行模型等实际需求出现时另立设计，不预置。环境/工具类工序按本次改动定级，不按系统重要性套 P1 模板。
 - 密钥只进 `.env`（已 ignore），不进 README、日志、注释、commit；提交前过 `git status` 与 `git diff --cached`。
 - 代码改完运行 `bun run quality:report`；阈值、级别与反馈闭环见 `docs/playbook/code-health-rules.md`。报告里的 `ERROR` 表示工具失效或输入缺失，先修工具，不能当通过；需要按阈值卡门禁时运行 `bun run quality:gate`。存量基线是修复起点，不是新代码继续新增的理由。
@@ -56,9 +56,9 @@ AgentFlow 研发智能体工作流编排服务的编排侧：只提供 HTTP API�
 > 暂只在本项目生效，不回灌技能；观察若干工序后再评估。
 
 - 开工先框定范围：本轮做什么、不做什么、需要你定什么。未立工序的小任务在对话里说清；立工序（无论改动级别）或跨会话，按 `doc-layout-spec` 写 `brief.md`，不另造一份范围文档。
-- 范围扩展只在“任务目标之外”时默认避免：新阶段、新交付物、新表/schema、新依赖、新组件、新契约，不在本轮顺手做；确需做时说明“不做就无法交付”的理由和影响，按 `arch-design-spec` 的 P0–P3 改动级别与人工确认门处理。
+- 范围扩展只在“任务目标之外”时默认避免：新阶段、新交付物、新表/schema、新依赖、新组件、新契约，不在本轮顺手做；确需做时说明“不做就无法交付”的理由和影响，按 `arch-design-spec` 的 P0–P3 改动级别与人工评审确认处理。
 - “以后可能需要”分两种：未来功能/交付物不做，记入待定（跨工序→`plan/open-questions.md`；工序内→`brief.md`/`result.md`）；已知变化轴的隔离与低成本接缝属于当前设计，不算范围扩展。
-- 实现深度改进只在“当前基线/取舍”下提出：超出当前基线（性能、验证、可维护性、错误处理）且有取舍时，不静默加、也不静默放弃；给 2–3 个选项、推荐、默认、代价和影响，按同一 P0–P3 改动级别与人工确认门处理。规则已要求的质量项（契约、边界、验收基线）直接做，不当作审批题；跨出当前 diff 的改进按范围扩展处理。
+- 实现深度改进只在“当前基线/取舍”下提出：超出当前基线（性能、验证、可维护性、错误处理）且有取舍时，不静默加、也不静默放弃；给 2–3 个选项、推荐、默认、代价和影响，按同一 P0–P3 改动级别与人工评审确认处理。规则已要求的质量项（契约、边界、验收基线）直接做，不当作审批题；跨出当前 diff 的改进按范围扩展处理。
 - 需要拍板的决策由 agent 起草、用户选择；范围与优先级由用户定；无实质取舍、可逆的局部细节给默认并记录。
 
 ## 文档纪律

@@ -49,7 +49,7 @@ bun run check          # tsc --noEmit + bun test + docs:check
 
 ## 4 未完成与待确认
 
-1. **P1 人工门已签字（2026-11-11）**：7 项决策已确认，其中 `D-03` 改为「失败结果不自动重派」，已同步 `scheduler/spec.md` §4.5、`config/spec.md`、`SCN-0202`；设计冻结，实现工序另立。
+1. **P1 人工评审确认已签字（2026-11-11）**：7 项决策已确认，其中 `D-03` 改为「失败结果不自动重派」，已同步 `scheduler/spec.md` §4.5、`config/spec.md`、`SCN-0202`；设计冻结，实现工序另立。
 2. **执行面无实现**：`EXE-01`–`EXE-03`、`task`/`task_attempt`/`instance` 表、执行面配置、`SkillPackageSource` 均标「未实现」；实现工序另立（`H-06`）。
 3. **场景状态停在 `draft`**：5 张场景的运行序、不可变引用、3 正 1 反测试方案已齐，但仓库 `docs:check` 要求 frontmatter 的 TC ID 已存在于 `tests/**/*.test.ts`，纯设计工序无法满足 → 按 `review.md` `D-06` 保持 `draft`，实现工序补测试后转 `designed`/`verified`。
 4. **client 侧偏离未修**：`OQ-15`（`timeout` 错误码）、`OQ-16`（摘要不匹配不重试）、`OQ-17`（无缓存带条件头）仍按契约与设计并存；由于失败结果已不自动重派，`OQ-15` 的影响降为「失败原因展示口径」。

@@ -30,7 +30,7 @@ updated: 2026-10-27
 - 设计提议：[`proposal.md`](proposal.md)；设计与实施计划：[`implementation-plan.md`](implementation-plan.md)。
 - 2026-10-24 实施授权：用户直接要求按当前 spec 分步实现 API；据此把 `T-B1-D05` 契约复核门视为通过，不再等待逐项书面确认。
 
-## 设计优先：确认门
+## 设计优先：人工评审确认
 
 1. `T-B1-D01` 用例清单 → [`use-cases.md`](use-cases.md)（已完成）。
 2. `T-B1-D02` 领域对象清单 → [`domain-objects.md`](domain-objects.md)（已完成）。
@@ -56,7 +56,7 @@ updated: 2026-10-27
 ## 下一步（不在本工序）
 
 1. 把 [`http-gateway/spec.md`](../../../design/components/http-gateway/spec.md) 与 [`openapi.yaml`](../../../../src/components/http-gateway/openapi.yaml) 交给 `agent-flow-ui` 侧按契约印证；UI 接入与适配层是另一个项目的工作。
-2. B2/B3/B4（Key/工作区、工作流、实例/看板）与 ACP 执行模型另立工序，按各自改动级别走确认门。
+2. B2/B3/B4（Key/工作区、工作流、实例/看板）与 ACP 执行模型另立工序，按各自改动级别走人工评审确认。
 3. 生产化事项（鉴权、CORS、限流、容量、SLA、故障演练）未定，不在 B1 结果内。
 
 ## 不做什么

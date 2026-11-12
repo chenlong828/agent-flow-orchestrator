@@ -25,7 +25,7 @@ updated: 2026-11-02
 
 - 设计 B1 侧包形态：数据所有权、状态模型、读写路径、契约面、失败与并发语义、存储与 GC、迁移与验证。
 - 明确 UI 提案的 `body` + staging 部分被本设计取代。
-- 产出 P1 设计提案与 REST 契约，按人工确认门冻结。
+- 产出 P1 设计提案与 REST 契约，按人工评审确认冻结。
 - 契约冻结后同步规格/OpenAPI；T-SKP-08 起按任务实现代码、迁移与种子。
 
 本轮不做：
@@ -38,7 +38,7 @@ updated: 2026-11-02
 
 1. 设计提案写清 zip 与 brief 的真相边界、草稿状态机、读路径、写路径、保存原子性与失败语义、并发与重试、存储与 GC、原地重建与兼容、16 KiB 正文边界与长内容分流。
 2. 写清 `CMP-skill`、`CMP-catalog`、`CMP-http-gateway`、`CMP-platform`、`CMP-config`、`CMP-kernel` 的职责与数据所有权。
-3. 给出 P1 定级、人工确认门与待确认的设计选择；不写实现细节。
+3. 给出 P1 定级、人工评审确认与待确认的设计选择；不写实现细节。
 4. 契约冻结前不改既有规格/代码；冻结后同步规格/OpenAPI，实现从 T-SKP-08 起按任务推进。
 
 ## 任务表
@@ -47,7 +47,7 @@ updated: 2026-11-02
 |---|---|---|---|---|---|---|---|
 | T-SKP-01 | design | `CMP-skill` | 已完成 | 形成 Skill 包形态设计与 UI 提案映射 | P1 设计确认（v1） | 无 | 本 brief、[design.md](design.md)、UI 提案、skill / catalog / gateway 规格、architecture、现有迁移与实现 |
 | T-SKP-02 | design | `CMP-platform` + `CMP-config` | 已完成 | 存储与 GC、配置设计 | P1 设计确认（v1） | T-SKP-01 | [design.md](design.md)、platform / config 规格、存储与 GC 设计 |
-| T-SKP-03 | review | global | 已完成 | P1 设计评审与确认 | 确认记录落 brief | T-SKP-02 | [design.md](design.md)、本 brief、P1 确认门 |
+| T-SKP-03 | review | global | 已完成 | P1 设计评审与确认 | 确认记录落 brief | T-SKP-02 | [design.md](design.md)、本 brief、P1 人工评审确认 |
 | T-SKP-04 | review | global | 已完成 | 设计审查与阻塞项修订 | B1–B8 审查结论落 [design-review.md](design-review.md) | T-SKP-03 | [design-review.md](design-review.md)、design.md、本 brief、现有 schema / seed / 测试 |
 | T-SKP-05 | contract | `CMP-skill` + `CMP-http-gateway` + `CMP-catalog` | 已完成 | 字段、端点、错误、ETag、限额与迁移口径冻结 | 契约 v1 冻结 | T-SKP-04 | [contract-proposal.md](contract-proposal.md)、design v1、现有 OpenAPI / 规格、重建口径 |
 | T-SKP-06 | spec | `CMP-skill` + `CMP-catalog` + `CMP-http-gateway` + `CMP-platform` + `CMP-config` | 已完成 | 规格、architecture、OpenAPI 同步契约 v1 | 37 个业务 operation、14 个公共错误码、端点表一致 | T-SKP-05 | 契约 v1、组件规格、`architecture.md`、`openapi.yaml` |

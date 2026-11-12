@@ -294,7 +294,7 @@ Q12 暂定 2（用法/配置）。但「同 `clientId` 出现更新的 `runId`�
 
 ## 9. 附评：只读观测 HTTP P1（独立对象）
 
-> 对象：client 侧 `docs/works/2026-11-06-observability-http/proposal.md`（2026-11-06，442 行）。它不在本工序的冻结范围内，本节只给调度器侧视角，供其 P1 确认门使用。
+> 对象：client 侧 `docs/works/2026-11-06-observability-http/proposal.md`（2026-11-06，442 行）。它不在本工序的冻结范围内，本节只给调度器侧视角，供其 P1 人工评审确认使用。
 
 ### 9.1 方向判断：这是入站 HTTP 唯一成立的位置
 
