@@ -60,6 +60,13 @@ export function createInstanceService(deps: InstanceDeps): InstanceService {
       const rows = await store.listByClient(ensureClientId(clientId));
       return rows.map(toInstance);
     },
+    getByBinding: async (clientId, workspacePath) => {
+      const row = await store.findByClientAndPath(
+        ensureClientId(clientId),
+        ensureWorkspacePath(workspacePath),
+      );
+      return row === null ? null : toInstance(row);
+    },
     listDispatchable: async (clientId) => {
       const rows = await store.listDispatchable(ensureClientId(clientId));
       return rows.map(toInstance);

@@ -226,11 +226,11 @@ describe("组件依赖与数据所有权", () => {
     expect(violations).toEqual([]);
   });
 
-  test("FileStore 只由 skill 依赖", () => {
+  test("FileStore 只由 skill 与 run 依赖", () => {
     const violations: string[] = [];
     for (const file of sourceFiles(COMPONENTS)) {
       const owner = unitOf(relative(SRC, file));
-      if (owner === "skill") continue;
+      if (owner === "skill" || owner === "run") continue;
       if (/\bFileStore\b/.test(readFileSync(file, "utf8"))) {
         violations.push(toPosix(relative(SRC, file)));
       }

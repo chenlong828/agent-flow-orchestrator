@@ -19,6 +19,12 @@ export type ErrorCode =
   | "package_unavailable"
   | "unsupported_protocol"
   | "unauthorized"
+  | "run_not_found"
+  | "run_conflict"
+  | "session_log_missing"
+  | "invalid_state"
+  | "invalid_archive"
+  | "unsupported_node_type"
   | "database_unavailable";
 
 export type ErrorDetails = Record<string, unknown>;
@@ -136,7 +142,15 @@ export class DraftExpiredError extends AppError {
 
 export class PayloadTooLargeError extends AppError {
   constructor(
-    limit: "file_bytes" | "file_count" | "package_bytes" | "draft_bytes" | "result_bytes",
+    limit:
+      | "file_bytes"
+      | "file_count"
+      | "package_bytes"
+      | "draft_bytes"
+      | "result_bytes"
+      | "prompt_bytes"
+      | "session_log_bytes"
+      | "archive_bytes",
     limitValue: number,
     actualValue: number,
   ) {

@@ -58,6 +58,12 @@ const STATUS_BY_CODE: Record<AppError["code"], number> = {
   package_unavailable: 500,
   unsupported_protocol: 400,
   unauthorized: 401,
+  run_not_found: 404,
+  run_conflict: 409,
+  session_log_missing: 409,
+  invalid_state: 409,
+  invalid_archive: 400,
+  unsupported_node_type: 400,
   database_unavailable: 503,
 };
 

@@ -23,6 +23,8 @@ export type InstanceService = {
   enroll(input: EnrollInstance): Promise<Instance>;
   get(instanceId: string): Promise<Instance | null>;
   listByClient(clientId: string): Promise<Instance[]>;
+  /** 读：按绑定反查；不存在返回 null。供运行编排复用同一工作区的实例。 */
+  getByBinding(clientId: string, workspacePath: string): Promise<Instance | null>;
   listDispatchable(clientId: string): Promise<Instance[]>;
   isDispatchable(instanceId: string, clientId: string): Promise<boolean>;
   block(instanceId: string, reason: BlockReason): Promise<void>;

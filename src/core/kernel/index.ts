@@ -25,6 +25,14 @@ export {
 } from "./errors-executor.ts";
 export * from "./executor.ts";
 export {
+  InvalidArchiveError,
+  InvalidStateError,
+  RunConflictError,
+  RunNotFoundError,
+  SessionLogMissingError,
+  UnsupportedNodeTypeError,
+} from "./errors-run.ts";
+export {
   DEFAULT_PAGE_LIMIT,
   MAX_PAGE_LIMIT,
   normalizePageQuery,
