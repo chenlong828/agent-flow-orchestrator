@@ -47,13 +47,14 @@ describe("数据库结构", () => {
     expect(names).toEqual([...BUSINESS_TABLES, "schema_migrations"].sort());
   });
 
-  test("2 个迁移按顺序记录，分类参考数据为 4 条", async () => {
+  test("3 个迁移按顺序记录，分类参考数据为 4 条", async () => {
     const migrations = await db.query<{ version: string }>(
       "select version from schema_migrations order by version",
     );
     expect(migrations.map((row) => row.version)).toEqual([
       "0001_baseline.sql",
       "0002_workflow_run.sql",
+      "0003_task_space.sql",
     ]);
 
     const categories = await db.query<{ code: string; position: number }>(

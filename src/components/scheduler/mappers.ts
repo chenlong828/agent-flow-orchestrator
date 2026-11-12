@@ -22,6 +22,7 @@ export function envelope(row: TaskRow): TaskEnvelope {
     attempt: row.attempt,
     prompt: row.prompt,
     workspacePath: row.workspace_path,
+    taskSpacePath: row.task_space_path,
     timeoutMs: row.timeout_ms,
     skillSet: skillSetOf(row),
   };

@@ -113,7 +113,11 @@ describe("platform 迁移执行", () => {
     const migrator = createMigrator({ db, directory: MIGRATIONS });
     const result = await migrator.up();
     expect(result.applied).toEqual([]);
-    expect(result.skipped).toEqual(["0001_baseline.sql", "0002_workflow_run.sql"]);
+    expect(result.skipped).toEqual([
+      "0001_baseline.sql",
+      "0002_workflow_run.sql",
+      "0003_task_space.sql",
+    ]);
     const after = await db.query("select version, checksum from schema_migrations order by version");
     expect(after).toEqual(before);
   });

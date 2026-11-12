@@ -10,6 +10,7 @@ export type TaskRow = {
   state: TaskState;
   prompt: string;
   workspace_path: string;
+  task_space_path: string;
   timeout_ms: number;
   skill_set: SkillSet | string;
   skill_set_digest: string;
@@ -29,6 +30,7 @@ export type NewTaskRow = {
   nodeId: string;
   prompt: string;
   workspacePath: string;
+  taskSpacePath: string;
   timeoutMs: number;
   skillSet: SkillSet;
   skillSetDigest: string;
@@ -45,7 +47,7 @@ export type SettleInput = {
 
 const SELECT = `
   select t.id, t.instance_id, i.client_id, t.node_id, t.attempt, t.state, t.prompt,
-         t.workspace_path, t.timeout_ms, t.skill_set, t.skill_set_digest,
+         t.workspace_path, t.task_space_path, t.timeout_ms, t.skill_set, t.skill_set_digest,
          t.outcome, t.error, t.not_before, t.dispatched_at, t.cancel_requested_at,
          t.finished_at, t.created_at, t.updated_at
     from task t join instance i on i.id = t.instance_id`;
@@ -53,15 +55,16 @@ const SELECT = `
 async function insertTask(tx: Db, row: NewTaskRow): Promise<void> {
   await tx.query(
     `insert into task
-       (id, instance_id, node_id, attempt, state, prompt, workspace_path, timeout_ms,
-        skill_set, skill_set_digest, not_before, created_at, updated_at)
-     values ($1, $2, $3, 1, 'queued', $4, $5, $6, $7::jsonb, $8, $9, $10, $10)`,
+       (id, instance_id, node_id, attempt, state, prompt, workspace_path, task_space_path,
+        timeout_ms, skill_set, skill_set_digest, not_before, created_at, updated_at)
+     values ($1, $2, $3, 1, 'queued', $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $11)`,
     [
       row.id,
       row.instanceId,
       row.nodeId,
       row.prompt,
       row.workspacePath,
+      row.taskSpacePath,
       row.timeoutMs,
       row.skillSet,
       row.skillSetDigest,
