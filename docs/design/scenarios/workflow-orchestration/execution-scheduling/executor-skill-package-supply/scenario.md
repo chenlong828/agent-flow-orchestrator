@@ -67,7 +67,7 @@ externalRefs: []
 
 失败路径：
 
-- `packageId` 未知或已下架：`404 package_not_found`，client 报 `failed(asset)` 不重试（`executor-http-v2` §4.3）。
+- `packageId` 未知或已下架：`404 package_not_found`，client 报 `failed(asset)` 不重试（`executor-http-v3` §4.3）。
 - 服务端/依赖不可用（`5xx`）：client 退避重试，超过阈值报 `failed(asset)`；调度器按重试策略结算。
 - 任务进行中 Skill 被保存为新版本：旧 `packageId` 不再可下载（当前不保留历史包），返回 404；新任务用新 `packageId` 与 digest。
 

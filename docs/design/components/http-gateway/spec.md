@@ -3,7 +3,7 @@ layer: design
 module: http-gateway
 status: current
 component: CMP-http-gateway
-updated: 2026-11-10
+updated: 2026-11-11
 ---
 
 # `CMP-http-gateway` 组件规格与 REST API 契约
@@ -116,7 +116,7 @@ updated: 2026-11-10
 
 ## 4 端点总表
 
-48 个产品业务端点（B1 38 个 + B3 工作流 10 个）；`/healthz` 单独列在 §4.2；执行面 3 个端点见 §4.3，不计入产品业务端点；开发者文档端点见 §4.4，不计入业务端点。`openapi.yaml` 的 `x-api-count` 统计本表的 48 个产品端点，不含 `/healthz`。
+48 个已实现的产品业务端点（B1 38 个 + B3 工作流 10 个）；运行编排工序另有 6 个 **planned** 端点（`API-42`–`API-47`，§4.1.1），实现后总数 54，`openapi.yaml` 的 `x-api-count` 届时改为 54。`/healthz` 单独列在 §4.2；执行面 3 个已实现端点 + 2 个 planned 端点见 §4.3，不计入产品业务端点；开发者文档端点见 §4.4，不计入业务端点。
 
 ### 4.1 业务端点
 
@@ -171,6 +171,23 @@ updated: 2026-11-10
 | `API-39` | GET | `/workflows/{id}/dsl` | `UC-B3-03` | 导出 JSON/YAML DSL | 200 文件 |
 | `API-40` | POST | `/workflows/import` | `UC-B3-03` | 从严导入 DSL；允许空专家绑定，新建工作流 | 201 `{workflow,idMap,warnings}` |
 
+### 4.1.1 运行编排端点（planned）
+
+> 设计冻结于 2026-11-11（[`2026-11-11-workflow-run-orchestration`](../../../works/2026-11-11-workflow-run-orchestration/brief.md)），实现随 `T-RUN-06`。领域契约见 [`CMP-run`](../run/spec.md) §3；本节只定传输落点与 DTO 形状。
+
+| ID | 方法 | 路径 | 用途 | 成功 |
+|---|---|---|---|---|
+| `API-42` | POST | `/workflows/{id}/runs` | 启动 run：校验可运行、登记/复用实例、冻结图快照、推进首节点 | 201 `{runId}` + Location |
+| `API-43` | GET | `/runs/{id}` | run 详情（状态、当前节点、节点列表、归档状态） | 200 `RunDetail` |
+| `API-44` | GET | `/runs` | run 列表；按 `workflowId`、`state` 过滤 | 200 `Page<RunSummary>` |
+| `API-45` | POST | `/runs/{id}/cancel` | 取消 run；幂等 | 200 `RunDetail` |
+| `API-46` | POST | `/runs/{id}/nodes/{nodeId}/decision` | `confirm` 决策 `pass` / `reject` | 200 `RunDetail` |
+| `API-47` | GET | `/runs/{id}/nodes/{nodeId}/session-log` | 下载会话日志（gzip JSONL） | 200 + `Content-Encoding: gzip` |
+
+- 错误映射：工作流/harness/run/节点不存在 → `404`；图含 `split`/`fanout`、字段非法 → `400`（`unsupported_node_type` / `validation_error`）；同工作区已有活跃 run → `409 run_conflict`；实例登记冲突 → `409 binding_conflict`；决策时节点不在 `waiting_confirm` → `409 invalid_state`；会话日志不存在 → `404 not_found`。
+- `API-42` 的 `intentMarkdown` 上限 256 KiB，超出 `400 validation_error`（`details.field=intent`）。
+- `API-47` 的 `visit`、`attempt` 为可选查询参数，缺省分别取该节点最大 `visit` 与该行最大 `attempt`；响应头带 `Content-Length` 与 `X-Checksum-Sha256`。
+
 ### 4.2 健康检查
 
 | ID | 方法 | 路径 | 用途 | 成功 | 失败 |
@@ -179,33 +196,43 @@ updated: 2026-11-10
 
 ### 4.3 执行面端点
 
-执行面是第 4 类 API 面：给智能体 client 用，不属于 `/api/v1` 产品资源，但同样挂在 `/api/v1` 下、单独一套约定。语义权威是 [`design/contracts/executor-http-v2.md`](../../contracts/executor-http-v2.md)；本节只定义传输落点、错误映射与 `P-03` 的头部。
+执行面是第 4 类 API 面：给智能体 client 用，不属于 `/api/v1` 产品资源，但同样挂在 `/api/v1` 下、单独一套约定。语义权威是 [`design/contracts/executor-http-v3.md`](../../contracts/executor-http-v3.md)；本节只定义传输落点、错误映射与 `P-03` 的头部。
 
 | ID | 方法 | 路径 | 用途 | 成功 |
 |---|---|---|---|---|
-| `EXE-01` | POST | `/api/v1/executor/poll` | 取任务 + 上报在跑状态 + 收停止/取消 | 200 `PollResponse` |
-| `EXE-02` | POST | `/api/v1/executor/tasks/{taskId}/result` | 交结果 | 200 `ResultAck` |
+| `EXE-01` | POST | `/api/v1/executor/poll` | 取任务 + 上报在跑状态 + 收停止/取消/归档指令 | 200 `PollResponse` |
+| `EXE-02` | POST | `/api/v1/executor/tasks/{taskId}/result` | 交结果（前置：会话日志已上传） | 200 `ResultAck` |
 | `EXE-03` | GET | `/api/v1/executor/skill-packages/{packageId}` | 取技能包 | 200 zip / 304 |
+| `EXE-04` | POST | `/api/v1/executor/tasks/{taskId}/session-log?attempt=n` | 上传会话日志（gzip JSONL） | 200 `{taskId,attempt,bytes,sha256}` |
+| `EXE-05` | POST | `/api/v1/executor/runs/{runId}/archive` | 上传运行归档（tar.gz） | 200 `{runId,bytes,sha256}` |
 
-- 这三个端点不计入产品业务端点计数，也不写入 `openapi.yaml` 的产品 `paths`；它们由 `CMP-http-gateway` 的 `executor` 路由实现，调用 `CMP-scheduler` 与 `SkillPackageSource`。
+- `EXE-01`–`EXE-03` 已实现（当前按 v2 语义运行）；`EXE-04`/`EXE-05` 与 v3 字段为 **planned**（设计冻结 2026-11-11），随 `T-RUN-06` 与 client 同批升级。契约权威是 [`executor-http-v3`](../../contracts/executor-http-v3.md)。
+- 五个端点都不计入产品业务端点计数，也不写入 `openapi.yaml` 的产品 `paths`；它们由 `CMP-http-gateway` 的 `executor` 路由实现：`poll` 调 `CMP-scheduler`，`result` 先经 `CMP-run`（有 run 归属时）再调调度器，`skill-packages` 调 `SkillPackageSource`，`session-log`/`archive` 调 `CMP-run`。
 - 鉴权：`Authorization: Bearer <token>`，token → `clientId` 由 `CMP-harness` 的 `ExecutorAuthenticator` 在 `harness.client_token` 上解析；**产品端点不受影响**，仍无鉴权。
-- 版本闸门：`X-Executor-Protocol` 必须精确等于 `2`；缺失或不等 → `400 unsupported_protocol`，不进入调度。
-- 常量（代码常量，不通过配置协商）：`maxResultBytes=262144`、`maxPromptBytes=1048576`、`maxSkillPackageBytes=67108864`、`maxTasksPerPoll=10`、`pollHoldMs=30000`、`clientPollTimeoutMs=40000`、`clientSilentMs=120000`、`resultGraceMs=60000`。
-- `P-01` 长轮询：网关把请求转给 `SchedulerService.poll` 并等待至多 `pollHoldMs`；请求体透传 `capacity`/`running`/`finished`，响应透传 `tasks`/`stop`/`cancelInstances`/`nextPollAfterMs`。
+- 版本闸门：契约现行版本为 `3`，`X-Executor-Protocol` 必须精确等于 `3`；缺失或不等 → `400 unsupported_protocol`，不进入调度。当前代码仍校验 `2`，随 `T-RUN-06` 切到 `3`；双端同批上线，不保留兼容窗口。
+- 常量（代码常量，不通过配置协商）：`maxResultBytes=262144`、`maxPromptBytes=1048576`、`maxSkillPackageBytes=67108864`、`maxTasksPerPoll=10`、`pollHoldMs=30000`、`clientPollTimeoutMs=40000`、`clientSilentMs=120000`、`resultGraceMs=60000`；v3 新增 `maxSessionLogBytes=67108864`、`maxArchiveBytes=536870912`、`maxArchiveEntries=100000`、`maxArchiveUncompressedBytes=2147483648`（`API-42` 的 intent 上限仍是产品面 256 KiB，不是执行面常量）。
+- `P-01` 长轮询：网关按 `pollHoldMs` 调 `SchedulerService.poll`，返回后合并 `CMP-run.archiveRequestsFor(clientId)`；**不因归档指令缩短挂起**（首次下发的同一跳由编排侧唤醒一次）。请求体透传 `capacity`/`running`/`finished`/`archivedRuns`，响应透传 `tasks`/`stop`/`cancelInstances`/`nextPollAfterMs` + `archiveRequests`。
+- `P-02`：网关先调 `CMP-run.handleTaskResult(clientId, result)`；有 run 归属时由编排校验日志并结算，无归属时委托调度器。缺日志 → `409 session_log_missing`，任务不结算。
 - `P-03` 头部：`Content-Length`、`ETag`（来自 `SkillPackageRef.etag`）、`X-Checksum-Sha256`、`Cache-Control: private, max-age=3600`；`If-None-Match` 与 ETag 相等 → `304`，无响应体。`304` 只在客户端本地已有副本时有意义（`VR-01`，client 侧修复）。
 - `P-03` 的 `packageId` 与内容一一对应：Skill 保存新版本后旧 `packageId` 返回 `404`；包缺失/损坏返回 `500 package_unavailable`，不返回部分字节。
-- 经 BFF/反向代理转发时：请求头白名单必须放行 `authorization`、`x-executor-protocol`、`x-request-id`、`if-none-match`；代理超时必须大于 `pollHoldMs`（30s），否则长轮询会被代理提前切断。
+- `EXE-04`：`Content-Type: application/x-ndjson` + `Content-Encoding: gzip`；按 `taskId+attempt` 后到覆盖，响应 `stored`（`created`/`replaced`/`unchanged`）；允许 0 行；超限 `413`（`details.limit=session_log_bytes`）；先写临时键再原子改名。
+- `EXE-05`：`Content-Type: application/gzip`；run 未终态 `409 invalid_state`；解包路径/条目/总量校验失败 `400 invalid_archive`；超限 `413`（`details.limit=archive_bytes`）；落盘 `history/<instanceId>/<runId>/`，路径全部由服务端拼接。
+- 经 BFF/反向代理转发时：请求头白名单必须放行 `authorization`、`x-executor-protocol`、`x-request-id`、`if-none-match`、`content-encoding`；代理超时必须大于 `pollHoldMs`（30s），否则长轮询会被代理提前切断。
 
 执行面错误映射（沿用 §3.3 信封，`code` 为稳定英文）：
 
 | HTTP | `code` | 触发 |
 |---:|---|---|
-| 400 | `unsupported_protocol` | `X-Executor-Protocol` 缺失或不等于 `2` |
+| 400 | `unsupported_protocol` | `X-Executor-Protocol` 缺失或不等于 `3` |
 | 400 | `validation_error` | 请求体未知字段、字段类型/范围非法、`status`/`error.class` 不在闭集 |
+| 400 | `invalid_archive` | `P-05` 的 gzip/tar 损坏、含绝对路径/`..`/越界链接 |
 | 401 | `unauthorized` | Bearer 缺失或 token 未映射到 `clientId` |
-| 404 | `task_not_found` | `P-02` 的 `taskId` 不存在或不属于该 client 的实例 |
+| 404 | `task_not_found` | `P-02`/`P-04` 的 `taskId` 不存在或不属于该 client 的实例 |
+| 404 | `run_not_found` | `P-05` 的 `runId` 不存在或不属于该 `clientId` |
 | 404 | `package_not_found` | `P-03` 的 `packageId` 不存在或已下架 |
-| 413 | `payload_too_large` | 结果体超过 `maxResultBytes`；`details.limit=result_bytes` |
+| 409 | `session_log_missing` | `P-02` 到达时该 `taskId+attempt` 没有已上传的会话日志 |
+| 409 | `invalid_state` | `P-05` 的 run 未终态 |
+| 413 | `payload_too_large` | 结果/日志/归档超过对应上限；`details.limit` 标明对象 |
 | 500 | `package_unavailable` | 包文件缺失/损坏 |
 | 503 | `service_unavailable` | 数据库不可用 |
 
@@ -655,7 +682,7 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 
 ### 5.8 执行面 DTO
 
-传输形状与 [`executor-http-v2`](../../contracts/executor-http-v2.md) §5 一致；本节只登记与本仓库组件方法的对应关系，字段语义以契约与组件规格为准。
+传输形状与 [`executor-http-v3`](../../contracts/executor-http-v3.md) §4–§8 一致；本节只登记与本仓库组件方法的对应关系，字段语义以契约与组件规格为准。
 
 **`PollRequest`**（`EXE-01` 请求）
 
@@ -664,12 +691,13 @@ type PollRequest = {
   capacity: { free: number };
   running: { taskId: string; instanceId: string; startedAt: string; lastEventAt?: string }[];
   finished: { taskId: string; attempt: number; finishedAt: string }[];
+  archivedRuns?: string[];   // v3：已成功上传归档的 runId
 };
 ```
 
-**`PollResponse`**（`EXE-01` 响应）：`{tasks: TaskRequest[]; stop: boolean; cancelInstances: string[]; nextPollAfterMs: number}`；`tasks.length ≤ min(free, 10)`；`free=0` 时为空数组。
+**`PollResponse`**（`EXE-01` 响应）：`{tasks: TaskRequest[]; stop: boolean; cancelInstances: string[]; nextPollAfterMs: number; archiveRequests?: ArchiveRequest[]}`；`tasks.length ≤ min(free, 10)`；`free=0` 时为空数组；`archiveRequests` 为 v3 电平字段。
 
-**`TaskRequest`**（下发项）：`{taskId, instanceId, nodeId, attempt, prompt, workspacePath, timeoutMs, skillSet}`；`skillSet` 为 `{digest, packages: SkillPackage[]}`；`downloadUrl` 由服务端拼为 `/api/v1/executor/skill-packages/{packageId}`。
+**`TaskRequest`**（下发项）：`{taskId, instanceId, nodeId, attempt, prompt, workspacePath, timeoutMs, skillSet, taskSpacePath}`；`skillSet` 为 `{digest, packages: SkillPackage[]}`；`downloadUrl` 由服务端拼为 `/api/v1/executor/skill-packages/{packageId}`；启动诉求已并入 `prompt`（v3）。
 
 **`TaskResult`**（`EXE-02` 请求）：`{taskId, attempt, status, sessionId?, message, truncated, stopReason, usage, error, startedAt?, finishedAt?}`；`status` 闭集 `succeeded/failed/cancelled/timeout`；`error.class` 闭集见契约 §5。
 
@@ -677,8 +705,32 @@ type PollRequest = {
 
 **`SkillPackage`**（下发项与 `P-03` 元数据）：`{packageId, name, version, digest, sizeBytes, downloadUrl, etag?}`；`ETag` 与 `etag` 同源，均来自 `SkillPackageRef.etag`。
 
-- DTO ↔ 领域映射只在路由层完成：`PollRequest` → `ClientReport`，`PollResponse` ← `DispatchDecision`，`TaskResult` → 领域 `TaskResult`，`SkillPackage` ← `SkillPackageRef`。
-- 执行面 DTO 不写 `openapi.yaml`（契约由 `executor-http-v2` 文件承载）；实现工序在 `src/components/http-gateway/executor/` 落路由与类型。
+- DTO ↔ 领域映射只在路由层完成：`PollRequest` → `ClientReport`，`PollResponse` ← `DispatchDecision` + `ArchiveRequest[]`，`TaskResult` → 领域 `TaskResult`，`SkillPackage` ← `SkillPackageRef`；`P-04`/`P-05` 以流透传给 `CMP-run`，网关不缓冲整包。
+- 执行面 DTO 不写 `openapi.yaml`（契约由 `executor-http-v3` / `executor-http-v3` 文件承载）；`EXE-01`–`EXE-03` 已实现，`EXE-04`/`EXE-05` 为 planned。
+
+### 5.9 运行编排 DTO（planned）
+
+**`StartRunRequest`**（`API-42`）
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `harnessId` | string | 是 | 目标节点；必须已绑定 `clientId` 且 `enabled` |
+| `workspacePath` | string | 是 | 绝对路径；同 `clientId+workspacePath` 已有实例时复用 |
+| `intentMarkdown` | string | 是 | ≤ 256 KiB；编排侧写入首节点 `prompt`，由 start 节点模型落盘 |
+| `autoConfirm` | boolean | 否 | 默认 `false`；`true` 时 `confirm` 节点自动通过 |
+
+**`RunSummary`**（`API-44` 列表项）：`{runId, workflowId, workflowRevision, harnessId, clientId, instanceId, state, outcome, currentNodeId, archiveState, createdAt, startedAt, finishedAt}`。
+
+**`RunDetail`**（`API-42`/`API-43`/`API-45`/`API-46` 响应）：`RunSummary` + `{workspacePath, taskSpacePath, autoConfirm, finalMessage, error, nodes: RunNodeView[]}`。
+
+**`RunNodeView`**：`{nodeId, nodeType, visit, state, taskId, verdict, message, error, dispatchedAt, finishedAt}`；`attempt` 归执行面任务，不在 run 视图重复；`state` 闭集 `queued/dispatched/waiting_confirm/succeeded/rejected/failed`。
+
+**`DecisionRequest`**（`API-46`）：`{decision: "pass" | "reject", comment?: string}`；仅 `waiting_confirm` 可接受，同决策重复提交幂等。
+
+**`ArchiveRequest`**（`EXE-01` 响应内）：`{runId, instanceId, workspacePath, taskSpacePath}`。
+
+- `API-47` 响应：`application/x-ndjson` + `Content-Encoding: gzip` + `Content-Length` + `X-Checksum-Sha256`；`visit`/`attempt` 缺省取最新。
+- 运行编排 DTO 在实现时进入 `openapi.yaml`（`API-42`–`API-47`），`x-api-count` 同步 48 → 54。
 
 ## 6 外部 UI 页面映射（参考，不属于本仓库交付与验收）
 
@@ -721,13 +773,16 @@ B1/B3 不提供的页面动作：Harness 连接测试/心跳刷新、工具调�
 - 装配：重复目标、目标不存在、旧 `revision`、顺序回读；聚合保存的省略/替换/清空语义。
 - 工作流：列表/详情、复制后缀、图保存/校验、DSL JSON/YAML、导入缺失专家、revision 冲突、validate 404。
 - 契约快照：响应字段集合与 DTO 表一致；新增字段必须更新本文。
-- 执行面（§4.3）：协议版本闸门、Bearer → `clientId`、未知字段 400、`maxResultBytes` 413、`P-03` 的 ETag/304/`X-Checksum-Sha256`/404/500；三个端点各自 3 正 1 反，断言见场景 `SCN-0201`–`SCN-0205`。
+- 执行面（§4.3）：协议版本闸门、Bearer → `clientId`、未知字段 400、`maxResultBytes` 413、`P-03` 的 ETag/304/`X-Checksum-Sha256`/404/500；三个已实现端点各自 3 正 1 反，断言见场景 `SCN-0201`–`SCN-0205`。
+- 运行编排（planned，`API-42`–`API-47`）：启动校验（含 `split`/`fanout` 拒绝）、run 详情/列表、取消幂等、决策状态校验、日志下载头；断言见场景 `SCN-0301`–`SCN-0304`。
+- 执行面 v3（planned，`EXE-04`/`EXE-05`）：日志先传后报、`409 session_log_missing`、`413`、归档路径安全校验；断言见场景 `SCN-0302`、`SCN-0304` 与契约 v3 §11。
 - 外部 UI 若接入，可用同一份端点/DTO 表做适配层契约测试；不共享代码。
 
 ## 8 依赖与边界
 
-- 允许：`catalog` 读契约；四类资产写服务；工作流写服务；`scheduler` 的 `poll`/`acceptResult`；`kernel` 的 `SkillPackageSource` 端口；`platform` 的 `Health`；`kernel` 的错误、分页、ID/时钟类型；Bun 的 multipart/流读取；文档子模块的 Bun 文件读取与本地静态资源。
+- 允许：`catalog` 读契约；四类资产写服务；工作流写服务；`scheduler` 的 `poll`/`acceptResult`；`run` 的启动/推进/结果/日志/归档方法（planned）；`kernel` 的 `SkillPackageSource` 端口；`platform` 的 `Health`；`kernel` 的错误、分页、ID/时钟类型；Bun 的 multipart/流读取；文档子模块的 Bun 文件读取与本地静态资源。
 - 禁止：导入任何 store；执行 SQL；直接使用 `FileStore` 或 Bun 文件 API 读写包/草稿；在路由层实现名称唯一、引用保护、版本递增、路径校验等业务规则；直接序列化领域实体；文档子模块接触数据库或领域服务。
+- 执行面路由分工：`poll` 直连 `scheduler` 并合并 `run` 的归档电平；`result` 先经 `run`（无 run 归属时委托调度器）；`session-log`/`archive` 直接经 `run` 透传流；网关不做 verdict/task.db/解包等业务解析。
 - 校验分工：HTTP 校验 multipart/JSON 形状、必填、类型、简单范围、未知字段、请求体大小；领域校验路径、文件数/总量、唯一性、引用、状态与事务不变量。
 - 错误映射：领域错误 → HTTP `code`/状态码；未知异常 → 500，不泄漏 SQL/堆栈。
 
@@ -735,11 +790,12 @@ B1/B3 不提供的页面动作：Harness 连接测试/心跳刷新、工具调�
 
 - 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 36 KB；OpenAPI 运行时资产约 85 KB、Swagger UI 静态资源约 2.14 MB，均单独计量，不计入组件预算。
 - 单独验证命令：`bun test tests/components/http-gateway`。
-- 文档入口：启动后访问 `/docs`；机器可读契约：`/openapi.yaml`。OpenAPI 资产随组件发布，覆盖 48 个产品业务 operation 与 `/healthz`（共 49 个 operation），以及 Skill 包/草稿、工作流定义 DTO。
+- 文档入口：启动后访问 `/docs`；机器可读契约：`/openapi.yaml`。OpenAPI 资产随组件发布，当前覆盖 48 个产品业务 operation 与 `/healthz`（共 49 个 operation）；运行编排实现后为 54 个产品业务 operation（65 个 operation 含 `/healthz`），`x-api-count` 同批更新。
 - `API-41`（Harness 节点登记）、`clientId`/`clientToken` 字段已实现，直接改基线表结构、未做数据迁移（演示数据可丢弃）。
 - 执行面 3 个端点（`EXE-01`–`EXE-03`，§4.3）已实现（2026-11-11，`src/components/http-gateway/routes/executor.ts`）。
 - Harness 派生态 `health`/`lastHeartbeatAt` 已实现：`catalog` 组合 `CMP-scheduler` 的 `presence` 读（`harness` §3.3），未绑定或未被观测时返回 `unknown`，观测不可用时降级 `unknown`，不伪造 `offline`。
 - 当前状态：`current`；B1 资产端点与 B3 工作流定义端点均已实现，运行时 OpenAPI 为 32 个 path、49 个 operation（含 `/healthz`）；B3 验证记录见 [工作流工序 result.md](../../../history/works/2026-10-28-workflow-definition/result.md)。
+- 运行编排（`API-42`–`API-47`）与执行面 v3（`EXE-04`/`EXE-05`）设计冻结于 2026-11-11，尚未实现；实现后需重启 `3100` 服务并验证 `/openapi.yaml` 已含新 operation。
 
 ## 10 B1/B3 实现口径与剩余问题
 

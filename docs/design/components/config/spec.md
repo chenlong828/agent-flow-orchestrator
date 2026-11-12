@@ -3,7 +3,7 @@ layer: design
 module: config
 status: current
 component: CMP-config
-updated: 2026-11-10
+updated: 2026-11-11
 ---
 
 # `CMP-config` 组件规格
@@ -36,6 +36,9 @@ export type Config = {
   skillDraftTtlHours: number;   // 默认 24；可由 SKILL_DRAFT_TTL_HOURS 覆盖
   taskMaxAttempts: number;      // 未回报重派上限；默认 3（失败结果不自动重派）
   taskRetryDelayMs: number;     // 未回报回队后的退避；默认 5000
+  archiveRoot: string;          // 运行归档根；默认 .local/archive
+  runDefaultTimeoutMs: number;  // 节点任务默认超时；默认 1800000
+  runMaxNodeVisits: number;     // 单节点最大重访轮次；默认 5
 };
 
 export type LoadConfigOptions = {
@@ -70,12 +73,12 @@ export function loadConfig(options?: LoadConfigOptions): Promise<Config>;
   < process.env（包含 Bun 从 .env 加载的值）
 ```
 
-- 环境变量键：`HOST`、`PORT`、`DATABASE_URL`、`DEV_ACTOR`、`LOG_LEVEL`、`SKILL_STORAGE_ROOT`、`SKILL_DRAFT_TTL_HOURS`、`TASK_MAX_ATTEMPTS`、`TASK_RETRY_DELAY_MS`。
+- 环境变量键：`HOST`、`PORT`、`DATABASE_URL`、`DEV_ACTOR`、`LOG_LEVEL`、`SKILL_STORAGE_ROOT`、`SKILL_DRAFT_TTL_HOURS`、`TASK_MAX_ATTEMPTS`、`TASK_RETRY_DELAY_MS`、`ARCHIVE_ROOT`、`RUN_DEFAULT_TIMEOUT_MS`、`RUN_MAX_NODE_VISITS`。
 - 空字符串视为未设置，沿用现有行为。
 - `SKILL_STORAGE_ROOT` 为空时按未设置处理，回退 `.local/skills`；`SKILL_DRAFT_TTL_HOURS` 必须是正整数小时，非法值报 `config_validation_error`。
 - 执行面凭据**不通过配置提供，永久保存在 `harness.client_token`**（数据库）：token → `clientId` 由 `CMP-harness` 解析（经 `kernel.ExecutorAuthenticator`），登记与轮换走 `API-41`；配置里不出现任何 token，也不读 `.env` 中的凭据键。
-- `TASK_MAX_ATTEMPTS` 必须是 1–10 的整数，默认 3，只约束「未回报重派」（`executor-http-v2` `S-02`）；`TASK_RETRY_DELAY_MS` 必须是 0–600000 的整数，默认 5000。失败或超时的结果不自动重派（[`scheduler`](../scheduler/spec.md) §4.5，2026-11-11 裁决），这两个参数不影响失败结果。
-- `executor-http-v2` §3 的常量（`pollHoldMs=30000`、`maxTasksPerPoll=10`、`clientSilentMs=120000`、`resultGraceMs=60000`、`maxResultBytes`、`maxPromptBytes`、`maxSkillPackageBytes`、`clientPollTimeoutMs`）不通过配置协商，代码常量固定；本组件不读取。
+- `TASK_MAX_ATTEMPTS` 必须是 1–10 的整数，默认 3，只约束「未回报重派」（`executor-http-v3` `S-02`）；`TASK_RETRY_DELAY_MS` 必须是 0–600000 的整数，默认 5000。失败或超时的结果不自动重派（[`scheduler`](../scheduler/spec.md) §4.5，2026-11-11 裁决），这两个参数不影响失败结果。
+- `executor-http-v3` §3 的常量（`pollHoldMs=30000`、`maxTasksPerPoll=10`、`clientSilentMs=120000`、`resultGraceMs=60000`、`maxResultBytes`、`maxPromptBytes`、`maxSkillPackageBytes`、`clientPollTimeoutMs`）不通过配置协商，代码常量固定；本组件不读取。
 - 已存在的 shell 环境变量优先于 `.env`；这是 Bun 的加载语义。
 - `CONFIG_FILE`：可选环境变量，指定单个 TOML 文件；设置后不再读 `default.toml` / `local.toml`，环境变量仍可覆盖。
 - `configDir`：测试注入用；运行时默认 `process.cwd()/config`。
@@ -96,10 +99,19 @@ level = "info"
 [executor]
 max_attempts = 3
 retry_delay_ms = 5000
+
+[run]
+default_timeout_ms = 1800000
+max_node_visits = 5
+
+[archive]
+root = ".local/archive"
 ```
 
-- 只允许 `server`、`app`、`log`、`executor` 四个顶层分节；未知分节/键报错。
-- `server.host`、`app.actor`、`log.level` 为字符串；`server.port` 为 1–65535 的整数。
+- 只允许 `server`、`app`、`log`、`executor`、`run`、`archive` 六个顶层分节；未知分节/键报错。
+- `server.host`、`app.actor`、`log.level`、`archive.root` 为字符串；`server.port` 为 1–65535 的整数；`run.default_timeout_ms` 为 1000–86400000 的整数；`run.max_node_visits` 为 1–20 的整数。
+- `archive.root` 必须是相对或绝对路径字符串，非空；为空时按未设置处理，回退 `.local/archive`。目录在首次归档时创建，不在启动期创建。
+- `run.default_timeout_ms` 与 `run.max_node_visits` 只约束运行编排的节点任务；与 `[executor]` 的重派参数正交。
 - `local.toml` 可以是部分文件，只覆盖需要改变的值。
 - 文件不存在：`default.toml` / `local.toml` 缺失时使用现有默认值；`CONFIG_FILE` 指定的文件缺失时启动失败。
 - TOML 只承载非密钥启动参数；`DATABASE_URL` 不从 TOML 读取。

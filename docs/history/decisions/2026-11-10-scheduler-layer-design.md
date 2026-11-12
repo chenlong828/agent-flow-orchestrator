@@ -9,7 +9,7 @@ decision: 2026-11-10-scheduler-layer-design
 # 决策：执行面调度层的组件切分与数据身份
 
 > 背景：`executor-http-v2` 已冻结并由 `agent-flow-client` 实现，调度器侧只有契约、没有组件。本决策固定调度器侧的结构、数据身份与不变量；实现细节另立工序。
-> 依据：[`executor-http-v2`](../../design/contracts/executor-http-v2.md)、[`review.md`](../works/2026-11-10-scheduler-layer-design/review.md)。
+> 依据：[`executor-http-v2`](../works/2026-11-10-executor-contract-v2/executor-http-v2.md)、[`review.md`](../works/2026-11-10-scheduler-layer-design/review.md)。
 
 ## 1 决策
 

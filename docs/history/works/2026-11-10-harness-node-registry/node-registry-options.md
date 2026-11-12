@@ -11,7 +11,7 @@ level: P2
 
 > 方向前提（用户 2026-11-10 裁决）：**A. Harness 就是 client 节点目录，管理员维护，不恢复 client 自注册。**
 > 本文比较 A 内部的 8 个子决策，给出推荐组合与分期；确认后按 `brief.md` `T-NODE-02` 落组件规格与迁移。
-> 契约基线：[`executor-http-v2`](../../../design/contracts/executor-http-v2.md)（不改）。
+> 契约基线：[`executor-http-v2`](../2026-11-10-executor-contract-v2/executor-http-v2.md)（不改）。
 
 ## 1 现状（证据）
 

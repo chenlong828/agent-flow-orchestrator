@@ -8,7 +8,7 @@ updated: 2026-11-10
 # 对齐检查：边界预设 vs 执行面契约 v2
 
 > 对象：[`brief.md`](brief.md)「已定框架」、[`boundary-design.md`](boundary-design.md)、[`client-work.md`](client-work.md)。
-> 基线：[`docs/design/contracts/executor-http-v2.md`](../../../design/contracts/executor-http-v2.md)（2026-11-10 现行权威）。
+> 基线：[`docs/design/contracts/executor-http-v2.md`](../2026-11-10-executor-contract-v2/executor-http-v2.md)（2026-11-10 现行权威）。
 > 方法：逐条取边界原文与契约条款对照；只判「是否同一事实被两处写成不同结论」，不评实现好坏。
 
 ## 1. 结论

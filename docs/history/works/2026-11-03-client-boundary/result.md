@@ -28,7 +28,7 @@ updated: 2026-11-10
 
 | 结论 | 落点 |
 |---|---|
-| 现行交互机制（唯一依据） | [`docs/design/contracts/executor-http-v2.md`](../../../design/contracts/executor-http-v2.md)：三端点、at-least-once、无租约/心跳/绑定/清理指令 |
+| 现行交互机制（唯一依据） | [`docs/design/contracts/executor-http-v2.md`](../2026-11-10-executor-contract-v2/executor-http-v2.md)：三端点、at-least-once、无租约/心跳/绑定/清理指令 |
 | 与 v2 的逐条冲突（12 处）与缺口（2 处） | [`v2-alignment.md`](v2-alignment.md) |
 | 进程模型决策 | `docs/history/decisions/2026-11-03-client-workspace-process-model.md` |
 | 仍成立的边界结论 | 控制面/执行面分离、状态单家、工作区与产物归 client、决策归属、`timeoutMs` 上界、client 只重试传输层 |

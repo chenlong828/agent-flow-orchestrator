@@ -3,7 +3,7 @@ layer: design
 module: kernel
 status: current
 component: CMP-kernel
-updated: 2026-11-10
+updated: 2026-11-11
 ---
 
 # `CMP-kernel` 共享契约组件规格
@@ -43,6 +43,12 @@ type ErrorCode =
   | "package_unavailable"     // 500
   | "unsupported_protocol"    // 400
   | "unauthorized"            // 401
+  | "run_not_found"           // 404
+  | "run_conflict"            // 409
+  | "session_log_missing"     // 409
+  | "invalid_state"           // 409
+  | "invalid_archive"         // 400
+  | "unsupported_node_type"   // 400
   | "database_unavailable";   // 503
 
 type ErrorDetails = Record<string, unknown>;
@@ -69,6 +75,12 @@ class BindingConflictError extends AppError {}
 class PackageUnavailableError extends AppError {}
 class UnsupportedProtocolError extends AppError {}
 class UnauthorizedError extends AppError {}
+class RunNotFoundError extends AppError {}
+class RunConflictError extends AppError {}
+class SessionLogMissingError extends AppError {}
+class InvalidStateError extends AppError {}
+class InvalidArchiveError extends AppError {}
+class UnsupportedNodeTypeError extends AppError {}
 class DatabaseUnavailableError extends AppError {}
 ```
 
@@ -82,7 +94,13 @@ class DatabaseUnavailableError extends AppError {}
 - `unauthorized` 只由执行面守护产生：Bearer 缺失或 token 未映射到 `clientId`；产品端点不使用。
 - `task_not_found` 只用于执行面 `P-02`：请求的 `taskId` 不存在或不属于该 client 的实例；其他资源的「不存在」仍用 `not_found`。
 - `binding_conflict` 只用于执行面的节点绑定与实例登记：Harness 登记时 `clientId` 或 token 已被其他节点占用（`details.field` 区分，凭据冲突不回显 token 值）；实例登记时同 `instanceId` 的 `clientId`/`workspacePath` 被改成不同值，或同一 client 下 `workspacePath` 重复登记。不用于任务或资产名称。
-- `unsupported_protocol` 只用于 `X-Executor-Protocol` 与当前整数版本不匹配（`executor-http-v2` §3、§13）；请求体形状错误用 `validation_error`。
+- `unsupported_protocol` 只用于 `X-Executor-Protocol` 与当前整数版本不匹配（`executor-http-v3` §3、§13）；请求体形状错误用 `validation_error`。
+- `run_not_found` 只用于执行面 `P-05` 与产品面 run 端点：`runId` 不存在或其所属实例不绑定该 `clientId`；其他资源的「不存在」仍用 `not_found`。
+- `run_conflict` 只用于启动 run：同一工作区（`instanceId`）已有 `running`/`waiting_confirm` 的 run；不用于任务冲突（任务归调度器）。
+- `session_log_missing` 只用于执行面 `P-02`：结果到达时该 `taskId+attempt` 没有已上传并校验通过的会话日志；任务不结算、不重派。
+- `invalid_state` 用于「当前状态不允许该操作」：`P-05` 的 run 未终态、产品面决策时节点不在 `waiting_confirm`；与 `revision_conflict` 的区别是后者只针对 revision 闸门。
+- `invalid_archive` 只用于 `P-05`：gzip/tar 损坏、含绝对路径/`..`/越界符号链接、超出条目或解压总量上限。
+- `unsupported_node_type` 只用于启动 run 时图含本期不支持的节点类型（`split`/`fanout`）；保存工作流时不使用（保存允许这两类）。
 - `database_unavailable` 只由 `platform` 在连接不可用时抛出；`http-gateway` 映射为 503。
 
 ### 3.2 分页
@@ -263,7 +281,7 @@ type ExecutorAuthenticator = {
 - 允许依赖：仅 TypeScript 标准库与纯类型工具。
 - 禁止依赖：`platform`、任何领域组件、`catalog`、`http-gateway`、Bun/PostgreSQL 驱动。
 - 本组件不拥有数据表；`schema_migrations` 属于 `platform`。
-- **实现状态**：`binding_conflict`、`NodeDirectory`、`ExecutorAuthenticator` 已实现（节点目录）；`task_not_found`、`package_not_found`、`unsupported_protocol`、`unauthorized` 与 `SkillPackageSource` 端口已随调度层实现（2026-11-11）；其余错误类型与端口不变。
+- **实现状态**：`binding_conflict`、`NodeDirectory`、`ExecutorAuthenticator` 已实现（节点目录）；`task_not_found`、`package_not_found`、`unsupported_protocol`、`unauthorized` 与 `SkillPackageSource` 端口已随调度层实现（2026-11-11）；`run_not_found`、`run_conflict`、`session_log_missing`、`invalid_state`、`invalid_archive`、`unsupported_node_type` 已设计冻结、随运行编排实现（2026-11-11）；其余错误类型与端口不变。
 - 所有公开类型不得包含 HTTP 状态码、SQL 行类型或框架类型。
 
 ## 5. 单独验证

@@ -11,7 +11,7 @@ level: P1
 
 ## 1 范围
 
-**本轮做**：按冻结的 [`executor-http-v2`](../../../design/contracts/executor-http-v2.md)，把调度器侧落成设计：
+**本轮做**：按冻结的 [`executor-http-v2`](../2026-11-10-executor-contract-v2/executor-http-v2.md)，把调度器侧落成设计：
 
 1. 组件切分与数据所有权：新增 `CMP-scheduler`、`CMP-instance`；执行面三端点作为 `CMP-http-gateway` 的 `executor` 路由。
 2. 执行面场景设计：派发、结果回收与重派、技能包供给、停止与取消、协议版本与凭据，共 5 张场景卡。
@@ -21,10 +21,10 @@ level: P1
 
 ## 2 输入与约束
 
-- 契约权威：[`executor-http-v2`](../../../design/contracts/executor-http-v2.md)（`P-01`–`P-03`、`S-01`–`S-08`、`C-01`–`C-09`、§3 常量、§13 版本演进）。
+- 契约权威：[`executor-http-v2`](../2026-11-10-executor-contract-v2/executor-http-v2.md)（`P-01`–`P-03`、`S-01`–`S-08`、`C-01`–`C-09`、§3 常量、§13 版本演进）。
 - client 已按契约实现（`agent-flow-client` `e047e0a`），接口一致性见 [`verification.md`](../../works/2026-11-10-executor-contract-verification/verification.md)；偏离项 `OQ-15`–`OQ-17` 不在本轮修。
 - 用户裁决：本轮只做执行面调度；3 组件切分（scheduler + instance，端点并入 http-gateway）；数据设计到实体/所有权/状态机，列级留实现；实例粘性只重派回原 client；实例与 `workspacePath` 由任务启动时通过界面设置、启动前建好。
-- 级别 P1：触碰新增组件、公共契约面、数据所有权，人工确认在切分与契约阶段（已确认切分）与最终冻结（待确认）。
+- 级别 P1：触碰新增组件、公共契约面、数据所有权，人工评审确认在切分与契约阶段（已确认切分）与最终冻结（待确认）。
 
 ## 3 交付物
 
@@ -77,7 +77,7 @@ level: P1
 - `OQ-21`（实例不可用无载体）：给调度器侧兜底（`blocked`），契约缺口保留待定。
 - `OQ-12`–`OQ-14`、`OQ-15`–`OQ-17`、`OQ-19`：只读引用，不改本轮范围。
 
-## 8 裁决（P1 人工门，2026-11-11）
+## 8 裁决（P1 人工评审确认，2026-11-11）
 
 - 用户确认 7 项 `Decision now`：组件切分、技能集冲突拒绝、**失败不自动重派**、制品身份与不保留历史包、长轮询单飞、场景保持 `draft`、凭据留配置；详见 `review.md` §7。
 - 其中失败重派由原草案的「有限重试」改为「直接结算」，代价与落点见 `review.md` 的 `D-03`。

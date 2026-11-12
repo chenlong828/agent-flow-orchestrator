@@ -3,12 +3,12 @@ layer: design
 module: instance
 status: active
 component: CMP-instance
-updated: 2026-11-10
+updated: 2026-11-11
 ---
 
 # `CMP-instance` 组件规格
 
-> 范围：执行实例的登记、工作区路径归属、client 绑定与可用性状态，即 `executor-http-v2` 的 `TaskRequest.instanceId` / `workspacePath` 与 `S-02`/`S-06` 依赖的实例事实。
+> 范围：执行实例的登记、工作区路径归属、client 绑定与可用性状态，即 `executor-http-v3` 的 `TaskRequest.instanceId` / `workspacePath` 与 `S-02`/`S-06` 依赖的实例事实。
 > 不包含：任务状态与派发裁决（[`CMP-scheduler`](../scheduler/spec.md)）、工作区目录的创建与校验（client 侧）、HTTP 传输（`CMP-http-gateway`）、跨 client 改派的管理面。
 > 状态：`active`，2026-11-11 实现并通过测试（`tests/components/instance`）。
 
@@ -21,7 +21,7 @@ updated: 2026-11-10
 - 不创建、不检查工作区目录是否存在/可写/是否在 git 仓库外；契约 `P-01` §4.1 #3 规定 client 只校验不创建，调度器只登记路径字符串；
 - 不决定任务派发顺序、容量与重试（`CMP-scheduler`）；
 - 不持有任务状态、技能集 digest 或安装状态（digest 一致性由调度器按任务派生）；
-- 不回收目录、不清理进程（v2 没有清理指令，实例不再需要时由运维按 `instanceId` 回收）；
+- 不回收目录、不清理进程（契约没有清理指令，实例不再需要时由运维按 `instanceId` 回收）；
 - 不解析 HTTP、不做鉴权（`CMP-http-gateway`）。
 
 ## 2 拥有的数据
@@ -75,6 +75,9 @@ type InstanceService = {
   /** 读：按 client 列可派发实例。 */
   listDispatchable(clientId: string): Promise<Instance[]>;
 
+  /** 读：按绑定反查实例；不存在返回 null。供运行编排复用同一工作区的实例。 */
+  getByBinding(clientId: string, workspacePath: string): Promise<Instance | null>;
+
   /** 派发前复核：实例存在、active、绑定该 client。 */
   isDispatchable(instanceId: string, clientId: string): Promise<boolean>;
 
@@ -96,13 +99,14 @@ type InstanceService = {
 | `enroll` | 登记实例 | `EnrollInstance` | `Instance` | `ValidationError`、`BindingConflictError`（同 ID 不同绑定、或同 client 同路径重复）、`DatabaseUnavailableError` | 单事务；唯一约束兜底 |
 | `get` | 读实例 | `instanceId` | `Instance \| null` | 无 | 只读 |
 | `listDispatchable` | 列可派发实例 | `clientId` | `Instance[]` | `ValidationError` | 只读；只回 `active` |
+| `getByBinding` | 按绑定反查 | `clientId`、`workspacePath` | `Instance \| null` | `ValidationError` | 只读；含 `blocked`/`retired`，供运行编排复用 |
 | `isDispatchable` | 派发复核 | `instanceId`、`clientId` | `boolean` | 无 | 只读 |
 | `block` | 摘除实例 | `instanceId`、`reason` | `void` | `NotFoundError` | 幂等；`retired` 不回到 `blocked` |
 | `unblock` | 恢复实例 | `instanceId` | `void` | `NotFoundError` | 幂等；`retired` 拒绝恢复（`ValidationError`） |
 | `retire` | 回收实例 | `instanceId` | `void` | `NotFoundError` | 幂等；终态 |
 
 - 错误类型定义在 [`CMP-kernel`](../kernel/spec.md)；`BindingConflictError` 用于「同 `instanceId` 的绑定被改」与「同 client 同路径重复登记」，映射为 `409 binding_conflict`。
-- `enroll` 的调用方向：任务启动用例（上游编排 / 界面）在创建任务列表前登记实例并确保目录已建好；`enroll` 不接受来自执行面 client 的请求（`executor-http-v2` 没有注册端点）。
+- `enroll` 的调用方向：任务启动用例（上游编排 / 界面）在创建任务列表前登记实例并确保目录已建好；`enroll` 不接受来自执行面 client 的请求（`executor-http-v3` 没有注册端点）。
 - `block` / `unblock` / `retire` 是运维与调度器的写入口；本期没有对外 REST 面，由组合根暴露给运维脚本与调度器。
 
 ## 4 状态机与不变量
@@ -124,11 +128,11 @@ enroll ──▶ active ──block──▶ blocked ──unblock──▶ acti
 | 消费方 | 用法 |
 |---|---|
 | `CMP-scheduler` | `get`（取 `workspacePath`）、`isDispatchable`（派发复核）、`listDispatchable`（批量筛选）；`block`（实例失败摘除） |
-| 上游编排 / 任务启动用例 | `enroll`（任务启动时登记实例，目录提前建好） |
+| `CMP-run`（运行编排） | `getByBinding`（复用同工作区实例）、`enroll`（首次启动登记实例，目录提前建好） |
 | 运维脚本 | `unblock` / `retire`；`retire` 前先经调度器取消该实例在跑任务、结算排队任务 |
 | `CMP-http-gateway` | 不直接依赖；执行面三个端点只经 `CMP-scheduler` |
 
-### 4.3 与 `executor-http-v2` 的对应
+### 4.3 与 `executor-http-v3` 的对应
 
 | 契约 | 落点 |
 |---|---|
@@ -179,4 +183,4 @@ enroll ──▶ active ──block──▶ blocked ──unblock──▶ acti
 ## 8 待定
 
 - 实例与 client 的绑定是否需要「临时改派」接口（跨 client 迁移工作区）——当前只做 `retire` + 重新 `enroll`，不提供迁移；等真实运维需求出现再定。
-- `blocked` 是否自动恢复（client 重启后重新探活）——v2 无实例不可用上报载体（`OQ-21`），当前保持人工 `unblock`。
+- `blocked` 是否自动恢复（client 重启后重新探活）——契约无实例不可用上报载体（`OQ-21`），当前保持人工 `unblock`。

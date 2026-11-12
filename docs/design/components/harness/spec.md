@@ -12,7 +12,7 @@ updated: 2026-11-10
 
 维护 Harness 聚合的生命周期、标签与不变量，并作为**执行节点目录**：一个 Harness 绑定一个 client 节点（`clientId`），供执行面判定「这个节点还能不能接活」。它是 `harness` / `harness_tag` 的唯一写入口。
 
-**不负责**：工具管理、在线状态推进（由 `CMP-scheduler` 的 poll 观测派生，见 §3.3）、任务派发、跨资产读模型、HTTP 路由、client 自注册（`executor-http-v2` 没有注册端点）。
+**不负责**：工具管理、在线状态推进（由 `CMP-scheduler` 的 poll 观测派生，见 §3.3）、任务派发、跨资产读模型、HTTP 路由、client 自注册（`executor-http-v3` 没有注册端点）。
 
 ## 2 拥有的数据
 
@@ -166,7 +166,7 @@ Harness 是执行节点目录：`client_id` 绑定 `CMP-instance` 里实例所�
 - 权威来源是 `CMP-scheduler` 的 presence 读契约（[`scheduler` §3.3](../scheduler/spec.md)）；本组件不写 `health` / `last_heartbeat_at`，两列保留但非权威。
 - `lastHeartbeatAt` 派生为「最近一次 poll 时间」；从未 poll 则为 `null`。
 - 调度器不可用时，组合方降级为 `unknown`，不伪造 `offline`；当前没有结构化日志设施，降级不额外打日志（可观测性欠账，记 `OQ-10` 范围）。
-- 在线状态不参与派发：派发只看 `NodeDirectory.isDispatchable`（`enabled` + 已绑定）与 client 自报的 `capacity.free`（`executor-http-v2` §9 规定容量不做二次限制）。
+- 在线状态不参与派发：派发只看 `NodeDirectory.isDispatchable`（`enabled` + 已绑定）与 client 自报的 `capacity.free`（`executor-http-v3` §9 规定容量不做二次限制）。
 - 停用（`enabled=false`）语义：不派发新任务；在跑任务继续跑完；不向 client 下发 `stop`（`stop` 只由运维停止动作触发，见 `scheduler` §4.6）。
 
 ## 4 依赖与边界

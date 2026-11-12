@@ -55,7 +55,7 @@ externalRefs: []
 - 领域：`CMP-scheduler` 的 `createScheduler`：`poll`。
 - 读：`CMP-instance` 的 `createInstanceService`：`get` / `isDispatchable`。
 
-契约冻结在前：[`executor-http-v2`](../../../../contracts/executor-http-v2.md) §4.1。本场景不修改契约。
+契约冻结在前：[`executor-http-v3`](../../../../contracts/executor-http-v3.md) §4.1。本场景不修改契约。
 
 ## 3 运行序
 
@@ -81,7 +81,7 @@ externalRefs: []
 
 ## 4 不可变引用
 
-- 契约 [`executor-http-v2`](../../../../contracts/executor-http-v2.md)：§4.1 `P-01` 请求/响应与语义、`S-01`/`S-03`/`S-04`/`S-05`/`S-06`、`C-01`、§3 常量。
+- 契约 [`executor-http-v3`](../../../../contracts/executor-http-v3.md)：§4.1 `P-01` 请求/响应与语义、`S-01`/`S-03`/`S-04`/`S-05`/`S-06`、`C-01`、§3 常量。
 - 任务快照与技能集 digest 口径：`CMP-scheduler` 规格 §4.4（不改契约字段）。
 - `workspacePath` 只登记与透传，不创建、不校验存在性（`P-01` §4.1 #3）。
 

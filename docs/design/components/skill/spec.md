@@ -229,7 +229,7 @@ type SkillPackageSource = {
 
 - `packageId` 形如 `<skillId>.<revision>`，由当前包指针派生；同一 `packageId` 对应的 zip 字节不变。
 - `digest` 是 zip 字节的 sha256，`etag` 为 `"sha256-<hex>"`（带引号），二者都由包字节派生，不由调用方拼装；`sizeBytes` 是 zip 文件字节数。
-- 保存新版本会推进 `revision` 并切换包指针，旧 `packageId` 随即失效（当前不保留历史包）：`describe` 返回 `null`，`P-03` 按 `404 package_not_found` 处理；`open` 只对仍有效的 `packageId` 提供字节。任务进行中遇到 Skill 升级请按 [`executor-http-v2`](../../contracts/executor-http-v2.md) §4.3 处理，不在任务内改写技能集。
+- 保存新版本会推进 `revision` 并切换包指针，旧 `packageId` 随即失效（当前不保留历史包）：`describe` 返回 `null`，`P-03` 按 `404 package_not_found` 处理；`open` 只对仍有效的 `packageId` 提供字节。任务进行中遇到 Skill 升级请按 [`executor-http-v3`](../../contracts/executor-http-v3.md) §4.3 处理，不在任务内改写技能集。
 - 包缺失/损坏（zip 不可读、`SKILL.md` 无效）→ `open` 抛 `PackageUnavailableError`（映射 `500 package_unavailable`），不返回部分字节。
 - 端口不暴露 HTTP 语义；条件请求与 304 判定在 `CMP-http-gateway` 完成。
 

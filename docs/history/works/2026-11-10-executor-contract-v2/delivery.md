@@ -11,7 +11,7 @@ updated: 2026-11-10
 
 | 文件 | 内容 |
 |---|---|
-| 契约正文（现移至 [`design/contracts/executor-http-v2.md`](../../../design/contracts/executor-http-v2.md)） | 3 个端点、5 个类型、调度器 8 条职责、client 9 条承诺、失败矩阵、验收 |
+| 契约正文（归档件，2026-11-11 由 [`executor-http-v3`](../../../design/contracts/executor-http-v3.md) 取代） | 3 个端点、5 个类型、调度器 8 条职责、client 9 条承诺、失败矩阵、验收 |
 | 本文件 | 交付说明：改了什么、client 怎么改、怎么验收 |
 
 ## 2. 一句话

@@ -45,7 +45,7 @@ externalRefs: []
 
 结果：节点目录成为「谁能接活」的唯一权威；停用节点后不再派新任务，界面状态与调度器观测一致，且不出现第二份状态真相。
 
-前置：`client` 端只持有 Bearer token，不自注册（`executor-http-v2` 没有注册端点）；token → `clientId` 由 Harness 的节点登记提供（`harness.client_token`，经 `kernel.ExecutorAuthenticator` 解析），不读配置。
+前置：`client` 端只持有 Bearer token，不自注册（`executor-http-v3` 没有注册端点）；token → `clientId` 由 Harness 的节点登记提供（`harness.client_token`，经 `kernel.ExecutorAuthenticator` 解析），不读配置。
 
 ## 2 入口
 
@@ -78,7 +78,7 @@ externalRefs: []
 
 ## 4 不可变引用
 
-- `executor-http-v2`：三端点与鉴权语义不变；本场景只决定「派给谁」，不改契约字段。
+- `executor-http-v3`：三端点与鉴权语义不变；本场景只决定「派给谁」，不改契约字段。
 - Harness 资产契约：`create` / `update` 不接受 `clientId` / `token`，登记只走 `API-41`（[`harness/spec.md`](../../../../components/harness/spec.md) §2）。
 - 凭据权威：`harness.client_token` 是执行端 Bearer 的唯一权威，配置不持有凭据（[`2026-11-10-executor-client-token.md`](../../../../../history/decisions/2026-11-10-executor-client-token.md)）。
 - `health` / `lastHeartbeatAt` 的派生口径：`harness` §3.3；`presence` 读契约：`scheduler` §3.3。

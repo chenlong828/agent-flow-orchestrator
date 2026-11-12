@@ -3,13 +3,13 @@ layer: design
 module: scheduler
 status: active
 component: CMP-scheduler
-updated: 2026-11-10
+updated: 2026-11-11
 ---
 
 # `CMP-scheduler` 组件规格
 
-> 范围：执行面任务列表与派发裁决，即 [`executor-http-v2`](../../contracts/executor-http-v2.md) 的 `S-01`–`S-08` 在调度器侧的落点。
-> 不包含：任务来源与 prompt 组成（上游编排，后续工序）、HTTP 传输（`CMP-http-gateway`）、实例登记与可用性（`CMP-instance`）、技能包字节与摘要计算（`CMP-skill`）。
+> 范围：执行面任务列表与派发裁决，即 [`executor-http-v3`](../../contracts/executor-http-v3.md) 的 `S-01`–`S-08` 在调度器侧的落点。
+> 不包含：任务来源与 prompt 组成（[`CMP-run`](../run/spec.md) 负责）、HTTP 传输（`CMP-http-gateway`）、实例登记与可用性（`CMP-instance`）、技能包字节与摘要计算（`CMP-skill`）。
 > 状态：`active`，2026-11-11 实现并通过测试（`tests/components/scheduler`、执行面场景测试）。
 
 ## 1 主目标
@@ -284,7 +284,7 @@ type SkillSet = { digest: string; packages: SkillPackageRef[] };
 ### 4.7 实例粘性与排障读口
 
 - 实例首次派发时绑定 `clientId`（以 `CMP-instance` 登记为准），之后该实例的任务只发给该 client；`S-02` 的重派不跨 client。跨 client 改派需要运维在 `CMP-instance` 显式改绑（另立管理面，当前不做）。
-- `inspect` 只读任务快照，供排障、验收与后续只读面使用；`executor-http-v2` §12.4 的只读状态端点仍未定，不在本组件新增对外端点。
+- `inspect` 只读任务快照，供排障、验收与后续只读面使用；**运行编排的启动恢复**也用它：`CMP-run.resumePending` 对 `dispatched` 的节点按 `taskId` 对账。契约 §12 的只读状态端点仍未定，不在本组件新增对外端点。
 
 ### 4.8 节点可用性与派发门禁
 
@@ -341,10 +341,10 @@ type SkillSet = { digest: string; packages: SkillPackageRef[] };
 
 - 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 12 KB。
 - 单独验证入口：`src/components/scheduler/service.ts` 的 `createScheduler`；命令 `bun test tests/components/scheduler`。
-- 当前状态：`active`。契约冻结在前（[`executor-http-v2`](../../contracts/executor-http-v2.md)）；实现在 [`2026-11-11-scheduler-layer-implementation`](../../../works/2026-11-11-scheduler-layer-implementation/brief.md) 落盘，失败结果不自动重派按 2026-11-11 裁决。
+- 当前状态：`active`。契约冻结在前（[`executor-http-v3`](../../contracts/executor-http-v3.md)）；实现在 [`2026-11-11-scheduler-layer-implementation`](../../../works/2026-11-11-scheduler-layer-implementation/brief.md) 落盘，失败结果不自动重派按 2026-11-11 裁决。
 
 ## 8 待定
 
 - 任务列表规模上界（几十 vs 上千）与批量下发查询的索引策略，属实现取舍，不改契约。
 - 失败不自动重派已定（2026-11-11）；若将来要按类别重试，需重开本节并给出 token 成本评估。
-- `inspect` 是否升级为对外只读面（`executor-http-v2` §12.4），待排障需求出现后定。
+- `inspect` 是否升级为对外只读面（契约 §12 待定），待排障需求出现后定。

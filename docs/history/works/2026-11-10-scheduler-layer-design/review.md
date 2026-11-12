@@ -9,7 +9,7 @@ procedure: 2026-11-10-scheduler-layer-design
 # 评审：执行面调度层设计（P1，四档裁决）
 
 > 对象：本工序全部设计产物（见 [`brief.md`](brief.md) §3）。
-> 基线：[`executor-http-v2`](../../../design/contracts/executor-http-v2.md)（冻结，`protocolVersion = 2`）。
+> 基线：[`executor-http-v2`](../2026-11-10-executor-contract-v2/executor-http-v2.md)（冻结，`protocolVersion = 2`）。
 > 级别：P1（新增组件、公共契约面、数据所有权）。
 > 裁决口径见 `arch-design-spec` 第 8 步；定级与裁决是两把尺子，不合并。
 

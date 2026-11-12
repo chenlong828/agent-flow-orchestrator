@@ -27,7 +27,7 @@ updated: 2026-11-10
 
 | 结论 | 落点 |
 |---|---|
-| 契约正文（现行权威） | [`../../../design/contracts/executor-http-v2.md`](../../../design/contracts/executor-http-v2.md) |
+| 契约正文（归档件；2026-11-11 已被 `executor-http-v3` 取代） | [`executor-http-v2.md`](executor-http-v2.md) |
 | 客户端改造清单 | `delivery.md` §6；client 已按单落实 |
 | 接口一致性与偏离 | [`../2026-11-10-executor-contract-verification/verification.md`](../2026-11-10-executor-contract-verification/verification.md) |
 | 契约待修订 3 项 | `plan/open-questions.md` `OQ-12`…`OQ-14` |
@@ -36,5 +36,6 @@ updated: 2026-11-10
 ## 4. 收口说明
 
 - 本工序交付物（契约、client 改造清单、v1 差异表）已完成并被 client 实现吸收；本轮验证没有再发现契约骨架问题，只发现 2 处需修订的语义边界与 1 处未定义行为，已转出为开放问题，不阻塞收口。
-- **归档前已处置**（2026-11-10）：契约正文已移到 `docs/design/contracts/executor-http-v2.md`，本工序目录不再持有现行权威。client 仓库契约副本头部的权威路径仍需同步更新（跨仓库，登记为待办）。
+- **归档前已处置**（2026-11-10）：契约正文已从 design 层移入本工序目录，本工序目录不再持有现行权威。client 仓库契约副本头部的权威路径仍需同步更新（跨仓库，登记为待办）。
+- **2026-11-11**：v2 被 [`executor-http-v3`](../../../design/contracts/executor-http-v3.md) 取代，本文件随之冻结；`design/contracts/` 只保留 v3。
 - 契约正文的 3 处修订（`OQ-12`–`OQ-14`）属语义变更，按 P2 另行处理，不在本工序内改。
