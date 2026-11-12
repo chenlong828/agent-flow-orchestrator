@@ -1,7 +1,7 @@
 ---
 layer: works
 module: global
-status: active
+status: frozen
 updated: 2026-11-11
 procedure: 2026-11-11-workflow-run-orchestration
 stage: P1 设计提案（已确认；规格冻结见 design/）
@@ -11,7 +11,7 @@ stage: P1 设计提案（已确认；规格冻结见 design/）
 
 > 输入：`REQ-0001`、2026-11-11 概念讨论逐项确认（§2）。
 > 本文件是 P1 第一次人工评审确认的材料：只定切分、数据、契约与分期，不定列级细节。
-> **2026-11-11 已确认**；场景卡与规格已落：[`SCN-0301`–`SCN-0304`](../../design/scenarios/workflow-orchestration/workflow-execution/)、[`CMP-run` 规格](../../design/components/run/spec.md)、[`executor-http-v3`](../../design/contracts/executor-http-v3.md)。本文件保留为决策过程记录，列级细节以规格为准。
+> **2026-11-11 已确认**；场景卡与规格已落：[`SCN-0301`–`SCN-0304`](../../../design/scenarios/workflow-orchestration/workflow-execution/)、[`CMP-run` 规格](../../../design/components/run/spec.md)、[`executor-http-v3`](../../../design/contracts/executor-http-v3.md)。本文件保留为决策过程记录，列级细节以规格为准。
 > 一句话：**新增 `CMP-run` 编排组件，`CMP-scheduler` 不动，客户端契约升 v3，工作流 DSL 收敛为 7 类节点。**
 
 ## 1 现状与缺口

@@ -1,7 +1,7 @@
 ---
 layer: works
 module: global
-status: active
+status: frozen
 updated: 2026-11-11
 procedure: 2026-11-11-workflow-run-orchestration
 level: P1
@@ -9,7 +9,7 @@ level: P1
 
 # 工序：工作流运行编排（B4 第一期）
 
-> 承接 [`REQ-0001`](../../requirements/REQ-0001-workflow-run-orchestration.md)。设计提案见 [`design-proposal.md`](design-proposal.md)；本文件只定范围、任务与验收。
+> 承接 [`REQ-0001`](../../../requirements/REQ-0001-workflow-run-orchestration.md)。设计提案见 [`design-proposal.md`](design-proposal.md)；本文件只定范围、任务与验收。
 
 ## 1 目标与结论
 
@@ -58,8 +58,8 @@ level: P1
 装载清单（开工前必读）：
 
 - `T-RUN-02`：本文件、`design-proposal.md`、`REQ-0001`、现有执行面场景 `SCN-0201`–`SCN-0206`。
-- `T-RUN-03`：`design-proposal.md`、[`executor-http-v3.md`](../../design/contracts/executor-http-v3.md)、[`scheduler/spec.md`](../../design/components/scheduler/spec.md)、[`workflow/spec.md`](../../design/components/workflow/spec.md)、[`http-gateway/spec.md`](../../design/components/http-gateway/spec.md)。规格冻结产物：[`run/spec.md`](../../design/components/run/spec.md)、[`executor-http-v3.md`](../../design/contracts/executor-http-v3.md)、[`architecture.md`](../../design/architecture.md)。
-- `T-RUN-04`：迁移 `0001_baseline.sql`、[`config/spec.md`](../../design/components/config/spec.md)、[`platform/spec.md`](../../design/components/platform/spec.md)。
+- `T-RUN-03`：`design-proposal.md`、[`executor-http-v3.md`](../../../design/contracts/executor-http-v3.md)、[`scheduler/spec.md`](../../../design/components/scheduler/spec.md)、[`workflow/spec.md`](../../../design/components/workflow/spec.md)、[`http-gateway/spec.md`](../../../design/components/http-gateway/spec.md)。规格冻结产物：[`run/spec.md`](../../../design/components/run/spec.md)、[`executor-http-v3.md`](../../../design/contracts/executor-http-v3.md)、[`architecture.md`](../../../design/architecture.md)。
+- `T-RUN-04`：迁移 `0001_baseline.sql`、[`config/spec.md`](../../../design/components/config/spec.md)、[`platform/spec.md`](../../../design/components/platform/spec.md)。
 - 实现记录（2026-11-12）：`CMP-run` 落 `src/components/run/`（`types`/`deps`/`store`/`service`/`prompt`/`verdict`/`archive`/`graph-checks`/`validate`）；DSL 落 `graph.ts`/`graph-analysis.ts`/`dsl.schema.json`/`openapi.yaml`；`instance.getByBinding` 与 kernel 新错误码/常量已落。
 - T-RUN-06 记录（2026-11-12）：新增 `task_space_path`（迁移 `0003_task_space.sql`、scheduler `TaskDraft`/`TaskEnvelope`），执行面协议升 3；`P-04`/`P-05` 与 `archiveRequests`/`archivedRuns` 已接线；产品面 `POST /workflows/{id}/runs`、`GET /runs`、`GET /runs/{id}`、`POST /runs/{id}/cancel`、决策与日志下载已实现；`3100` 已重启并验证 `/healthz`、`/openapi.yaml`、run 启动/取消。
 - 联调问题（2026-11-12）：取消的 run 若从未有成功节点，服务端仍下发 `archiveRequests`，客户端本地无 task-space 只能反复 `archive.skipped`。已修：`finishRun` 仅在存在成功节点时置 `pending`；`archiveRequestsFor` 对 `pending` 超过 10 分钟（`archivePendingTtlMs`）的 run 降级 `failed` 并停止下发；迁移 `0004` 回填存量。测试 13 例，`bun run check` 353 pass。
@@ -102,23 +102,23 @@ level: P1
 - `OQ-22`（任务启动入口）→ 本工序关闭：启动端点定为 `POST /api/v1/workflows/{id}/runs`。
 - `OQ-24`（联调注入通道）→ 本工序关闭：联调改用 run 启动；`jd.ts` 保留作排障。
 - `OQ-25`（stop 无外部触发面）→ 本工序关闭运行级入口：`POST /runs/{id}/cancel` 经 `cancelInstances` 生效；进程优雅停机仍由信号处理。
-- 新增 `OQ-26`–`OQ-28`（见 [`open-questions.md`](../../plan/open-questions.md)），本工序不阻塞。
-- 跨项目依赖：`agent-flow-client` 的契约副本与 v3 实现不在本工序范围（见 §6「不做什么」），需在 client 仓库另立工序，交接件已建在 [`agent-flow-client/docs/works/2026-11-12-contract-v3-handoff/`](../../../../agent-flow-client/docs/works/2026-11-12-contract-v3-handoff/brief.md)；本工序只交付调度器侧，`T-RUN-09` 以其完成为前置。
+- 新增 `OQ-26`–`OQ-28`（见 [`open-questions.md`](../../../plan/open-questions.md)），本工序不阻塞。
+- 跨项目依赖：`agent-flow-client` 的契约副本与 v3 实现不在本工序范围（见 §6「不做什么」），需在 client 仓库另立工序，交接件已建在 ``agent-flow-client/docs/works/2026-11-12-contract-v3-handoff/``（外部仓库）；本工序只交付调度器侧，`T-RUN-09` 以其完成为前置。
 
 ## 9 规格冻结记录（T-RUN-03，2026-11-11）
 
 **冻结产物**
 
-- [`CMP-run` 规格](../../design/components/run/spec.md)：数据所有权、公共契约、状态机、推进/判定/回退/prompt/归档、恢复、验证计划。
-- [`executor-http-v3`](../../design/contracts/executor-http-v3.md)：协议版本 3、`P-04`/`P-05`、`P-01`/`TaskRequest` 增量、错误码、客户端承诺 `C-10`–`C-12`。
-- [`CMP-workflow` §5.1](../../design/components/workflow/spec.md)：7 类节点语义、删 `fanin`、`fanout` 前驱规则、执行侧归属。
-- [`CMP-http-gateway`](../../design/components/http-gateway/spec.md)：`API-42`–`API-47`、`EXE-04`/`EXE-05`、DTO、错误映射、依赖边界。
-- [`CMP-config`](../../design/components/config/spec.md)：`[run]` / `[archive]` 分节与三个配置项。
-- [`CMP-kernel`](../../design/components/kernel/spec.md)：6 个新错误码与语义边界。
-- [`CMP-instance`](../../design/components/instance/spec.md)：`getByBinding` 读方法。
-- [`CMP-scheduler`](../../design/components/scheduler/spec.md)：`inspect` 用于运行对账；调度语义不变。
-- [`architecture.md`](../../design/architecture.md)：第 13 个组件、依赖边、数据所有权、端点计数。
-- [`history/decisions/2026-11-11-workflow-run-orchestration.md`](../../history/decisions/2026-11-11-workflow-run-orchestration.md)：结构性决策与被否决方案。
+- [`CMP-run` 规格](../../../design/components/run/spec.md)：数据所有权、公共契约、状态机、推进/判定/回退/prompt/归档、恢复、验证计划。
+- [`executor-http-v3`](../../../design/contracts/executor-http-v3.md)：协议版本 3、`P-04`/`P-05`、`P-01`/`TaskRequest` 增量、错误码、客户端承诺 `C-10`–`C-12`。
+- [`CMP-workflow` §5.1](../../../design/components/workflow/spec.md)：7 类节点语义、删 `fanin`、`fanout` 前驱规则、执行侧归属。
+- [`CMP-http-gateway`](../../../design/components/http-gateway/spec.md)：`API-42`–`API-47`、`EXE-04`/`EXE-05`、DTO、错误映射、依赖边界。
+- [`CMP-config`](../../../design/components/config/spec.md)：`[run]` / `[archive]` 分节与三个配置项。
+- [`CMP-kernel`](../../../design/components/kernel/spec.md)：6 个新错误码与语义边界。
+- [`CMP-instance`](../../../design/components/instance/spec.md)：`getByBinding` 读方法。
+- [`CMP-scheduler`](../../../design/components/scheduler/spec.md)：`inspect` 用于运行对账；调度语义不变。
+- [`architecture.md`](../../../design/architecture.md)：第 13 个组件、依赖边、数据所有权、端点计数。
+- [`history/decisions/2026-11-11-workflow-run-orchestration.md`](../../decisions/2026-11-11-workflow-run-orchestration.md)：结构性决策与被否决方案。
 
 **冻结中发现并调整的设计点**（第二次人工评审确认重点）
 

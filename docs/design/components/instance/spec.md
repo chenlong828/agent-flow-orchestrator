@@ -165,7 +165,7 @@ enroll ──▶ active ──retire──▶ retired
 
 - 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 6 KB。
 - 单独验证入口：`src/components/instance/service.ts` 的 `createInstanceService`；命令 `bun test tests/components/instance`。
-- 当前状态：`active`；实现随调度层工序落盘（[`2026-11-11-scheduler-layer-implementation`](../../../works/2026-11-11-scheduler-layer-implementation/brief.md)）。
+- 当前状态：`active`；实现随调度层工序落盘（[`2026-11-11-scheduler-layer-implementation`](../../../history/works/2026-11-11-scheduler-layer-implementation/result.md)）。
 
 ## 8 待定
 

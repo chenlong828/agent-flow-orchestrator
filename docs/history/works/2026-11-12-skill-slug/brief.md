@@ -1,7 +1,7 @@
 ---
 layer: works
 module: global
-status: active
+status: frozen
 updated: 2026-11-12
 procedure: 2026-11-12-skill-slug
 level: P1
@@ -9,7 +9,7 @@ level: P1
 
 # 工序：技能系统标识 `slug`（分离展示名与 DSH 技能名）
 
-> 输入：`agent-flow-client` 的提案 [`2026-11-12-skill-name-proposal/proposal.md`](../../../agent-flow-client/docs/works/2026-11-12-skill-name-proposal/proposal.md)；`OQ-31`。
+> 输入：`agent-flow-client` 的提案 ``2026-11-12-skill-name-proposal/proposal.md``（外部仓库）；`OQ-31`。
 > 用户裁决（2026-11-12）：方案 A（新增 `slug`，`name` 继续做展示名）；开发阶段不做复杂迁移，只给存量补一个默认名继续开发；本轮先只做 slug，安装布局另议。
 
 ## 1 问题

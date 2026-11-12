@@ -9,7 +9,7 @@ level: P1
 
 # 工序：执行面身份旁路与节点自注册（开发期）
 
-> 状态：设计已按 2026-11-12 用户裁决落定（[`2026-11-12-executor-auth-dev-bypass`](../../history/decisions/2026-11-12-executor-auth-dev-bypass.md)），本工序只实现编排侧；客户端改动以提案交回 client 仓库。
+> 状态：设计已按 2026-11-12 用户裁决落定（[`2026-11-12-executor-auth-dev-bypass`](../../decisions/2026-11-12-executor-auth-dev-bypass.md)），本工序只实现编排侧；客户端改动以提案交回 client 仓库。
 
 ## 1 要解决的问题
 

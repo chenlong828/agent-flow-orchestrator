@@ -23,13 +23,8 @@ updated: 2026-11-12
 
 **在办工序**
 
-| 工序 | 级别 | 范围 | 状态 |
-|---|---|---|---|
-| [`2026-11-12-skill-slug`](../works/2026-11-12-skill-slug/brief.md) | P1 | 技能系统标识 `slug`：`skill.slug` 列、包内 frontmatter 与下载文件名改用 slug、读模型/OpenAPI/种子同步；安装布局与 UI 输入框不在本轮 | 实现完成（2026-11-12）：390 pass、quality 0 违规；真实运行通过 |
-| [`2026-11-10-node-registry-implementation`](../works/2026-11-10-node-registry-implementation/brief.md) | P2 | 落 `harness.client_id`/`client_token`、`API-41`、`NodeDirectory`/`ExecutorAuthenticator`、凭据落库与测试；派生状态与调度器不在此列 | 实现完成，待用户验收 |
-| [`2026-11-11-scheduler-layer-implementation`](../works/2026-11-11-scheduler-layer-implementation/brief.md) | P1 | 落 `instance`/`task`/`task_attempt`、`CMP-scheduler`、`CMP-instance`、执行面三端点、制品供给与派生状态 | 实现完成，待 P1 验收（`bun run check` 334 pass、`quality:gate` 0 违规） |
-| [`2026-11-11-executor-joint-debug`](../works/2026-11-11-executor-joint-debug/brief.md) | P2 | 与 `agent-flow-client` 联调：登记 → 鉴权 → 派发 → 真实执行 → 回报 → 结算 | 实测完成（2026-11-11）：8 条用例 7 通过、`stop` 无外部触发面（`OQ-25`） |
-| [`2026-11-11-workflow-run-orchestration`](../works/2026-11-11-workflow-run-orchestration/brief.md) | P1 | 工作流运行编排（`REQ-0001`）：`CMP-run`、run 三张表、6 个产品端点、执行面契约 v3、DSL 7 类节点、session-log 与归档 | `T-RUN-04`–`T-RUN-10` 完成；`SCN-0301`–`SCN-0304` 已转 verified；与 client v3 四条链路联调通过；`bun run check` 369 pass、`quality:gate` 0 违规 |
+（当前无在办工序；已收口的工序见下方「近期完成」）
+
 - M2 只产出裁定与规格，不写实现代码；M2 是 P1，人参与切分与契约评审后才可编码。
 - 跨项目依赖：`T-RUN-09` 联调需 `agent-flow-client` 先同步 `executor-http-v3` 副本并实现 v3（task-space、`P-04`/`P-05`、归档、协议 3）。该工作不在本仓库工序表内，已在 client 仓库建立交接工序 [`2026-11-12-contract-v3-handoff`](../../../agent-flow-client/docs/works/2026-11-12-contract-v3-handoff/brief.md)。
 - 无用户旅程的技术债 / 文档活走旁路，不进 `requirements/`。
@@ -37,6 +32,12 @@ updated: 2026-11-12
 - 已知欠账：无 CI 门禁；文档校验目前只有场景索引（`docs:check`），完整文档树校验待补。
 
 ## 近期完成
+- `2026-11-12-drop-instance-blocked`（P2）：删除实例 `blocked` 状态，工作区失败直接重跑。见 [`history/works/2026-11-12-drop-instance-blocked/result.md`](../history/works/2026-11-12-drop-instance-blocked/result.md)。
+- `2026-11-12-skill-slug`（P1）：技能增 `slug`，`SKILL.md` 的 `name` 与下载文件名改用系统标识。见 [`history/works/2026-11-12-skill-slug/result.md`](../history/works/2026-11-12-skill-slug/result.md)。
+- `2026-11-11-workflow-run-orchestration`（P1）：run 编排、执行面契约 v3、DSL 7 类节点、session-log 与归档；`SCN-0301`–`SCN-0304` verified。见 [`history/works/2026-11-11-workflow-run-orchestration/result.md`](../history/works/2026-11-11-workflow-run-orchestration/result.md)。
+- `2026-11-11-scheduler-layer-implementation`（P1）：调度层、实例、三端点、制品供给与派生状态。见 [`history/works/2026-11-11-scheduler-layer-implementation/result.md`](../history/works/2026-11-11-scheduler-layer-implementation/result.md)。
+- `2026-11-11-executor-joint-debug`（P2）：与 client 真实联调，登记 → 派发 → 执行 → 结算链路打通；`stop` 无外部触发面的问题已由运行取消端点（`API-45`）覆盖。见 [`history/works/2026-11-11-executor-joint-debug/result.md`](../history/works/2026-11-11-executor-joint-debug/result.md)。
+- `2026-11-10-node-registry-implementation`（P2）：`client_id`/`client_token`、`API-41`、节点目录与凭据落库。见 [`history/works/2026-11-10-node-registry-implementation/result.md`](../history/works/2026-11-10-node-registry-implementation/result.md)。
 - `2026-11-12-dev-executor-self-enroll`（P1）：开发期执行面身份旁路 + 节点自注册（`EXECUTOR_AUTH=off`、`X-Client-Id`、首见建节点行），client 已按提案实现并实测自动登记在线；同时修掉 RESTRICT 类删除冲突的 500。见 [`history/works/2026-11-12-dev-executor-self-enroll/result.md`](../history/works/2026-11-12-dev-executor-self-enroll/result.md)。
 - `2026-11-12-client-skill-package-304`（P3，外部仓库缺陷）：带技能包的 run 100% 失败于 `download_failed: 304 但本地无缓存`；定位为客户端缓存未命中仍发 `If-None-Match`，提案交 `agent-flow-client` 修复并已落地（客户端用例 12/12，真实运行不再报该错）。收口后暴露下一层问题：技能包 `SKILL.md` 的 `name` 为中文、执行端要求 kebab-case，转 `OQ-31`。见 [`history/works/2026-11-12-client-skill-package-304/result.md`](../history/works/2026-11-12-client-skill-package-304/result.md)。
 - `2026-11-10-scheduler-layer-design`（P1）与 `2026-11-10-harness-node-registry`（P2）：设计工序已收口归档。调度层按 `executor-http-v2` 落 3 组件切分、执行面 6 张场景与组件规格；其中 **失败/超时结果不自动重派**（2026-11-11 用户裁决，只保留未回报的 `S-02` 回队）。节点目录按「Harness 即节点目录、管理员维护」落第一期。见 [`history/works/2026-11-10-scheduler-layer-design/result.md`](../history/works/2026-11-10-scheduler-layer-design/result.md)、[`history/works/2026-11-10-harness-node-registry/result.md`](../history/works/2026-11-10-harness-node-registry/result.md)。

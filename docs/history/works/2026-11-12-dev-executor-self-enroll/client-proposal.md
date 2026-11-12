@@ -8,7 +8,7 @@ procedure: 2026-11-12-dev-executor-self-enroll
 
 # 提案：client 以 `X-Client-Id` 自报身份（交 client 仓库实施）
 
-> 对应编排侧决策：[`2026-11-12-executor-auth-dev-bypass`](../../history/decisions/2026-11-12-executor-auth-dev-bypass.md)。编排侧已实现并有测试；本文件是 client 仓库的改动清单，本仓库不修改 client 代码。
+> 对应编排侧决策：[`2026-11-12-executor-auth-dev-bypass`](../../decisions/2026-11-12-executor-auth-dev-bypass.md)。编排侧已实现并有测试；本文件是 client 仓库的改动清单，本仓库不修改 client 代码。
 > 目标：开发期 client 一行配置启动即被调度器认出并登记为节点，不需要建 Harness 资产、不需要 `API-41`、不需要 token。
 
 ## 1 契约增量（执行面，开发期）

@@ -8,7 +8,7 @@ procedure: 2026-11-12-dev-executor-self-enroll
 
 # 评审与裁决：执行面身份旁路与节点自注册
 
-定级 **P1**（执行面鉴权属核心契约；自动登记给 `harness` 增加了一条写入路径）。用户 2026-11-12 已就机制作出裁决（见 [`2026-11-12-executor-auth-dev-bypass`](../../history/decisions/2026-11-12-executor-auth-dev-bypass.md) §1），本文件记录实现期的四档裁决。
+定级 **P1**（执行面鉴权属核心契约；自动登记给 `harness` 增加了一条写入路径）。用户 2026-11-12 已就机制作出裁决（见 [`2026-11-12-executor-auth-dev-bypass`](../../decisions/2026-11-12-executor-auth-dev-bypass.md) §1），本文件记录实现期的四档裁决。
 
 ## Blocker
 
@@ -39,7 +39,7 @@ procedure: 2026-11-12-dev-executor-self-enroll
 
 | ID | 事项 | 去向 |
 |---|---|---|
-| `H-01` | 自动登记节点无回收机制 | [`risks.md`](../../plan/risks.md) `R-006`；需要时另立节点回收工序 |
+| `H-01` | 自动登记节点无回收机制 | [`risks.md`](../../../plan/risks.md) `R-006`；需要时另立节点回收工序 |
 | `H-02` | 自动登记不刷新 `address`、不随客户端换机更新 | 本工序 `brief.md` §6 未决；需要时加一行「地址变更即更新」，代价是执行面获得 `address` 写权限 |
 | `H-03` | 客户端尚未实现 `X-Client-Id` | [`client-proposal.md`](client-proposal.md) 交 client 仓库；在此之前只能用 curl 验证 |
 | `H-04` | 管理面仍无鉴权，旁路关闭后仍需它 | 与 `OQ-23` 同一前置条件；不在本工序范围 |

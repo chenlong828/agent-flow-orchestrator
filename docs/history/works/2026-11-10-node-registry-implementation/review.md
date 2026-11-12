@@ -1,7 +1,7 @@
 ---
 layer: works
 module: global
-status: active
+status: frozen
 updated: 2026-11-10
 procedure: 2026-11-10-node-registry-implementation
 ---

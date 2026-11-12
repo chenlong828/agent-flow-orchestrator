@@ -1,7 +1,7 @@
 ---
 layer: works
 module: global
-status: active
+status: frozen
 updated: 2026-11-12
 ---
 
@@ -10,7 +10,7 @@ updated: 2026-11-12
 ## 1 背景
 
 联调 `SCN-0301` 时 client 拒收任务：`TaskRequest.taskSpacePath` 落库为空串，client 按
-[`executor-http-v3`](../../design/contracts/executor-http-v3.md) §5（必填、非空、绝对路径）判为非法字段。
+[`executor-http-v3`](../../../design/contracts/executor-http-v3.md) §5（必填、非空、绝对路径）判为非法字段。
 
 直接原因已修（`07e7a38`）：`CMP-scheduler.validateDraft` 返回值漏掉 `taskSpacePath`，入队写入 `""`。
 残留风险：`TaskDraft.taskSpacePath` 仍是可选字段，`enqueue` 用 `?? ""` 兜底；任何调用方漏传都会重复「静默下发空串 → client 拒收 → 重派」。

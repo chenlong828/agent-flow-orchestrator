@@ -1,7 +1,7 @@
 ---
 layer: works
 module: global
-status: active
+status: frozen
 updated: 2026-11-10
 procedure: 2026-11-10-node-registry-implementation
 level: P2
@@ -11,7 +11,7 @@ level: P2
 
 ## 1 范围
 
-**背景**：`2026-11-10-harness-node-registry` 完成第一期设计（Harness 即节点目录、`API-41`、派生状态、门禁），用户 2026-11-10 确认 P2；同日追加裁决「执行面 token 落库，明文入库、详情可读回」（`OQ-23` 关闭，见 [`2026-11-10-executor-client-token.md`](../../history/decisions/2026-11-10-executor-client-token.md)）。
+**背景**：`2026-11-10-harness-node-registry` 完成第一期设计（Harness 即节点目录、`API-41`、派生状态、门禁），用户 2026-11-10 确认 P2；同日追加裁决「执行面 token 落库，明文入库、详情可读回」（`OQ-23` 关闭，见 [`2026-11-10-executor-client-token.md`](../../decisions/2026-11-10-executor-client-token.md)）。
 
 **本轮做**：
 
@@ -32,8 +32,8 @@ level: P2
 
 ## 2 输入与约束
 
-- [`harness/spec.md`](../../design/components/harness/spec.md) §2–§3.3、§7；[`kernel/spec.md`](../../design/components/kernel/spec.md) §3.1、§3.7–§3.9；[`http-gateway/spec.md`](../../design/components/http-gateway/spec.md) §4.1、§5.1、§7。
-- [`2026-11-10-harness-node-registry.md`](../../history/decisions/2026-11-10-harness-node-registry.md)、[`2026-11-10-executor-client-token.md`](../../history/decisions/2026-11-10-executor-client-token.md)。
+- [`harness/spec.md`](../../../design/components/harness/spec.md) §2–§3.3、§7；[`kernel/spec.md`](../../../design/components/kernel/spec.md) §3.1、§3.7–§3.9；[`http-gateway/spec.md`](../../../design/components/http-gateway/spec.md) §4.1、§5.1、§7。
+- [`2026-11-10-harness-node-registry.md`](../../decisions/2026-11-10-harness-node-registry.md)、[`2026-11-10-executor-client-token.md`](../../decisions/2026-11-10-executor-client-token.md)。
 - `executor-http-v2`：无注册/心跳；`Bearer <token>` 语义不变。
 - 凭据不得进入日志、错误 `details`、commit、文档、对话记录（AGENTS.md 安全边界）。
 - 本地验收统一 `3100` 端口（`config/local.toml`），改完立即重启并验证 `/healthz` 与 `/openapi.yaml`。

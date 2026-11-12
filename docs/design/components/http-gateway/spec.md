@@ -173,7 +173,7 @@ updated: 2026-11-11
 
 ### 4.1.1 运行编排端点
 
-> 设计冻结于 2026-11-11，`T-RUN-06` 实现（[`2026-11-11-workflow-run-orchestration`](../../../works/2026-11-11-workflow-run-orchestration/brief.md)）。领域契约见 [`CMP-run`](../run/spec.md) §3；本节只定传输落点与 DTO 形状。
+> 设计冻结于 2026-11-11，`T-RUN-06` 实现（[`2026-11-11-workflow-run-orchestration`](../../../history/works/2026-11-11-workflow-run-orchestration/result.md)）。领域契约见 [`CMP-run`](../run/spec.md) §3；本节只定传输落点与 DTO 形状。
 
 | ID | 方法 | 路径 | 用途 | 成功 |
 |---|---|---|---|---|

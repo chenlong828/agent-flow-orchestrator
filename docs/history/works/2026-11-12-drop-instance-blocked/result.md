@@ -1,7 +1,7 @@
 ---
 layer: works
 module: global
-status: active
+status: frozen
 updated: 2026-11-12
 procedure: 2026-11-12-drop-instance-blocked
 ---
@@ -28,9 +28,9 @@ procedure: 2026-11-12-drop-instance-blocked
 | 产物 | 落点 |
 |---|---|
 | 迁移 | `db/migrations/0007_drop_instance_blocked.sql` |
-| 状态机与契约 | [`instance/spec.md`](../../design/components/instance/spec.md) §2、§3、§4 |
-| 结算语义 | [`scheduler/spec.md`](../../design/components/scheduler/spec.md) §4.5、§4.8 |
-| 运行编排复用 | [`run/spec.md`](../../design/components/run/spec.md) §5 |
+| 状态机与契约 | [`instance/spec.md`](../../../design/components/instance/spec.md) §2、§3、§4 |
+| 结算语义 | [`scheduler/spec.md`](../../../design/components/scheduler/spec.md) §4.5、§4.8 |
+| 运行编排复用 | [`run/spec.md`](../../../design/components/run/spec.md) §5 |
 | 场景 | `SCN-0202`（`TC-EXR-004`）、`SCN-0201`、`SCN-0301` 的失败路径描述 |
 | 代码 | `instance/{types,service,store,validate,index}.ts`、`scheduler/result.ts`、`main.ts` |
 | 开放问题 | `OQ-32` 关闭；`OQ-21` 改为「部分关闭」 |

@@ -356,7 +356,7 @@ dispatched ──失败/超时/verdict 非法──▶ failed ──▶ run.fail
 
 - 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 12 KB。
 - 单独验证入口：`src/components/run/service.ts` 的 `createRunService`；命令 `bun test tests/components/run tests/components/http-gateway/run-*.test.ts`。
-- 当前状态：`active`；契约见 [`executor-http-v3`](../../contracts/executor-http-v3.md)，实现与任务状态见 [`T-RUN-05`/`T-RUN-06`](../../../works/2026-11-11-workflow-run-orchestration/brief.md)。
+- 当前状态：`active`；契约见 [`executor-http-v3`](../../contracts/executor-http-v3.md)，实现与任务状态见 [`T-RUN-05`/`T-RUN-06`](../../../history/works/2026-11-11-workflow-run-orchestration/result.md)。
 
 ## 8 待定
 

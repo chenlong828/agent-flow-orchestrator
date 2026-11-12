@@ -1,7 +1,7 @@
 ---
 layer: works
 module: global
-status: active
+status: frozen
 updated: 2026-11-11
 procedure: 2026-11-11-executor-joint-debug
 level: P2

@@ -344,7 +344,7 @@ type SkillSet = { digest: string; packages: SkillPackageRef[] };
 
 - 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 12 KB。
 - 单独验证入口：`src/components/scheduler/service.ts` 的 `createScheduler`；命令 `bun test tests/components/scheduler`。
-- 当前状态：`active`。契约冻结在前（[`executor-http-v3`](../../contracts/executor-http-v3.md)）；实现在 [`2026-11-11-scheduler-layer-implementation`](../../../works/2026-11-11-scheduler-layer-implementation/brief.md) 落盘，失败结果不自动重派按 2026-11-11 裁决。
+- 当前状态：`active`。契约冻结在前（[`executor-http-v3`](../../contracts/executor-http-v3.md)）；实现在 [`2026-11-11-scheduler-layer-implementation`](../../../history/works/2026-11-11-scheduler-layer-implementation/result.md) 落盘，失败结果不自动重派按 2026-11-11 裁决。
 
 ## 8 待定
 

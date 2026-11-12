@@ -49,7 +49,7 @@ req: REQ-0001
 | 2026-11-11 | 制品与归档 | task.db 用 SQLite、由 skill 脚本生成、client 上传、调度器只读校验；session-log 全量 JSONL + gzip，上传成功才算节点完成；run 结束 client 打包 task-space 上传，服务端存 `<archive.root>/history/<instanceId>/` |
 | 2026-11-11 | 分期 | 第一期：run 骨架 + 常规 + 审核回退 + confirm + session-log + 归档；第二期：split + fanout |
 
-详细定案见 [`2026-11-11-workflow-run-orchestration/design-proposal.md`](../works/2026-11-11-workflow-run-orchestration/design-proposal.md) §2。
+详细定案见 [`2026-11-11-workflow-run-orchestration/design-proposal.md`](../history/works/2026-11-11-workflow-run-orchestration/design-proposal.md) §2。
 
 ## 7 状态
 

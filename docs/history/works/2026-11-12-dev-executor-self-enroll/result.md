@@ -29,13 +29,13 @@ procedure: 2026-11-12-dev-executor-self-enroll
 
 | 产物 | 落点 |
 |---|---|
-| 决策：默认关闭鉴权、身份头、自动登记、重复即复用 | [`2026-11-12-executor-auth-dev-bypass.md`](../../history/decisions/2026-11-12-executor-auth-dev-bypass.md) |
-| 配置键与默认值 | [`config/spec.md`](../../design/components/config/spec.md) §3.1 |
-| 身份解析顺序、`X-Client-Id`/`X-Client-Address`、401/400 映射 | [`http-gateway/spec.md`](../../design/components/http-gateway/spec.md) §5.5 |
-| `ensureNode` 方法与默认值 | [`harness/spec.md`](../../design/components/harness/spec.md) §3.2、§3.4 |
-| 契约增量（开发期头） | [`executor-http-v3.md`](../../design/contracts/executor-http-v3.md) §3 |
-| 运行序与测试映射 | [`executor-node-registry/scenario.md`](../../design/scenarios/workflow-orchestration/execution-scheduling/executor-node-registry/scenario.md) §3、§5（`TC-EXN-101`/`TC-EXN-102`） |
-| 风险 | [`risks.md`](../../plan/risks.md) `R-005`（默认无鉴权）、`R-006`（垃圾行累积） |
+| 决策：默认关闭鉴权、身份头、自动登记、重复即复用 | [`2026-11-12-executor-auth-dev-bypass.md`](../../decisions/2026-11-12-executor-auth-dev-bypass.md) |
+| 配置键与默认值 | [`config/spec.md`](../../../design/components/config/spec.md) §3.1 |
+| 身份解析顺序、`X-Client-Id`/`X-Client-Address`、401/400 映射 | [`http-gateway/spec.md`](../../../design/components/http-gateway/spec.md) §5.5 |
+| `ensureNode` 方法与默认值 | [`harness/spec.md`](../../../design/components/harness/spec.md) §3.2、§3.4 |
+| 契约增量（开发期头） | [`executor-http-v3.md`](../../../design/contracts/executor-http-v3.md) §3 |
+| 运行序与测试映射 | [`executor-node-registry/scenario.md`](../../../design/scenarios/workflow-orchestration/execution-scheduling/executor-node-registry/scenario.md) §3、§5（`TC-EXN-101`/`TC-EXN-102`） |
+| 风险 | [`risks.md`](../../../plan/risks.md) `R-005`（默认无鉴权）、`R-006`（垃圾行累积） |
 | 实现 | `src/core/config/executor-config.ts`、`src/core/config/config.ts`、`src/components/http-gateway/routes/executor.ts`、`src/components/http-gateway/app.ts`、`src/components/harness/service.ts`、`src/components/harness/store.ts`、`src/main.ts` |
 | 客户端改动提案 | [`client-proposal.md`](client-proposal.md) |
 

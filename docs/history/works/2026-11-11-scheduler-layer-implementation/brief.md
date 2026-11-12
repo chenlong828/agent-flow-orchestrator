@@ -1,7 +1,7 @@
 ---
 layer: works
 module: global
-status: active
+status: frozen
 updated: 2026-11-11
 procedure: 2026-11-11-scheduler-layer-implementation
 level: P1
@@ -19,9 +19,9 @@ level: P1
 
 ## 2 输入
 
-- 契约：[`executor-http-v2`](../../history/works/2026-11-10-executor-contract-v2/executor-http-v2.md)
-- 组件规格：[`scheduler`](../../design/components/scheduler/spec.md)、[`instance`](../../design/components/instance/spec.md)、[`kernel`](../../design/components/kernel/spec.md)、[`skill`](../../design/components/skill/spec.md) §3.3、[`http-gateway`](../../design/components/http-gateway/spec.md) §4.3/§5.8、[`config`](../../design/components/config/spec.md)
-- 决策：[`2026-11-10-scheduler-layer-design`](../../history/decisions/2026-11-10-scheduler-layer-design.md)（失败不自动重派）、[`2026-11-10-executor-client-token`](../../history/decisions/2026-11-10-executor-client-token.md)（凭据落库）
+- 契约：[`executor-http-v2`](../2026-11-10-executor-contract-v2/executor-http-v2.md)
+- 组件规格：[`scheduler`](../../../design/components/scheduler/spec.md)、[`instance`](../../../design/components/instance/spec.md)、[`kernel`](../../../design/components/kernel/spec.md)、[`skill`](../../../design/components/skill/spec.md) §3.3、[`http-gateway`](../../../design/components/http-gateway/spec.md) §4.3/§5.8、[`config`](../../../design/components/config/spec.md)
+- 决策：[`2026-11-10-scheduler-layer-design`](../../decisions/2026-11-10-scheduler-layer-design.md)（失败不自动重派）、[`2026-11-10-executor-client-token`](../../decisions/2026-11-10-executor-client-token.md)（凭据落库）
 
 ## 3 任务表
 

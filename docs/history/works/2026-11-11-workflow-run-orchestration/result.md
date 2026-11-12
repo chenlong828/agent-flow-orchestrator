@@ -1,7 +1,7 @@
 ---
 layer: works
 module: global
-status: active
+status: frozen
 updated: 2026-11-12
 procedure: 2026-11-11-workflow-run-orchestration
 level: P1
@@ -9,7 +9,7 @@ level: P1
 
 # 结果：工作流运行编排（B4 第一期）
 
-> 承接 [`REQ-0001`](../../requirements/REQ-0001-workflow-run-orchestration.md)。任务表与范围见 [`brief.md`](brief.md)，评审见 [`review.md`](review.md)。
+> 承接 [`REQ-0001`](../../../requirements/REQ-0001-workflow-run-orchestration.md)。任务表与范围见 [`brief.md`](brief.md)，评审见 [`review.md`](review.md)。
 
 ## 1 结论
 
@@ -63,7 +63,7 @@ level: P1
 
 | 项 | 说明 | 去向 |
 |---|---|---|
-| 取消后未认领任务占容量 | client 重启丢掉 in-flight 时，`cancelInstances` 电平会让 client 丢弃重发任务却不结算，同实例新任务被容量挡住（实测约 30 分钟才被 `S-02` 回收） | [`OQ-29`](../../plan/open-questions.md) |
+| 取消后未认领任务占容量 | client 重启丢掉 in-flight 时，`cancelInstances` 电平会让 client 丢弃重发任务却不结算，同实例新任务被容量挡住（实测约 30 分钟才被 `S-02` 回收） | [`OQ-29`](../../../plan/open-questions.md) |
 | client 信号测试 | `tests/components/cli/signals.test.ts` 的 SIGINT 用例本机 10s 超时（118/119），与本次契约无关 | client 仓库处理 |
 | `split`/`fanout` 执行 | 本期只定义不执行，启动时 `unsupported_node_type` | 第二期 |
 | 归档读取端点 | 本期无下载 API，运维按 `archive.root` 访问 | 超出本期范围 |

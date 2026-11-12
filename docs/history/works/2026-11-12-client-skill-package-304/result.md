@@ -19,7 +19,7 @@ procedure: 2026-11-12-client-skill-package-304
 | 无缓存语义 | 同一包：不带条件头 → `200` / 367 B；带该包 ETag → `304` | 与服务端逻辑一致，`304` 由客户端主动触发 |
 | 影响面 | `task.skill_set` 历史：`packages=0` 的 run 成功，`packages≥1` 的 run 全部 `failed(asset)` | 100% 复现，与网络/凭据无关 |
 | 客户端代码 | `gateway.ts:64-73`、`package-cache.ts:26-36` | 缓存未命中仍传 `etag` |
-| 文档 | `OQ-17` 由「待定」改为「已实测触发 + 修复归属」 | 见 [`open-questions.md`](../../plan/open-questions.md) |
+| 文档 | `OQ-17` 由「待定」改为「已实测触发 + 修复归属」 | 见 [`open-questions.md`](../../../plan/open-questions.md) |
 
 ### 2.1 客户端实施后的复核（2026-11-12）
 
@@ -33,8 +33,8 @@ procedure: 2026-11-12-client-skill-package-304
 | 产物 | 落点 |
 |---|---|
 | 修改提案（补丁、测试、验收、临时办法） | [`client-proposal.md`](client-proposal.md) |
-| 开放问题状态 | [`OQ-17`](../../plan/open-questions.md) |
-| 契约（不改） | [`executor-http-v3.md`](../../design/contracts/executor-http-v3.md) `P-03`；[`http-gateway/spec.md`](../../design/components/http-gateway/spec.md) §5.5 的 `304` 说明保持原样 |
+| 开放问题状态 | [`OQ-17`](../../../plan/open-questions.md) |
+| 契约（不改） | [`executor-http-v3.md`](../../../design/contracts/executor-http-v3.md) `P-03`；[`http-gateway/spec.md`](../../../design/components/http-gateway/spec.md) §5.5 的 `304` 说明保持原样 |
 
 ## 4 偏差与未覆盖
 

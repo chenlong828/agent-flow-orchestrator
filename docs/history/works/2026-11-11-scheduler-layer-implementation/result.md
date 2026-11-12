@@ -1,7 +1,7 @@
 ---
 layer: works
 module: global
-status: active
+status: frozen
 updated: 2026-11-11
 procedure: 2026-11-11-scheduler-layer-implementation
 ---
@@ -31,27 +31,27 @@ bun run quality:gate # 违规 0 条；工具健康 8/8；exit 0
 
 | 交付物 | 路径 |
 |---|---|
-| 基线三表与 `skill` 摘要列 | [`db/migrations/0001_baseline.sql`](../../../db/migrations/0001_baseline.sql) |
-| 执行实例组件 | [`src/components/instance/`](../../../src/components/instance/) |
-| 调度器组件（enqueue/poll/acceptResult/控制/观测） | [`src/components/scheduler/`](../../../src/components/scheduler/) |
-| 执行面路由与网关装配 | [`src/components/http-gateway/routes/executor.ts`](../../../src/components/http-gateway/routes/executor.ts)、[`src/executor-backend.ts`](../../../src/executor-backend.ts) |
-| 制品供给 | [`src/components/skill/package-source.ts`](../../../src/components/skill/package-source.ts) |
-| 节点状态派生 | [`src/components/catalog/harness.ts`](../../../src/components/catalog/harness.ts) |
-| 配置 | [`src/core/config/executor-config.ts`](../../../src/core/config/executor-config.ts)、`config/default.toml` |
+| 基线三表与 `skill` 摘要列 | [`db/migrations/0001_baseline.sql`](../../../../db/migrations/0001_baseline.sql) |
+| 执行实例组件 | [`src/components/instance/`](../../../../src/components/instance/) |
+| 调度器组件（enqueue/poll/acceptResult/控制/观测） | [`src/components/scheduler/`](../../../../src/components/scheduler/) |
+| 执行面路由与网关装配 | [`src/components/http-gateway/routes/executor.ts`](../../../../src/components/http-gateway/routes/executor.ts)、[`src/executor-backend.ts`](../../../../src/executor-backend.ts) |
+| 制品供给 | [`src/components/skill/package-source.ts`](../../../../src/components/skill/package-source.ts) |
+| 节点状态派生 | [`src/components/catalog/harness.ts`](../../../../src/components/catalog/harness.ts) |
+| 配置 | [`src/core/config/executor-config.ts`](../../../../src/core/config/executor-config.ts)、`config/default.toml` |
 | 测试 | `tests/components/{scheduler,instance,catalog,http-gateway}` |
-| 场景转档 | [`design/scenarios/.../execution-scheduling/`](../../design/scenarios/workflow-orchestration/execution-scheduling/) |
+| 场景转档 | [`design/scenarios/.../execution-scheduling/`](../../../design/scenarios/workflow-orchestration/execution-scheduling/) |
 
 ## 4 结论落点
 
 | 结论 | 落点 |
 |---|---|
-| 调度器状态机、重派、结算、控制、观测实现 | [`scheduler/spec.md`](../../design/components/scheduler/spec.md)（状态 `active`） |
-| 实例登记与状态机实现 | [`instance/spec.md`](../../design/components/instance/spec.md)（状态 `active`） |
-| 执行面端点、协议闸门、鉴权、413/404/304 | [`http-gateway/spec.md`](../../design/components/http-gateway/spec.md) §4.3、§5.8 |
-| 制品身份与摘要实现 | [`skill/spec.md`](../../design/components/skill/spec.md) §3.3 |
-| 执行面配置实现 | [`config/spec.md`](../../design/components/config/spec.md) §3.1 |
-| 节点状态派生实现 | [`harness/spec.md`](../../design/components/harness/spec.md) §3.3、[`catalog/spec.md`](../../design/components/catalog/spec.md) §4 |
-| 实施状态与表数 | [`architecture.md`](../../design/architecture.md) §10 |
+| 调度器状态机、重派、结算、控制、观测实现 | [`scheduler/spec.md`](../../../design/components/scheduler/spec.md)（状态 `active`） |
+| 实例登记与状态机实现 | [`instance/spec.md`](../../../design/components/instance/spec.md)（状态 `active`） |
+| 执行面端点、协议闸门、鉴权、413/404/304 | [`http-gateway/spec.md`](../../../design/components/http-gateway/spec.md) §4.3、§5.8 |
+| 制品身份与摘要实现 | [`skill/spec.md`](../../../design/components/skill/spec.md) §3.3 |
+| 执行面配置实现 | [`config/spec.md`](../../../design/components/config/spec.md) §3.1 |
+| 节点状态派生实现 | [`harness/spec.md`](../../../design/components/harness/spec.md) §3.3、[`catalog/spec.md`](../../../design/components/catalog/spec.md) §4 |
+| 实施状态与表数 | [`architecture.md`](../../../design/architecture.md) §10 |
 | 评审与裁决 | [`review.md`](review.md) |
 
 ## 5 未完成与待办

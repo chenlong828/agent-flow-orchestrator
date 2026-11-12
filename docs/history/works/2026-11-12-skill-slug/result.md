@@ -1,7 +1,7 @@
 ---
 layer: works
 module: global
-status: active
+status: frozen
 updated: 2026-11-12
 procedure: 2026-11-12-skill-slug
 ---
@@ -30,8 +30,8 @@ procedure: 2026-11-12-skill-slug
 | 产物 | 落点 |
 |---|---|
 | 迁移 | `db/migrations/0006_skill_slug.sql` |
-| 契约（字段、派生、改名、冲突） | [`skill/spec.md`](../../design/components/skill/spec.md) §2、§3、§4 |
-| 目录投影 | [`catalog/spec.md`](../../design/components/catalog/spec.md) `SkillListItem.slug` |
+| 契约（字段、派生、改名、冲突） | [`skill/spec.md`](../../../design/components/skill/spec.md) §2、§3、§4 |
+| 目录投影 | [`catalog/spec.md`](../../../design/components/catalog/spec.md) `SkillListItem.slug` |
 | REST 契约 | `openapi.yaml` `SkillListItem`/`SkillDraftSave` 加 `slug` |
 | 种子 | `scripts/seed.ts`：12 个技能补 `slug`，包内 frontmatter 用 slug |
 | 代码 | `skill/{contract,draft-types,draft-save,read}.ts`、`catalog/{types,skill}.ts`、`gateway/{fields,openapi}` |
