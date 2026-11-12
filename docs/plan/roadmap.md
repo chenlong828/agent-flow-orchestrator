@@ -28,7 +28,9 @@ updated: 2026-11-11
 | [`2026-11-10-node-registry-implementation`](../works/2026-11-10-node-registry-implementation/brief.md) | P2 | 落 `harness.client_id`/`client_token`、`API-41`、`NodeDirectory`/`ExecutorAuthenticator`、凭据落库与测试；派生状态与调度器不在此列 | 实现完成，待用户验收 |
 | [`2026-11-11-scheduler-layer-implementation`](../works/2026-11-11-scheduler-layer-implementation/brief.md) | P1 | 落 `instance`/`task`/`task_attempt`、`CMP-scheduler`、`CMP-instance`、执行面三端点、制品供给与派生状态 | 实现完成，待 P1 验收（`bun run check` 334 pass、`quality:gate` 0 违规） |
 | [`2026-11-11-executor-joint-debug`](../works/2026-11-11-executor-joint-debug/brief.md) | P2 | 与 `agent-flow-client` 联调：登记 → 鉴权 → 派发 → 真实执行 → 回报 → 结算 | 实测完成（2026-11-11）：8 条用例 7 通过、`stop` 无外部触发面（`OQ-25`） |
+| [`2026-11-11-workflow-run-orchestration`](../works/2026-11-11-workflow-run-orchestration/brief.md) | P1 | 工作流运行编排（`REQ-0001`）：`CMP-run`、run 三张表、6 个产品端点、执行面契约 v3、DSL 7 类节点、session-log 与归档 | 设计已确认；`T-RUN-04` 完成，`T-RUN-05`/`07` 实现完成待收口，`T-RUN-06`/`08`/`09` 待办 |
 - M2 只产出裁定与规格，不写实现代码；M2 是 P1，人参与切分与契约评审后才可编码。
+- 跨项目依赖：`T-RUN-09` 联调需 `agent-flow-client` 先同步 `executor-http-v3` 副本并实现 v3（task-space、`P-04`/`P-05`、归档、协议 3）。该工作不在本仓库工序表内，已在 client 仓库建立交接工序 [`2026-11-12-contract-v3-handoff`](../../../agent-flow-client/docs/works/2026-11-12-contract-v3-handoff/brief.md)。
 - 无用户旅程的技术债 / 文档活走旁路，不进 `requirements/`。
 - B1 是基础设施工序（无 UI 改动；UI 为独立项目），按旁路处理，不建 `REQ`/`SCN`，`brief.md` 为锚点；追溯方式已在 `implementation-plan.md` §9 落为默认旁路。
 - 已知欠账：无 CI 门禁；文档校验目前只有场景索引（`docs:check`），完整文档树校验待补。
@@ -38,7 +40,7 @@ updated: 2026-11-11
 
 - `2026-11-03-client-boundary`：边界与职责设计收口归档。产品侧确认当时**没有智能体客户端真实执行负载数据**，注册/心跳/租约/session 绑定/清理回执/幂等键等交互预设属过度设计，已被契约 v2 的 at-least-once 模型替换；保留职责、所有权与决策归属。结论见 [`result.md`](../history/works/2026-11-03-client-boundary/result.md)，与 v2 的逐条冲突见 [`v2-alignment.md`](../history/works/2026-11-03-client-boundary/v2-alignment.md)。
 
-- `2026-11-10-executor-contract-v2` 及配套评审：执行面契约 v2 收口，正文移入 [`design/contracts/executor-http-v2.md`](../design/contracts/executor-http-v2.md)。client 已按契约完成实现；调度器侧用桩服务做了 57 项接口断言（55 通过），2 项 client 偏离（总超时错误码、技能包摘要不匹配未重试）与 2 项契约边界（`C-05` 终止范围、400 双语义）等共 8 项转 [`open-questions.md`](open-questions.md) `OQ-12`–`OQ-19`。结论见 [`result.md`](../history/works/2026-11-10-executor-contract-verification/result.md)，验证报告见 [`verification.md`](../history/works/2026-11-10-executor-contract-verification/verification.md)。`2026-11-05-scheduler-contract-review`、`2026-11-07-client-architecture-review`、`2026-11-10-execution-semantics-review` 的对象均已被 v2 替换或吸收，同期收口归档。
+- `2026-11-10-executor-contract-v2` 及配套评审：执行面契约 v2 收口，正文移入 [`design/contracts/executor-http-v2.md`](../history/works/2026-11-10-executor-contract-v2/executor-http-v2.md)。client 已按契约完成实现；调度器侧用桩服务做了 57 项接口断言（55 通过），2 项 client 偏离（总超时错误码、技能包摘要不匹配未重试）与 2 项契约边界（`C-05` 终止范围、400 双语义）等共 8 项转 [`open-questions.md`](open-questions.md) `OQ-12`–`OQ-19`。结论见 [`result.md`](../history/works/2026-11-10-executor-contract-verification/result.md)，验证报告见 [`verification.md`](../history/works/2026-11-10-executor-contract-verification/verification.md)。`2026-11-05-scheduler-contract-review`、`2026-11-07-client-architecture-review`、`2026-11-10-execution-semantics-review` 的对象均已被 v2 替换或吸收，同期收口归档。
 
 - `2026-10-30-quality-refactor`：代码质量基线从 80 条违规降到 0，组件与 service/store 工厂完成结构拆分；迁移历史拍扁为单一 `0001_baseline.sql`。`bun run check` 273 pass、`quality:gate` 通过。结论见 [`result.md`](../history/works/2026-10-30-quality-refactor/result.md)。
 - `2026-10-30-workflow-contract-boundary`：工作流契约边界收敛——创建必须提交合法图，拓扑/绑定错误阻断写入，`layout` / `viewport` 归前端并透明持久化；评审 blocker 0 / decision 3 / hold 0。结论见 [`result.md`](../history/works/2026-10-30-workflow-contract-boundary/result.md)。

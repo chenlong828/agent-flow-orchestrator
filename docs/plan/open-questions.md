@@ -2,14 +2,14 @@
 layer: plan
 module: global
 status: current
-updated: 2026-11-10
+updated: 2026-11-11
 ---
 
 # 开放问题
 
 本表只收跨工序疑问；需求请建 `requirements/REQ-xxxx.md`。工序领取时在 `brief.md` 记编号；有结论后写去向（转 REQ / 落 `history/decisions/`），条目不删除。
 
-当前无阻塞性开放问题；2026-10-29 技术债清理留下 6 项 hold，见下表 OQ-5～OQ-7、OQ-9～OQ-11（OQ-8 已于 2026-11-02 关闭）；OQ-12～OQ-19 为 2026-11-10 执行面契约 v2 接口验证转出；OQ-18、OQ-20 已于 2026-11-10 由调度层设计关闭，OQ-22 为该设计转出。OQ-1～OQ-4 已于 2026-10-25 关闭归档，条目保留供追溯，结论见 [项目边界与早期开放问题归档](../history/decisions/2026-10-25-project-boundary-and-open-questions.md)。
+当前无阻塞性开放问题；2026-10-29 技术债清理留下 6 项 hold，见下表 OQ-5～OQ-7、OQ-9～OQ-11（OQ-8 已于 2026-11-02 关闭）；OQ-12～OQ-19 为 2026-11-10 执行面契约 v2 接口验证转出；OQ-18、OQ-20 已于 2026-11-10 由调度层设计关闭；OQ-22、OQ-24、OQ-25 已于 2026-11-11 由运行编排设计（`REQ-0001`）关闭，并转出 OQ-26～OQ-28。OQ-1～OQ-4 已于 2026-10-25 关闭归档，条目保留供追溯，结论见 [项目边界与早期开放问题归档](../history/decisions/2026-10-25-project-boundary-and-open-questions.md)。
 
 | # | 问题 | 结论 / 去向 |
 |---|---|---|
@@ -34,7 +34,10 @@ updated: 2026-11-10
 | OQ-19 | **观测面 fail-open**：client 只读观测 HTTP 在非 loopback + 空 token 下仍启动（`raw_enabled` 默认 true），评审 `OB-01` 未采纳「拒绝启动」建议。 | 待定（`OB-01`）：属 client 侧安全项；建议改为启动期检查（非 loopback 且空 token → 退出 2）或强制 `raw_enabled=false`。 |
 | OQ-20 | **实例粘性没有契约条款**：边界设计把「实例绑定 client、重派不换 client」当硬约束，但 v2 的 `poll` 载荷不含 `clientId`，`S-02` 只要求「同一时刻派给一个 client」，**未禁止重派到另一个 client**；若实现按空闲派发，本地 `workspacePath` 会落到别的机器。 | 已关闭（2026-11-10，用户裁决 + 调度层设计）：粘性作为调度器硬约束，实例首次派发绑定 `clientId`，重派只回同一 client；**不改 v2 契约**。落点：`design/components/instance/spec.md` §4.3、`design/components/scheduler/spec.md` §4.7。 |
 | OQ-21 | **实例不可用无上报载体**：client 无法声明「这个实例别再派」，只能事后报 `failed(workspace)`；`2026-11-10-execution-semantics-review` 的 `SA-01` 在 v2 中并未真正解决。 | 待定（`BC-14`）：调度层设计已给调度器侧兜底——`failed(workspace)` 后实例转 `blocked`、同实例任务结算失败、不再派发（见 `design/components/instance/spec.md` §4.1）。契约仍无上报载体，是否补字段留待 P2 契约修订。 |
-| OQ-22 | **任务启动入口归属**：实例登记（界面设置 `workspacePath`）与任务入队（fan-out 任务列表、prompt 组成）需要 HTTP 面与用例，但 `executor-http-v2` 只有执行面三端点，调度层设计只留了领域接缝（`InstanceService.enroll`、`SchedulerService.enqueue`）。 | 待定（2026-11-10 调度层设计转出）：由 B4 运行/任务启动工序确定端点、鉴权与界面契约；在定之前不新增对外端点。节点目录问题另由 `2026-11-10-harness-node-registry` 比较方案（`OQ-23`）。 |
+| OQ-22 | **任务启动入口归属**：实例登记（界面设置 `workspacePath`）与任务入队（fan-out 任务列表、prompt 组成）需要 HTTP 面与用例，但 `executor-http-v2` 只有执行面三端点，调度层设计只留了领域接缝（`InstanceService.enroll`、`SchedulerService.enqueue`）。 | 已关闭（2026-11-11，`REQ-0001`）：启动入口定为 `POST /api/v1/workflows/{id}/runs`，请求带 `harnessId`/`workspacePath`/`intent`/`autoConfirm`，服务端自动登记 instance；任务由 `CMP-run` 推进时入队。见 [`design-proposal.md`](../works/2026-11-11-workflow-run-orchestration/design-proposal.md) §6.2。 |
 | OQ-23 | **执行面 token 的权威来源**：token → `clientId` 放配置还是落库？产品端点当前无鉴权，本地写接口可直接读回/换绑凭据。 | 已关闭（2026-11-10，用户裁决）：token 落 Harness 表（`harness.client_token`，明文入库、详情可读回），登记/轮换/解绑走 `API-41`；配置不再持有凭据。接受「本机无鉴权即可读回凭据」的演示期风险，进生产前必须补管理面鉴权或改为哈希存储。落点见 [`2026-11-10-executor-client-token.md`](../history/decisions/2026-11-10-executor-client-token.md)。 |
-| OQ-24 | **联调期的任务注入通道**：执行面三端点落实现后，`SchedulerService.enqueue` 之外没有把任务放进队列的入口（`OQ-22` 未定正式端点）；联调需要一个可重复、可清理的注入方式。 | 待定（2026-11-11 联调计划转出）：优先「工序目录下开发脚本直接调服务 + 一次性数据库清理」；若联调频率高再评估受控端点（绑定本机、开关默认关）。见 [`2026-11-11-executor-joint-debug/brief.md`](../works/2026-11-11-executor-joint-debug/brief.md) §3。 |
-| OQ-25 | **`stop` 没有外部触发面**：`requestStop` 只作用于调度器进程内的 presence，HTTP 面与运维入口都没有；联调时无法让真实 client 收到 `stop`，只能靠自动测试。 | 待定（2026-11-11 联调发现）：等任务启动/运维控制端点一起设计（与 `OQ-22` 同批）；在此之前 `stop` 端到端不可验证，`cancelInstances` 可用（走库）。见 [`2026-11-11-executor-joint-debug/result.md`](../works/2026-11-11-executor-joint-debug/result.md) §2、§5。 |
+| OQ-24 | **联调期的任务注入通道**：执行面三端点落实现后，`SchedulerService.enqueue` 之外没有把任务放进队列的入口（`OQ-22` 未定正式端点）；联调需要一个可重复、可清理的注入方式。 | 已关闭（2026-11-11，`REQ-0001`）：联调改用 run 启动端点（`POST /workflows/{id}/runs`）驱动真实链路；`docs/works/2026-11-11-executor-joint-debug/tools/jd.ts` 保留作排障脚本，不再作为主要注入通道。 |
+| OQ-25 | **`stop` 没有外部触发面**：`requestStop` 只作用于调度器进程内的 presence，HTTP 面与运维入口都没有；联调时无法让真实 client 收到 `stop`，只能靠自动测试。 | 已关闭（2026-11-11，`REQ-0001`）：运行级入口由 `POST /api/v1/runs/{id}/cancel` 提供，经 `scheduler.cancelInstances` 电平生效；client 进程优雅停机仍由信号（SIGTERM）处理，不再需要 HTTP 面。 |
+| OQ-26 | **fan-out 的并发与技能集**：同一工作区已确认同一时刻只跑一个活跃 run，普通节点不会再撞 `S-06`；fan-out 在同一个 run 内展开多个任务，专家由 `fanout` 节点统一给出、共用同一 digest，但展开的大批任务与 client `maxConcurrent` 如何错峰、单条任务换专家是否允许仍未定。 | 部分关闭（2026-11-11）：并发 run 冲突已由「同工作区单活跃 run」消除；剩余部分（fan-out 批次与 client 并发上限、单任务换专家）留第二期工序开工前定。部分失败策略已定：单条任务失败不中断，全部跑完再汇总。 |
+| OQ-27 | **session-log 与归档的容量、保留期**：单节点日志可能上百 MB，归档包含整个 task-space；当前只定单次上传上限（64 MiB / 512 MiB），没有保留期、清理与配额策略。 | 待定（2026-11-11 运行编排设计转出）：等真实日志体积与归档频率数据出现后再定；在此之前超过上限的节点直接失败并报明确错误码。 |
+| OQ-28 | **节点失败后的原地重试**：当前节点失败即 run 失败，运维只能重开一个 run（新 runId、新 task-space），代价是整个流程重跑。是否需要「从失败节点原地重试、复用 task-space」？ | 待定（2026-11-11 运行编排设计转出）：第一期按「失败即终态」实现；若运维反馈重跑成本高，再评估在 run 内加 `retry` 动作（只对当前节点，`visit` 不递增）。 |
