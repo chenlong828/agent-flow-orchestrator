@@ -46,13 +46,19 @@ export function validateDraft(draft: TaskDraft): TaskDraft {
   if (!Array.isArray(draft.skillIds)) throw new ValidationError("skillIds", "必须是字符串数组");
   const skillIds = [...new Set(draft.skillIds)];
   for (const id of skillIds) ensureUuid(id, "skillIds");
+  if (typeof draft.taskSpacePath !== "string" || draft.taskSpacePath.trim() === "") {
+    throw new ValidationError("taskSpacePath", "必须是非空字符串");
+  }
+  if (!draft.taskSpacePath.startsWith("/")) {
+    throw new ValidationError("taskSpacePath", "必须是绝对路径");
+  }
   return {
     instanceId,
     nodeId: draft.nodeId,
     prompt: draft.prompt,
     timeoutMs,
     skillIds,
-    ...(draft.taskSpacePath === undefined ? {} : { taskSpacePath: draft.taskSpacePath }),
+    taskSpacePath: draft.taskSpacePath,
   };
 }
 

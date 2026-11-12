@@ -68,7 +68,7 @@ externalRefs: []
 3. 容量裁决：可派发数 = `min(free, maxTasksPerPoll=10)`；同一 client 的 poll 串行，不超卖（`S-04`）。
 4. 挑选 `queued` 且 `notBefore` 已到、实例 `active` 且绑定该 client 的任务；按入队顺序（FIFO）取。
 5. 派发前复核同实例已下发未结算任务的 `skillSet.digest` 一致（`S-06`）；不一致不派发，任务留在队列。
-6. 下发 `TaskEnvelope` 快照（`prompt`、`workspacePath`、`timeoutMs`、`skillSet`）；`attempt` 从 1 开始，重派递增（`S-01`/`S-05`）。
+6. 下发 `TaskEnvelope` 快照（`prompt`、`workspacePath`、`taskSpacePath`、`timeoutMs`、`skillSet`）；`attempt` 从 1 开始，重派递增（`S-01`/`S-05`）。
 7. 无任务可派：挂起到 `pollHoldMs=30000` 或新任务入队唤醒；返回 `200` + `tasks: []` + `nextPollAfterMs: 0`。
 
 失败路径：
@@ -82,7 +82,7 @@ externalRefs: []
 ## 4 不可变引用
 
 - 契约 [`executor-http-v3`](../../../../contracts/executor-http-v3.md)：§4.1 `P-01` 请求/响应与语义、`S-01`/`S-03`/`S-04`/`S-05`/`S-06`、`C-01`、§3 常量。
-- 任务快照与技能集 digest 口径：`CMP-scheduler` 规格 §4.4（不改契约字段）。
+- 任务快照与技能集 digest 口径：`CMP-scheduler` 规格 §4.4（v3 起快照含 `taskSpacePath`，入队必填）。
 - `workspacePath` 只登记与透传，不创建、不校验存在性（`P-01` §4.1 #3）。
 
 ## 5 测试方案
@@ -95,6 +95,8 @@ externalRefs: []
 | R2 | `TC-EXD-002` | `free=0` 返回空批且不下发；容量大于 `maxTasksPerPoll` 时截断到 10；`nextPollAfterMs=0`；长轮询挂起与唤醒由补充用例 `TC-EXD-007` 覆盖 |
 | R3 | `TC-EXD-003` | 同实例并发派发的任务 digest 相同；同实例已下发未结算任务已有不同 digest 时新任务不派发，任务留在队列 |
 | N1 | `TC-EXD-004` | 响应丢失：任务既不在 `running[]` 也不在 `finished[]`、无结果 → 下一次 poll 原样重发且 `attempt` 不变；任务出现在 `running[]` 或 `finished[]` 时不重发 |
+
+补充用例：`TC-EXD-005` 节点停用门禁、`TC-EXD-006` presence 观测、`TC-EXD-007` 长轮询挂起与唤醒、`TC-EXD-008` 入队 `taskSpacePath` 必填且为绝对路径。
 
 ## 6 覆盖边界
 

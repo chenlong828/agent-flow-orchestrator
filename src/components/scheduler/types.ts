@@ -11,8 +11,8 @@ export type TaskDraft = {
   prompt: string;
   timeoutMs: number;
   skillIds: string[];
-  /** v3：run 的 task-space 绝对路径；空串表示旧任务（无 task-space）。 */
-  taskSpacePath?: string;
+  /** v3：run 的 task-space 绝对路径；必填，由上游编排传入。 */
+  taskSpacePath: string;
 };
 
 export type EnqueueInput = { tasks: TaskDraft[]; actor?: string };

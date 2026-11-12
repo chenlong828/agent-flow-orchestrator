@@ -59,7 +59,16 @@ function exec(token: string, headers: Record<string, string> = {}): Record<strin
 
 async function enqueueOne(clientId: string, instanceId: string, skillId: string, prompt = "执行面任务") {
   const result = await ctx.scheduler.enqueue({
-    tasks: [{ instanceId, nodeId: "n1", prompt, timeoutMs: 1800000, skillIds: [skillId] }],
+    tasks: [
+      {
+        instanceId,
+        nodeId: "n1",
+        prompt,
+        taskSpacePath: `/work/${instanceId}/.agent-flow/task/run-1`,
+        timeoutMs: 1800000,
+        skillIds: [skillId],
+      },
+    ],
   });
   return result.taskIds[0]!;
 }

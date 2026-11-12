@@ -2,6 +2,7 @@ import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { TaskNotFoundError, ValidationError, type Clock } from "../../../src/core/kernel/index.ts";
 import { createHarnessNodeDirectory } from "../../../src/components/harness/index.ts";
 import { createScheduler } from "../../../src/components/scheduler/index.ts";
+import type { TaskDraft } from "../../../src/components/scheduler/index.ts";
 import { closeTestDb, resetBusinessData } from "../../helpers/test-db.ts";
 import { createTestContext, type TestContext } from "../../helpers/app.ts";
 
@@ -50,6 +51,10 @@ async function enroll(clientId: string): Promise<string> {
     workspacePath: `/work/${instanceId}`,
   });
   return instanceId;
+}
+
+function taskSpaceOf(instanceId: string): string {
+  return `/work/${instanceId}/.agent-flow/task/0191f2f0-7777-7000-8000-000000000001`;
 }
 
 async function createSkill(name: string): Promise<string> {
@@ -108,7 +113,7 @@ describe("任务派发与容量（S-01/S-04/S-05/S-06）", () => {
     await bindNode(clientId);
     const instanceId = await enroll(clientId);
     const skillId = await createSkill("派发技能");
-    const taskSpacePath = `/work/${instanceId}/.agent-flow/task/0191f2f0-7777-7000-8000-000000000001`;
+    const taskSpacePath = taskSpaceOf(instanceId);
     const enqueued = await ctx.scheduler.enqueue({
       tasks: [
         { instanceId, nodeId: "n1", prompt: "任务一", taskSpacePath, timeoutMs: 1800000, skillIds: [skillId] },
@@ -136,6 +141,40 @@ describe("任务派发与容量（S-01/S-04/S-05/S-06）", () => {
     expect(decision.tasks[1]!.taskId).not.toBe(decision.tasks[0]!.taskId);
   });
 
+  test("TC-EXD-008 入队拒绝缺失、空串或非绝对的 taskSpacePath", async () => {
+    const clientId = "node-task-space-guard";
+    await bindNode(clientId);
+    const instanceId = await enroll(clientId);
+    const skillId = await createSkill("task-space 校验技能");
+    const missing = {
+      instanceId,
+      nodeId: "n1",
+      prompt: "缺少 task-space",
+      timeoutMs: 1000,
+      skillIds: [skillId],
+    } as unknown as TaskDraft;
+    await expect(ctx.scheduler.enqueue({ tasks: [missing] })).rejects.toMatchObject({
+      details: { field: "taskSpacePath" },
+    });
+    for (const taskSpacePath of ["", " ", "relative/task"]) {
+      await expect(
+        ctx.scheduler.enqueue({
+          tasks: [
+            {
+              instanceId,
+              nodeId: "n1",
+              prompt: "非法 task-space",
+              taskSpacePath,
+              timeoutMs: 1000,
+              skillIds: [skillId],
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({ details: { field: "taskSpacePath" } });
+    }
+    expect((await poll(ctx.scheduler, clientId, 1)).tasks).toEqual([]);
+  });
+
   test("TC-EXD-002 容量 0 不下发；超过上限时截断到 10", async () => {
     const clientId = "node-capacity";
     await bindNode(clientId);
@@ -144,6 +183,7 @@ describe("任务派发与容量（S-01/S-04/S-05/S-06）", () => {
     await ctx.scheduler.enqueue({
       tasks: Array.from({ length: 12 }, (_, index) => ({
         instanceId,
+        taskSpacePath: taskSpaceOf(instanceId),
         nodeId: `n${index}`,
         prompt: `任务${index}`,
         timeoutMs: 1000,
@@ -164,19 +204,19 @@ describe("任务派发与容量（S-01/S-04/S-05/S-06）", () => {
     const second = await createSkill("技能二");
 
     await ctx.scheduler.enqueue({
-      tasks: [{ instanceId, nodeId: "n1", prompt: "一", timeoutMs: 1000, skillIds: [first] }],
+      tasks: [{ instanceId, taskSpacePath: taskSpaceOf(instanceId), nodeId: "n1", prompt: "一", timeoutMs: 1000, skillIds: [first] }],
     });
     const decision = await poll(ctx.scheduler, clientId, 1);
     expect(decision.tasks[0]!.skillSet.packages[0]!.skillId).toBe(first);
 
     await expect(
       ctx.scheduler.enqueue({
-        tasks: [{ instanceId, nodeId: "n2", prompt: "二", timeoutMs: 1000, skillIds: [second] }],
+        tasks: [{ instanceId, taskSpacePath: taskSpaceOf(instanceId), nodeId: "n2", prompt: "二", timeoutMs: 1000, skillIds: [second] }],
       }),
     ).rejects.toBeInstanceOf(ValidationError);
 
     await ctx.scheduler.enqueue({
-      tasks: [{ instanceId, nodeId: "n3", prompt: "三", timeoutMs: 1000, skillIds: [first] }],
+      tasks: [{ instanceId, taskSpacePath: taskSpaceOf(instanceId), nodeId: "n3", prompt: "三", timeoutMs: 1000, skillIds: [first] }],
     });
     const same = await poll(ctx.scheduler, clientId, 1);
     expect(same.tasks[0]!.skillSet.digest).toBe(decision.tasks[0]!.skillSet.digest);
@@ -188,7 +228,7 @@ describe("任务派发与容量（S-01/S-04/S-05/S-06）", () => {
     const instanceId = await enroll(clientId);
     const skillId = await createSkill("重发技能");
     const enqueued = await ctx.scheduler.enqueue({
-      tasks: [{ instanceId, nodeId: "n1", prompt: "重发", timeoutMs: 1000, skillIds: [skillId] }],
+      tasks: [{ instanceId, taskSpacePath: taskSpaceOf(instanceId), nodeId: "n1", prompt: "重发", timeoutMs: 1000, skillIds: [skillId] }],
     });
     const taskId = enqueued.taskIds[0]!;
 
@@ -214,7 +254,7 @@ describe("结果结算（S-08：失败不自动重派）", () => {
     const instanceId = await enroll(clientId);
     const skillId = await createSkill("结果技能");
     const enqueued = await ctx.scheduler.enqueue({
-      tasks: [{ instanceId, nodeId: "n1", prompt: "结果", timeoutMs: 1000, skillIds: [skillId] }],
+      tasks: [{ instanceId, taskSpacePath: taskSpaceOf(instanceId), nodeId: "n1", prompt: "结果", timeoutMs: 1000, skillIds: [skillId] }],
     });
     const taskId = enqueued.taskIds[0]!;
     await poll(ctx.scheduler, clientId, 1);
@@ -278,7 +318,7 @@ describe("结果结算（S-08：失败不自动重派）", () => {
     for (const item of cases) {
       const enqueued = await ctx.scheduler.enqueue({
         tasks: [
-          { instanceId, nodeId: "n1", prompt: item.error.code, timeoutMs: 1000, skillIds: [skillId] },
+          { instanceId, taskSpacePath: taskSpaceOf(instanceId), nodeId: "n1", prompt: item.error.code, timeoutMs: 1000, skillIds: [skillId] },
         ],
       });
       const taskId = enqueued.taskIds[0]!;
@@ -306,7 +346,7 @@ describe("结果结算（S-08：失败不自动重派）", () => {
     const scheduler = schedulerWith(clock, { maxAttempts: 2 });
 
     const enqueued = await scheduler.enqueue({
-      tasks: [{ instanceId, nodeId: "n1", prompt: "未回报", timeoutMs: 1000, skillIds: [skillId] }],
+      tasks: [{ instanceId, taskSpacePath: taskSpaceOf(instanceId), nodeId: "n1", prompt: "未回报", timeoutMs: 1000, skillIds: [skillId] }],
     });
     const taskId = enqueued.taskIds[0]!;
 
@@ -332,7 +372,7 @@ describe("结果结算（S-08：失败不自动重派）", () => {
     const scheduler = schedulerWith(clock, { maxAttempts: 3 });
 
     const enqueued = await scheduler.enqueue({
-      tasks: [{ instanceId, nodeId: "n1", prompt: "静默", timeoutMs: 600000, skillIds: [skillId] }],
+      tasks: [{ instanceId, taskSpacePath: taskSpaceOf(instanceId), nodeId: "n1", prompt: "静默", timeoutMs: 600000, skillIds: [skillId] }],
     });
     const taskId = enqueued.taskIds[0]!;
     expect((await poll(scheduler, silentClient, 1)).tasks[0]).toMatchObject({ taskId, attempt: 1 });
@@ -365,8 +405,8 @@ describe("结果结算（S-08：失败不自动重派）", () => {
     const skillId = await createSkill("实例失败技能");
     const enqueued = await ctx.scheduler.enqueue({
       tasks: [
-        { instanceId, nodeId: "n1", prompt: "一", timeoutMs: 1000, skillIds: [skillId] },
-        { instanceId, nodeId: "n2", prompt: "二", timeoutMs: 1000, skillIds: [skillId] },
+        { instanceId, taskSpacePath: taskSpaceOf(instanceId), nodeId: "n1", prompt: "一", timeoutMs: 1000, skillIds: [skillId] },
+        { instanceId, taskSpacePath: taskSpaceOf(instanceId), nodeId: "n2", prompt: "二", timeoutMs: 1000, skillIds: [skillId] },
       ],
     });
     await poll(ctx.scheduler, clientId, 2);
@@ -397,8 +437,8 @@ describe("停止与取消（S-07）", () => {
     const skillId = await createSkill("停止技能");
     await ctx.scheduler.enqueue({
       tasks: [
-        { instanceId, nodeId: "n1", prompt: "一", timeoutMs: 1000, skillIds: [skillId] },
-        { instanceId, nodeId: "n2", prompt: "二", timeoutMs: 1000, skillIds: [skillId] },
+        { instanceId, taskSpacePath: taskSpaceOf(instanceId), nodeId: "n1", prompt: "一", timeoutMs: 1000, skillIds: [skillId] },
+        { instanceId, taskSpacePath: taskSpaceOf(instanceId), nodeId: "n2", prompt: "二", timeoutMs: 1000, skillIds: [skillId] },
       ],
     });
     const first = await poll(ctx.scheduler, clientId, 1);
@@ -417,7 +457,7 @@ describe("停止与取消（S-07）", () => {
     const instanceId = await enroll(clientId);
     const skillId = await createSkill("取消技能");
     const enqueued = await ctx.scheduler.enqueue({
-      tasks: [{ instanceId, nodeId: "n1", prompt: "取消", timeoutMs: 1000, skillIds: [skillId] }],
+      tasks: [{ instanceId, taskSpacePath: taskSpaceOf(instanceId), nodeId: "n1", prompt: "取消", timeoutMs: 1000, skillIds: [skillId] }],
     });
     const taskId = enqueued.taskIds[0]!;
     await poll(ctx.scheduler, clientId, 1);
@@ -449,7 +489,7 @@ describe("停止与取消（S-07）", () => {
     const instanceId = await enroll(clientId);
     const skillId = await createSkill("排队取消技能");
     const enqueued = await ctx.scheduler.enqueue({
-      tasks: [{ instanceId, nodeId: "n1", prompt: "排队", timeoutMs: 1000, skillIds: [skillId] }],
+      tasks: [{ instanceId, taskSpacePath: taskSpaceOf(instanceId), nodeId: "n1", prompt: "排队", timeoutMs: 1000, skillIds: [skillId] }],
     });
     const taskId = enqueued.taskIds[0]!;
 
@@ -464,7 +504,7 @@ describe("停止与取消（S-07）", () => {
     const instanceId = await enroll(clientId);
     const skillId = await createSkill("幂等技能");
     await ctx.scheduler.enqueue({
-      tasks: [{ instanceId, nodeId: "n1", prompt: "幂等", timeoutMs: 1000, skillIds: [skillId] }],
+      tasks: [{ instanceId, taskSpacePath: taskSpaceOf(instanceId), nodeId: "n1", prompt: "幂等", timeoutMs: 1000, skillIds: [skillId] }],
     });
     await ctx.scheduler.requestStop(clientId);
     await ctx.scheduler.requestStop(clientId);
@@ -490,7 +530,7 @@ describe("长轮询", () => {
     const waiting = ctx.scheduler.poll(clientId, report(1), { holdMs: 1000 });
     await Bun.sleep(20);
     await ctx.scheduler.enqueue({
-      tasks: [{ instanceId, nodeId: "n1", prompt: "唤醒", timeoutMs: 1000, skillIds: [skillId] }],
+      tasks: [{ instanceId, taskSpacePath: taskSpaceOf(instanceId), nodeId: "n1", prompt: "唤醒", timeoutMs: 1000, skillIds: [skillId] }],
     });
     const woken = await waiting;
     expect(woken.tasks).toHaveLength(1);
@@ -504,7 +544,7 @@ describe("节点门禁与观测", () => {
     const instanceId = await enroll(clientId);
     const skillId = await createSkill("门禁技能");
     await ctx.scheduler.enqueue({
-      tasks: [{ instanceId, nodeId: "n1", prompt: "门禁", timeoutMs: 1000, skillIds: [skillId] }],
+      tasks: [{ instanceId, taskSpacePath: taskSpaceOf(instanceId), nodeId: "n1", prompt: "门禁", timeoutMs: 1000, skillIds: [skillId] }],
     });
 
     const harness = await ctx.harnessRead.getByClientId(clientId);
@@ -521,7 +561,7 @@ describe("节点门禁与观测", () => {
     const instanceId = await enroll(clientId);
     const skillId = await createSkill("观测技能");
     await ctx.scheduler.enqueue({
-      tasks: [{ instanceId, nodeId: "n1", prompt: "观测", timeoutMs: 1000, skillIds: [skillId] }],
+      tasks: [{ instanceId, taskSpacePath: taskSpaceOf(instanceId), nodeId: "n1", prompt: "观测", timeoutMs: 1000, skillIds: [skillId] }],
     });
 
     expect(await ctx.scheduler.presence([clientId])).toEqual([

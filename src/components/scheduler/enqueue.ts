@@ -68,7 +68,7 @@ export function createEnqueueHandler(
           nodeId: draft.nodeId,
           prompt: draft.prompt,
           workspacePath: instance.workspacePath,
-          taskSpacePath: draft.taskSpacePath ?? "",
+          taskSpacePath: draft.taskSpacePath,
           timeoutMs: draft.timeoutMs,
           skillSet,
           skillSetDigest: skillSet.digest,
