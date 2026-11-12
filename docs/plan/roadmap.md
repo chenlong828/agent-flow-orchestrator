@@ -23,8 +23,6 @@ updated: 2026-11-12
 
 **在办工序**
 
-（当前无在办工序；已收口的工序见下方「近期完成」）
-
 - M2 只产出裁定与规格，不写实现代码；M2 是 P1，人参与切分与契约评审后才可编码。
 - 跨项目依赖：`T-RUN-09` 联调需 `agent-flow-client` 先同步 `executor-http-v3` 副本并实现 v3（task-space、`P-04`/`P-05`、归档、协议 3）。该工作不在本仓库工序表内，已在 client 仓库建立交接工序 [`2026-11-12-contract-v3-handoff`](../../../agent-flow-client/docs/works/2026-11-12-contract-v3-handoff/brief.md)。
 - 无用户旅程的技术债 / 文档活走旁路，不进 `requirements/`。
@@ -32,6 +30,7 @@ updated: 2026-11-12
 - 已知欠账：无 CI 门禁；文档校验目前只有场景索引（`docs:check`），完整文档树校验待补。
 
 ## 近期完成
+- `2026-11-12-expert-skill-slug-guard`（P2）：专家装配入口拒绝同一专家内 Skill `slug` 重复（新 `SkillSlugReader` 端口），避免坏装配到 client 才报 `invalid_skill_format`；`OQ-33` 关闭。见 [`history/works/2026-11-12-expert-skill-slug-guard/result.md`](../history/works/2026-11-12-expert-skill-slug-guard/result.md)。
 - `2026-11-12-drop-instance-blocked`（P2）：删除实例 `blocked` 状态，工作区失败直接重跑。见 [`history/works/2026-11-12-drop-instance-blocked/result.md`](../history/works/2026-11-12-drop-instance-blocked/result.md)。
 - `2026-11-12-skill-slug`（P1）：技能增 `slug`，`SKILL.md` 的 `name` 与下载文件名改用系统标识。见 [`history/works/2026-11-12-skill-slug/result.md`](../history/works/2026-11-12-skill-slug/result.md)。
 - `2026-11-11-workflow-run-orchestration`（P1）：run 编排、执行面契约 v3、DSL 7 类节点、session-log 与归档；`SCN-0301`–`SCN-0304` verified。见 [`history/works/2026-11-11-workflow-run-orchestration/result.md`](../history/works/2026-11-11-workflow-run-orchestration/result.md)。

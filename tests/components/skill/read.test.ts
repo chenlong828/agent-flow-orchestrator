@@ -7,6 +7,7 @@ import { createFileStore } from "../../../src/core/platform/index.ts";
 import type { FileStore } from "../../../src/core/kernel/index.ts";
 import { PackageUnavailableError } from "../../../src/core/kernel/index.ts";
 import { createSkillRead } from "../../../src/components/skill/read.ts";
+import { createSkillSlugReader } from "../../../src/components/skill/slug-reader.ts";
 import { parseSkillMarkdown, readSkillPackage } from "../../../src/components/skill/package.ts";
 import { seedAll } from "../../../scripts/seed.ts";
 
@@ -120,5 +121,18 @@ describe("Skill 读路径", () => {
       { code: "review", label: "审视", position: 2 },
       { code: "testing", label: "测试", position: 3 },
     ]);
+  });
+
+  test("系统标识读取：按 id 返回 slug，未知 id 与空输入不产生条目", async () => {
+    const reader = createSkillSlugReader({ db });
+    const row = await db.one<{ id: string; slug: string }>(
+      "select id, slug from skill where name = 'CRES 技能'",
+    );
+    expect(row).not.toBeNull();
+    expect(await reader.slugsFor([])).toEqual({});
+    expect(await reader.slugsFor([row!.id])).toEqual({ [row!.id]: "cres" });
+    expect(
+      await reader.slugsFor([row!.id, "0191f2f0-bbbb-7000-8000-000000000000"]),
+    ).toEqual({ [row!.id]: "cres" });
   });
 });

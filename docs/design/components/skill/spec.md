@@ -3,7 +3,7 @@ layer: design
 module: skill
 status: current
 component: CMP-skill
-updated: 2026-11-10
+updated: 2026-11-12
 ---
 
 # `CMP-skill` 组件规格
@@ -250,9 +250,23 @@ type SkillPackageSource = {
 
 **实现状态**：`SkillPackageSource` 与 `packageId`/`digest`/`etag` 口径已实现（2026-11-11）：`skill` 表增 `package_digest`、`package_size`，保存与种子写入时计算摘要；直接改基线、不做数据迁移。现有 `getDocument`/`getPackage` 契约不变。
 
+### 3.4 系统标识只读端口
+
+专家装配入口需要断言同一专家内 Skill 的 `slug` 不重复；该查询由本组件实现，通过 kernel 的 `SkillSlugReader` 端口（定义见 [`CMP-kernel` §3.3](../kernel/spec.md)）注入 `CMP-expert`，不跨组件读 `skill` 表。
+
+```ts
+type SkillSlugReader = {
+  slugsFor(skillIds: string[]): Promise<Record<string, string>>;
+};
+```
+
+- 只返回 `id → slug`；未知 id 不出现，存在性仍由专家装配的外键判定。
+- 空输入返回空对象，不查库。
+- 不返回展示名、描述、包内容或启停状态；不承担装配规则，判重由 `CMP-expert` 负责。
+
 ## 4 依赖与边界
 
-- 允许：`platform` 的 `Db` 与 `FileStore` 实现；`kernel` 的 `Clock`、`IdGenerator`、`ReferenceGuard`、`FileData`/`FileStore` 端口与错误类型。
+- 允许：`platform` 的 `Db` 与 `FileStore` 实现；`kernel` 的 `Clock`、`IdGenerator`、`ReferenceGuard`、`SkillSlugReader`、`FileData`/`FileStore` 端口与错误类型。
 - 禁止：导入 `expert` 组件的 store/service；直接读 `expert_skill` 表；直接使用 Bun 文件 API；在组件内拼 HTTP 响应；解析 multipart。
 - `skill_category` 只读；种子写入，Skill 服务不提供分类 CRUD。
 - 存储键由本组件按 `packages/<package_key>`、`drafts/<draft_id>/...` 生成；`FileStore` 只接受相对键，拒绝绝对路径与 `..`。
@@ -271,6 +285,7 @@ type SkillPackageSource = {
 - 重建：单基线 `0001_baseline.sql` 后 16 张业务表、1 个迁移；种子 12 个 Skill 各有合法包与 23 条专家装配边。
 - 契约：对应 REST 端点 3 正 1 反在 `http-gateway` 规格中列明。
 - 制品供给（设计已定、未实现）：`packageId` 不可变、`digest`/`etag` 由字节派生、旧版本 404、包损坏 500；与 `CMP-scheduler` 的冻结口径一致。
+- 系统标识读取：按 id 返回 `id → slug`；未知 id 不出现；空输入返回空对象。
 
 ## 6 预算与运行
 

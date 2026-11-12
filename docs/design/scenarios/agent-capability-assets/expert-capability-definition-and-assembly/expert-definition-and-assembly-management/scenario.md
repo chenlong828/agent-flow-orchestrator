@@ -2,7 +2,7 @@
 layer: design
 module: agent-capability-assets
 status: designed
-updated: 2026-10-25
+updated: 2026-11-12
 flow: FLOW-EXP-ASSEMBLY-001
 scenario: SCN-0001
 domain: 智能体能力资产
@@ -74,6 +74,7 @@ externalRefs:
 ## 4 失败路径
 
 - 创建时 `skillIds` 或 `toolIds` 指向不存在的目标：整批失败，专家根不留下；对应 `N1`。
+- 创建/聚合更新/独立装配提交的多个 Skill 系统标识（`slug`）重复：400 `validation_error`，整批不写、`revision` 不变；由领域测试覆盖，不占用 3+1 映射。
 - `PATCH` 缺少 `If-Match`：返回 `428`；旧 revision 返回 `409`。
 - 列表或详情资源不存在：返回 `404`；这些错误路径不在本试点 3 正 1 反内，后续补测。
 
@@ -101,5 +102,6 @@ externalRefs:
 ## 7 覆盖边界
 
 - 当前场景覆盖创建、列表和聚合更新；删除、引用保护、启停等子流程尚未进入本场景的 3+1。
+- 同一专家内 Skill `slug` 重复的入口断言由 `tests/components/expert/service.test.ts` 覆盖，未映射到 3+1 测试 ID。
 - CRUD 是运行序步骤，不拆成多个业务场景；后续只有在某个子流程形成独立流程定义和独立场景集合时，才评估升层。
 - 索引中引用的是文档章节、代码导出符号、测试 ID 和 OpenAPI operationId，不使用行号。

@@ -1149,7 +1149,7 @@ paths:
       operationId: createExpert
       x-api-id: API-24
       x-component-method: expert.create + catalog.getExpert
-      description: 创建时可带可选的有序 `skillIds`/`toolIds`，与专家根同事务写入；也可省略后使用 API-28/API-29。
+      description: 创建时可带可选的有序 `skillIds`/`toolIds`，与专家根同事务写入；也可省略后使用 API-28/API-29。同一专家内 Skill 的系统标识（`slug`）重复时返回 400，专家根不落库。
       requestBody:
         required: true
         content:
@@ -1245,7 +1245,7 @@ paths:
       operationId: patchExpertAggregate
       x-api-id: API-30
       x-component-method: expert.updateAggregate + catalog.getExpert
-      description: 按提交字段更新五区、引用与有序装配；一次事务、一次递增 revision。省略字段不变，数组传入即整体替换，空数组清空。
+      description: 按提交字段更新五区、引用与有序装配；一次事务、一次递增 revision。省略字段不变，数组传入即整体替换，空数组清空；同一专家内 Skill 的系统标识（`slug`）重复时返回 400。
       parameters:
       - "$ref": "#/components/parameters/IfMatch"
       requestBody:
@@ -1346,7 +1346,7 @@ paths:
       operationId: setExpertSkills
       x-api-id: API-28
       x-component-method: expert.setSkills + catalog.getExpert
-      description: "`items` 顺序即装配顺序；整体替换，重复目标或目标不存在返回 400，旧 revision 返回 409。"
+      description: "`items` 顺序即装配顺序；整体替换，重复目标（含 Skill 系统标识 `slug` 重复）或目标不存在返回 400，旧 revision 返回 409。"
       parameters:
       - "$ref": "#/components/parameters/IfMatch"
       requestBody:
@@ -1386,7 +1386,7 @@ paths:
       operationId: setExpertTools
       x-api-id: API-29
       x-component-method: expert.setTools + catalog.getExpert
-      description: "`items` 顺序即装配顺序；整体替换，重复目标或目标不存在返回 400，旧 revision 返回 409。"
+      description: "`items` 顺序即装配顺序；整体替换，重复目标（含 Skill 系统标识 `slug` 重复）或目标不存在返回 400，旧 revision 返回 409。"
       parameters:
       - "$ref": "#/components/parameters/IfMatch"
       requestBody:
@@ -3213,7 +3213,7 @@ components:
           items:
             type: string
             format: uuid
-          description: 创建时可选的有序 Skill ID；与专家根同事务写入
+          description: 创建时可选的有序 Skill ID；与专家根同事务写入；同一专家内 Skill 的系统标识（`slug`）必须唯一
         toolIds:
           type: array
           uniqueItems: true
@@ -3312,7 +3312,7 @@ components:
           items:
             type: string
             format: uuid
-          description: 有序 Skill ID；传入即整体替换，空数组清空
+          description: 有序 Skill ID；传入即整体替换，空数组清空；同一专家内 Skill 的系统标识（`slug`）必须唯一
         toolIds:
           type: array
           uniqueItems: true
@@ -3337,7 +3337,7 @@ components:
                 type: string
                 format: uuid
           description: 按顺序排列的 Skill 目标
-      description: 整体替换专家 Skill 装配；items 顺序即装配顺序。
+      description: 整体替换专家 Skill 装配；items 顺序即装配顺序，同一专家内 Skill 的系统标识（`slug`）必须唯一。
     ExpertToolAssembly:
       type: object
       required:

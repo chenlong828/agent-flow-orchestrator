@@ -52,6 +52,7 @@ export type {
   ReferenceOwner,
   SkillPackageRef,
   SkillPackageSource,
+  SkillSlugReader,
 } from "./ports.ts";
 export {
   ensureBoolean,

@@ -20,6 +20,12 @@ export type ExpertStatusReader = {
   statuses(expertIds: string[]): Promise<Record<string, boolean>>;
 };
 
+/** 只读技能系统标识查询；由技能组件实现，供专家装配校验 DSH 技能名不重复。 */
+export type SkillSlugReader = {
+  /** 返回已存在技能的 `id → slug`；未知 id 不出现在结果中。 */
+  slugsFor(skillIds: string[]): Promise<Record<string, string>>;
+};
+
 /** 执行节点目录：client 节点是否可接任务。由 CMP-harness 实现，组合根注入 scheduler。 */
 export type NodeDirectory = {
   /** 节点存在、已绑定 clientId 且 enabled；未知 clientId 返回 false。 */

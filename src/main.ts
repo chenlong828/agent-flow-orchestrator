@@ -20,6 +20,7 @@ import {
   createSkillDraftService,
   createSkillPackageSource,
   createSkillRead,
+  createSkillSlugReader,
 } from "./components/skill/index.ts";
 import { createInstanceService } from "./components/instance/index.ts";
 import { createScheduler } from "./components/scheduler/index.ts";
@@ -58,6 +59,7 @@ const harnessRead = createHarnessRead({ db });
 const toolRead = createToolRead({ db });
 const skillStore = createFileStore(config.skillStorageRoot);
 const skillRead = createSkillRead(db, skillStore);
+const skillSlugReader = createSkillSlugReader({ db });
 const expertRead = createExpertRead({ db });
 const workflowRead = createWorkflowRead({ db });
 const instanceService = createInstanceService({
@@ -131,6 +133,7 @@ const expertService = createExpertService({
   ids: uuidv7Ids,
   actor: config.actor,
   guard: catalog,
+  skillSlugs: skillSlugReader,
 });
 const workflowService = createWorkflowService({
   db,

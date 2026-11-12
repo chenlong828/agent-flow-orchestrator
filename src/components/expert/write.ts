@@ -118,6 +118,31 @@ async function replaceSkills(
   }
 }
 
+/**
+ * 装配入口断言：同一专家内不同 Skill 的系统标识不能重复。
+ * 客户端按 `SKILL.md` 的 `name`（即 `slug`）建技能目录，重名会使整批技能安装失败。
+ */
+async function assertSkillSlugsUnique(
+  ctx: ExpertServiceContext,
+  skillIds: string[],
+  field: string,
+): Promise<void> {
+  if (skillIds.length < 2) return;
+  const slugs = await ctx.skillSlugs.slugsFor(skillIds);
+  const seen = new Map<string, string>();
+  for (const skillId of skillIds) {
+    const slug = slugs[skillId];
+    if (slug === undefined) continue;
+    if (seen.has(slug)) {
+      throw new ValidationError(
+        field,
+        `技能系统标识 ${slug} 重复：同一专家内 Skill 的系统标识必须唯一`,
+      );
+    }
+    seen.set(slug, skillId);
+  }
+}
+
 async function replaceTools(
   store: ExpertStore,
   tx: Db,
@@ -165,6 +190,7 @@ export async function createExpert(
   const enabled = enabledFrom(input);
   const skillIds = input.skillIds === undefined ? [] : normalizeIds(input.skillIds, "skillIds");
   const toolIds = input.toolIds === undefined ? [] : normalizeIds(input.toolIds, "toolIds");
+  await assertSkillSlugsUnique(ctx, skillIds, "skillIds");
   const id = ctx.ids.next();
   const now = ctx.clock.now();
   const actorValue = requestActor ?? ctx.actor;
@@ -233,6 +259,9 @@ export async function updateAggregateExpert(
   requestActor?: string,
 ): Promise<{ id: string; revision: number }> {
   const patch = normalizePatch(input);
+  if (patch.skillIds !== undefined) {
+    await assertSkillSlugsUnique(ctx, patch.skillIds, "skillIds");
+  }
   const now = ctx.clock.now();
   const actorValue = requestActor ?? ctx.actor;
   try {
@@ -342,7 +371,9 @@ export async function setExpertSkills(
   skillIds: string[],
   requestActor?: string,
 ): Promise<{ revision: number }> {
-  return setExpertLinks(ctx, id, revision, skillIds, {
+  const normalized = normalizeIds(skillIds, "items");
+  await assertSkillSlugsUnique(ctx, normalized, "items");
+  return setExpertLinks(ctx, id, revision, normalized, {
     requestActor,
     replace: (tx, targetId, ids) => replaceSkills(ctx.store, tx, targetId, ids),
   });

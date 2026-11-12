@@ -3,7 +3,7 @@ layer: design
 module: kernel
 status: current
 component: CMP-kernel
-updated: 2026-11-11
+updated: 2026-11-12
 ---
 
 # `CMP-kernel` 共享契约组件规格
@@ -141,6 +141,12 @@ type ExpertStatusReader = {
   statuses(expertIds: string[]): Promise<Record<string, boolean>>;
 };
 
+/** 只读技能系统标识端口；由 CMP-skill 实现，组合根注入专家服务。 */
+type SkillSlugReader = {
+  /** 返回已存在技能的 `id → slug`；未知 id 不出现在结果中。 */
+  slugsFor(skillIds: string[]): Promise<Record<string, string>>;
+};
+
 type ReferenceGuard = {
   check(owner: ReferenceOwner, id: string): Promise<Reference[]>;
 };
@@ -150,6 +156,8 @@ type ReferenceGuard = {
 - 返回空数组表示可删除；返回非空数组表示被引用，由领域服务抛 `ReferencedError`。
 - 本端口不负责删除后的级联清理；工作流删除级联自身定义/引用，不跨聚合删除专家。
 - `ExpertStatusReader` 只返回启停状态，不暴露专家实体；供工作流保存/校验判断 `expert_missing` / `expert_disabled`。
+- `SkillSlugReader` 只返回系统标识，不暴露展示名、正文或包；供专家装配入口断言同一专家内 Skill 的 `slug` 不重复（客户端按 `slug` 建技能目录）。
+- 端口返回映射而非数组，调用方按传入顺序自行判重；未知 id 不产生条目，存在性仍由装配外键判定。
 
 ### 3.4 时钟与 ID 端口
 
@@ -263,6 +271,7 @@ type ExecutorAuthenticator = {
 | `normalizePageQuery` | 规范化分页参数 | `limit?`, `offset?` | `PageQuery` | `ValidationError` | 默认 50，上限 200 |
 | `ReferenceGuard.check` | 查询引用方 | `owner`, `id` | `Reference[]` | 无 | 空数组表示可删除；owner 含 expert |
 | `ExpertStatusReader.statuses` | 批量专家启停 | `expertIds[]` | `Record<string,boolean>` | 无 | 只读状态，不暴露实体 |
+| `SkillSlugReader.slugsFor` | 批量技能系统标识 | `skillIds[]` | `Record<string,string>` | 无 | 未知 id 不出现；空输入返回空对象 |
 | `FileStore.put` | 原子写/覆盖 | `key`, `data` | `void` | 平台存储错误 | fsync 文件与目录 |
 | `FileStore.get` | 读流 | `key` | `ReadableStream<Uint8Array>` | 平台存储错误 | 不存在由 `head` 判定 |
 | `FileStore.head` | 文件元数据 | `key` | `FileStat \| null` | 平台存储错误 | 不存在返回 null |
@@ -281,7 +290,7 @@ type ExecutorAuthenticator = {
 - 允许依赖：仅 TypeScript 标准库与纯类型工具。
 - 禁止依赖：`platform`、任何领域组件、`catalog`、`http-gateway`、Bun/PostgreSQL 驱动。
 - 本组件不拥有数据表；`schema_migrations` 属于 `platform`。
-- **实现状态**：`binding_conflict`、`NodeDirectory`、`ExecutorAuthenticator` 已实现（节点目录）；`task_not_found`、`package_not_found`、`unsupported_protocol`、`unauthorized` 与 `SkillPackageSource` 端口已随调度层实现（2026-11-11）；`run_not_found`、`run_conflict`、`session_log_missing`、`invalid_state`、`invalid_archive`、`unsupported_node_type` 已设计冻结、随运行编排实现（2026-11-11）；其余错误类型与端口不变。
+- **实现状态**：`SkillSlugReader` 已随专家装配入口断言实现（2026-11-12）；`binding_conflict`、`NodeDirectory`、`ExecutorAuthenticator` 已实现（节点目录）；`task_not_found`、`package_not_found`、`unsupported_protocol`、`unauthorized` 与 `SkillPackageSource` 端口已随调度层实现（2026-11-11）；`run_not_found`、`run_conflict`、`session_log_missing`、`invalid_state`、`invalid_archive`、`unsupported_node_type` 已设计冻结、随运行编排实现（2026-11-11）；其余错误类型与端口不变。
 - 所有公开类型不得包含 HTTP 状态码、SQL 行类型或框架类型。
 
 ## 5. 单独验证
@@ -296,6 +305,7 @@ bunx tsc --noEmit
 | 错误码映射 | 每个 `AppError` 子类的 `code` 与 `retryable` 正确 |
 | 分页 | 缺省、边界、超上限、负数均符合契约 |
 | 引用端口 | 空/非空引用返回结构稳定，领域可用假实现替换 |
+| 技能标识端口 | 已存在 id 返回 `id → slug`；未知 id 不出现；空输入返回空对象 |
 | 存储端口 | `put/get/head/list/delete/move` 的 key 约束、幂等与流语义稳定，领域可用假实现替换 |
 | 制品端口 | `currentForSkill`/`describe`/`open` 的不可变与错误语义稳定，可用假实现替换 |
 | 节点目录端口 | `isDispatchable`/`listClientIds` 的语义稳定，可用假实现替换；未知 client 返回 `false`/`[]` |

@@ -3,7 +3,7 @@ layer: design
 module: http-gateway
 status: current
 component: CMP-http-gateway
-updated: 2026-11-11
+updated: 2026-11-12
 ---
 
 # `CMP-http-gateway` 组件规格与 REST API 契约
@@ -530,11 +530,12 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 | `verifyOrder` | string | 否 | 验证顺序说明 |
 | `notes` | string | 否 | 任务解读/备注 |
 | `refs` | `ExpertRef[]` | 否 | 有序 |
-| `skillIds` | string[] | 否 | 创建时可选的有序 Skill ID；同事务写入 |
+| `skillIds` | string[] | 否 | 创建时可选的有序 Skill ID；同事务写入；同一专家内 Skill 的 `slug` 必须唯一 |
 | `toolIds` | string[] | 否 | 创建时可选的有序工具 ID；同事务写入 |
 
 - `POST` 可带初始有序装配；`PUT` 只更新五区/人设/引用，不接收 `skills`/`tools`/`skillIds`/`toolIds`。
 - `PATCH /experts/{id}` 是聚合部分更新：省略字段不变，数组字段传入即整体替换，空数组清空；一次事务、一次递增 `revision`。独立装配端点 `API-28`/`API-29` 保留。
+- `API-24` / `API-28` / `API-30` 的 Skill 装配带有入口断言：同一专家内 Skill 的系统标识（`slug`，客户端据此建技能目录）重复时返回 `400 validation_error`，`details.field` 分别为 `skillIds` / `items` / `skillIds`，整批不写、`revision` 不变。
 - `GET /experts` 的 `skills` 只返回前 3 个 `{id,name}`，避免把详情摘要塞进列表；`GET /experts/{id}` 返回完整装配摘要。
 - `skillCount` / `toolCount` 由装配关系派生。
 
@@ -544,6 +545,8 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 // PUT /experts/{id}/skills
 { "items": [ { "skillId": "..." }, { "skillId": "..." } ] }
 ```
+
+- `items` 内 Skill 的系统标识（`slug`）必须唯一；重复返回 400，不写装配。
 
 - 成功 200，返回更新后的 `ExpertDetail`（同 `API-23`）；调用方可直接刷新详情，不需要额外的装配摘要 DTO。
 - 工具装配同构，请求字段为 `toolId`。

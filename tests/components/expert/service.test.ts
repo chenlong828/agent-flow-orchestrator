@@ -7,9 +7,11 @@ import {
   normalizePageQuery,
 } from "../../../src/core/kernel/index.ts";
 import {
+  createExpertService,
   SkillNotFoundError,
   ToolNotFoundError,
 } from "../../../src/components/expert/index.ts";
+import { systemClock, uuidv7Ids } from "../../../src/core/platform/index.ts";
 import { closeTestDb, resetBusinessData } from "../../helpers/test-db.ts";
 import { createTestContext, type TestContext } from "../../helpers/app.ts";
 
@@ -227,6 +229,49 @@ describe("专家写入规则", () => {
     expect(duplicateTool).toBeInstanceOf(ValidationError);
     expect(duplicateTool.details.field).toBe("items");
     expect((await ctx.catalog.getExpert(created.id)).revision).toBe(3);
+  });
+
+  test("同一专家内技能系统标识重复时入口拒绝，装配与 revision 不变", async () => {
+    const stub = createExpertService({
+      db: ctx.db,
+      clock: systemClock,
+      ids: uuidv7Ids,
+      actor: "tester",
+      guard: ctx.catalog,
+      skillSlugs: {
+        async slugsFor(ids) {
+          return Object.fromEntries(ids.map((id) => [id, "duplicate-slug"]));
+        },
+      },
+    });
+    const created = await ctx.expertService.create(expertBody("slug 断言专家"));
+
+    const createError = await stub
+      .create({ ...expertBody("重复装配创建"), skillIds })
+      .catch((error) => error);
+    expect(createError).toBeInstanceOf(ValidationError);
+    expect(createError.details.field).toBe("skillIds");
+    expect(createError.message).toContain("duplicate-slug");
+    const list = await ctx.catalog.listExperts({
+      q: "重复装配创建",
+      page: normalizePageQuery(),
+    });
+    expect(list.total).toBe(0);
+
+    const setError = await stub.setSkills(created.id, 1, skillIds).catch((error) => error);
+    expect(setError).toBeInstanceOf(ValidationError);
+    expect(setError.details.field).toBe("items");
+    expect(setError.message).toContain("duplicate-slug");
+
+    const patchError = await stub
+      .updateAggregate(created.id, 1, { skillIds })
+      .catch((error) => error);
+    expect(patchError).toBeInstanceOf(ValidationError);
+    expect(patchError.details.field).toBe("skillIds");
+
+    const detail = await ctx.catalog.getExpert(created.id);
+    expect(detail.skillCount).toBe(0);
+    expect(detail.revision).toBe(1);
   });
 
   test("目标不存在整批回滚，不留下半套装配且 revision 不变", async () => {

@@ -5,6 +5,7 @@ import type {
   PageQuery,
   ReferenceGuard,
   RevisionedLifecycle,
+  SkillSlugReader,
 } from "../../core/kernel/index.ts";
 import type { Db } from "../../core/platform/index.ts";
 
@@ -14,6 +15,7 @@ export type ExpertDeps = {
   ids: IdGenerator;
   actor: string;
   guard: ReferenceGuard;
+  skillSlugs: SkillSlugReader;
 };
 
 export type ExpertRefInput = {

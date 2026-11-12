@@ -3,7 +3,7 @@ layer: design
 module: expert
 status: current
 component: CMP-expert
-updated: 2026-10-29
+updated: 2026-11-12
 ---
 
 # `CMP-expert` 组件规格
@@ -28,6 +28,7 @@ updated: 2026-10-29
 
 - `name` 大小写不敏感唯一；`color` 形如 `#RRGGBB`；`role` 非空。
 - 同一专家内 Skill/工具不重复，`position` 唯一、从 0 连续。
+- 同一专家内绑定的多个 Skill，其 `slug`（DSH 技能名，客户端按此建技能目录）互不相同；重复由装配入口返回 400，不落库。
 - `skill_id` / `tool_id` 必须存在；外键失败由 store 翻译为可读错误。
 - B3 起专家可被工作流节点引用：删除前经 `ReferenceGuard.check("expert")` 返回使用该专家的工作流摘要，非空则 409 `referenced`；`workflow_expert_ref.expert_id` 外键 `RESTRICT` 兜底并发窗口。
 - `refCount` 不落列，由 `catalog` 组合 `WorkflowRead.countByExperts` 计算。
@@ -142,7 +143,7 @@ type ExpertReference = { id: string; name: string };
 | `updateAggregate` | 聚合部分更新五区、人设、引用与有序装配 | `id`、`revision`、`UpdateExpertAggregate` | `{ revision }` | `NotFoundError`、`RevisionConflictError`、`NameConflictError`、`ValidationError`、`SkillNotFoundError`、`ToolNotFoundError` | 单事务；省略不变，数组替换，`revision` 只递增一次 |
 | `setEnabled` | 启停 | `id`、`revision`、`enabled` | `{ id, revision }` | `NotFoundError`、`RevisionConflictError` | 单行更新并递增 `revision` |
 | `delete` | 删除专家 | `id`、`revision` | `void` | `NotFoundError`、`RevisionConflictError`、`ReferencedError` | 删除前查工作流引用；外键 `RESTRICT` 兜底 |
-| `setSkills` | 整体替换 Skill 装配 | `id`、`revision`、`skillIds[]` | `{ revision }` | `NotFoundError`、`RevisionConflictError`、`ValidationError`、`SkillNotFoundError` | 单事务；顺序即位置；重复/不存在整批失败 |
+| `setSkills` | 整体替换 Skill 装配 | `id`、`revision`、`skillIds[]` | `{ revision }` | `NotFoundError`、`RevisionConflictError`、`ValidationError`、`SkillNotFoundError` | 单事务；顺序即位置；重复（ID/slug）/不存在整批失败 |
 | `setTools` | 整体替换工具装配 | `id`、`revision`、`toolIds[]` | `{ revision }` | `NotFoundError`、`RevisionConflictError`、`ValidationError`、`ToolNotFoundError` | 单事务；顺序即位置；重复/不存在整批失败 |
 | `list` | 列表查询 | `ExpertQuery` | `Page<ExpertSummary>` | `ValidationError` | 读；含有序 `skillIds` |
 | `get` | 详情查询 | `id` | `ExpertDetail` | `NotFoundError` | 读 |
@@ -152,18 +153,21 @@ type ExpertReference = { id: string; name: string };
 
 `SkillNotFoundError` / `ToolNotFoundError` 是组件内对装配目标不存在的可读错误，继承 `ValidationError`。
 
+`create` / `updateAggregate` / `setSkills` 在写入前通过 `SkillSlugReader` 批量读取绑定 Skill 的 `slug`；同一专家内重复时抛 `ValidationError`，`details.field` 分别为入口数组字段 `skillIds`（创建/聚合更新）与 `items`（独立装配），整批不写、`revision` 不变。
+
 ## 4 依赖与边界
 
-- 允许：`platform` 的 `Db`；`kernel` 的 `Clock`、`IdGenerator`、错误类型与 `ReferenceGuard` 端口。
+- 允许：`platform` 的 `Db`；`kernel` 的 `Clock`、`IdGenerator`、错误类型、`ReferenceGuard` 与 `SkillSlugReader` 端口。
 - 禁止：导入 `skill` / `tool` 组件的 store/service；直接读 `skill` / `tool` 表；在组件内拼 HTTP 响应。
-- Skill/工具存在性由外键保证；store 翻译外键冲突，不跨组件查表。
+- Skill/工具存在性由外键保证；store 翻译外键冲突。Skill 的 `slug` 通过 kernel 的 `SkillSlugReader` 只读端口获取，不读 `skill` 表。
 - `ExpertRead` 供 `catalog` 组合；不把领域实体直接暴露给 HTTP。
 
 ## 5 验证
 
 - 规则：名称唯一、颜色、角色、人设顺序、装配唯一/顺序。
 - 存储：创建五区、创建即装配、更新整体替换人设/引用、聚合部分更新、启停、删除级联。
-- 装配：整体替换 Skill/工具；重复/不存在目标；`create` / `updateAggregate` 任一步失败整批回滚；`revision` 只递增一次。
+- 装配：整体替换 Skill/工具；重复目标（ID 或 slug）/不存在目标；`create` / `updateAggregate` 任一步失败整批回滚；`revision` 只递增一次。
+- 装配入口断言：同一专家内 Skill `slug` 重复时 `create` / `updateAggregate` / `setSkills` 均返回 `ValidationError`，装配与 `revision` 不变。
 - 读契约：列表筛选、列表含有序 `skillIds`、详情、`listExpertsUsingSkill/Tool`、`statuses`；`refCount` 与工作流引用计数一致。
 - 删除：被工作流引用返回 `ReferencedError`，引用项 `type="workflow"`；无引用 204。
 - 契约：对应 REST 端点 3 正 1 反在 `http-gateway` 规格中列明；`PATCH /experts/{id}` 覆盖省略不变、数组替换、空数组清空与旧版本冲突。

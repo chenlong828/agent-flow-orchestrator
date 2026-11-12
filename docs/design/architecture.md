@@ -2,7 +2,7 @@
 layer: design
 module: global
 status: current
-updated: 2026-11-11
+updated: 2026-11-12
 ---
 
 # B1+B3 架构与契约边界
@@ -48,13 +48,13 @@ updated: 2026-11-11
 
 | 组件 | 一句话主目标 | 拥有的数据 | 依赖 |
 |---|---|---|---|
-| `CMP-kernel` | 定义共享错误、分页、引用检查端口、时钟/ID 端口与文件存储端口 | 无 | 无 |
+| `CMP-kernel` | 定义共享错误、分页、引用检查端口、时钟/ID 端口、文件存储端口与技能系统标识只读端口 | 无 | 无 |
 | `CMP-config` | 合并 TOML 与进程环境，校验并产出启动 `Config`（含存储根/TTL） | 无 | Bun TOML、文件系统 |
 | `CMP-platform` | 提供数据库连接/事务、迁移、ID/时钟实现、健康检查、测试库与文件存储适配 | `schema_migrations`；存储根适配（无业务语义） | `kernel`、Bun、PostgreSQL |
 | `CMP-harness` | 维护 Harness 聚合的生命周期、标签与不变量；作为执行节点目录（`client_id` 绑定、`client_token` 凭据、`NodeDirectory` 与 `ExecutorAuthenticator` 端口实现） | `harness`、`harness_tag` | `platform`、`kernel` |
 | `CMP-tool` | 维护工具聚合、参数与 Harness 归属 | `tool`、`tool_param` | `platform`、`kernel` |
-| `CMP-skill` | 维护 Skill brief、包指针、草稿生命周期、`SKILL.md` 与整包读取 | `skill_category`（只读种子）、`skill`、`skill_tag`、`skill_draft`；`packages/`、`drafts/` | `platform`、`kernel` |
-| `CMP-expert` | 维护专家聚合、五区、有序装配与引用 | `expert`、`expert_persona`、`expert_skill`、`expert_tool`、`expert_ref` | `platform`、`kernel` |
+| `CMP-skill` | 维护 Skill brief、包指针、草稿生命周期、`SKILL.md` 与整包读取；实现 `SkillPackageSource` 与 `SkillSlugReader` 端口 | `skill_category`（只读种子）、`skill`、`skill_tag`、`skill_draft`；`packages/`、`drafts/` | `platform`、`kernel` |
+| `CMP-expert` | 维护专家聚合、五区、有序装配与引用 | `expert`、`expert_persona`、`expert_skill`、`expert_tool`、`expert_ref` | `platform`、`kernel`（`SkillSlugReader` 端口） |
 | `CMP-workflow` | 维护工作流聚合、唯一当前定义、图校验与专家引用投影 | `workflow`、`workflow_definition`、`workflow_expert_ref` | `platform`、`kernel` |
 | `CMP-catalog` | 组合跨资产的列表/详情/文档/整包/引用只读投影，并实现 `ReferenceGuard`；Harness 节点状态按调度器 presence 派生 | 无 | 四类资产与工作流的公开读契约、`scheduler` 的 presence 读、`kernel` |
 | `CMP-scheduler` | 维护执行面任务列表（`queued`/`dispatched`/`done`）、派发裁决、重派与结果接受 | `task`、`task_attempt` | `instance`（读）、`kernel`（`SkillPackageSource` 端口）、`platform` |
@@ -107,11 +107,11 @@ catalog
 
 harness / tool / expert / workflow
   ├── platform                  （Db、Clock、ID 实现）
-  └── kernel                    （ReferenceGuard 端口、错误、分页）
+  └── kernel                    （ReferenceGuard 端口、错误、分页；expert 另有 SkillSlugReader 端口）
 
 skill
   ├── platform                  （Db、FileStore 实现）
-  └── kernel                    （ReferenceGuard、FileStore 端口、错误、分页）
+  └── kernel                    （ReferenceGuard、FileStore、SkillSlugReader 端口、错误、分页）
 
 platform
   └── kernel                    （共享契约类型）
@@ -131,6 +131,7 @@ config
 - `NodeDirectory` 与 `ExecutorAuthenticator` 端口定义在 `kernel`，`harness` 实现；`scheduler` 派发前与执行端鉴权只依赖端口。`catalog` 通过 `scheduler` 的 presence 读派生 Harness 在线状态，`harness` 不感知 `scheduler`。
 - Harness 的 `client_id` 是执行节点绑定（可空、唯一），是节点目录的唯一写入口（`bindClient`/`unbindClient`）；`health`/`last_heartbeat_at` 列保留但不再作为权威。
 - `FileStore` 端口定义在 `kernel`，`platform` 实现；`skill` 与 `run` 只依赖端口，不直接使用 Bun 文件 API；组合根把存储根与适配器注入两者。
+- `SkillSlugReader` 端口定义在 `kernel`，`skill` 实现；`expert` 装配入口只依赖端口校验同一专家内 `slug` 唯一，不读 `skill` 表。
 - `catalog` 不拥有表，不执行写操作；只通过领域公开读契约读数据。
 - `http-gateway` 不执行 SQL，不实现业务规则；只校验传输层形状、调用契约、映射错误；multipart 只解析传输，不解释包结构；文档子模块只读本地静态资源，不新增依赖边。
 - `main.ts` 只做组合根：调用 `config` 取 `Config`、创建 `platform`/领域/`catalog`/`http-gateway`，注入 `ReferenceGuard` 与 `FileStore`；不承载业务规则，不计为组件。

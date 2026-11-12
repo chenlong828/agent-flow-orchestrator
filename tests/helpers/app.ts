@@ -18,6 +18,7 @@ import { createToolRead, createToolService } from "../../src/components/tool/ind
 import { createSkillRead } from "../../src/components/skill/read.ts";
 import { createSkillDraftService } from "../../src/components/skill/draft-service.ts";
 import { createSkillPackageSource } from "../../src/components/skill/package-source.ts";
+import { createSkillSlugReader } from "../../src/components/skill/slug-reader.ts";
 import { createInstanceService } from "../../src/components/instance/index.ts";
 import { createScheduler } from "../../src/components/scheduler/index.ts";
 import { createRunService } from "../../src/components/run/index.ts";
@@ -70,6 +71,7 @@ export async function createTestContext(
   const skillStore = createFileStore(join(storageRoot, "skills"));
   const archiveRoot = join(storageRoot, "archive");
   const catalogSkillRead = createSkillRead(db, skillStore);
+  const skillSlugReader = createSkillSlugReader({ db });
   const expertRead = createExpertRead({ db });
   const workflowRead = createWorkflowRead({ db });
   const instanceService = createInstanceService({
@@ -162,6 +164,7 @@ export async function createTestContext(
     ids: uuidv7Ids,
     actor: "tester",
     guard: catalog,
+    skillSlugs: skillSlugReader,
   });
   const workflowService = createWorkflowService({
     db,
