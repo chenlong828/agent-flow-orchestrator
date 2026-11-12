@@ -1,7 +1,7 @@
 ---
 layer: works
 module: global
-status: active
+status: frozen
 updated: 2026-11-12
 procedure: 2026-11-12-client-skill-package-304
 ---

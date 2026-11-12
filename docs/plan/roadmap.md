@@ -2,7 +2,7 @@
 layer: plan
 module: global
 status: current
-updated: 2026-11-11
+updated: 2026-11-12
 ---
 
 # 路线图
@@ -36,6 +36,7 @@ updated: 2026-11-11
 - 已知欠账：无 CI 门禁；文档校验目前只有场景索引（`docs:check`），完整文档树校验待补。
 
 ## 近期完成
+- `2026-11-12-client-skill-package-304`（P3，外部仓库缺陷）：带技能包的 run 100% 失败于 `download_failed: 304 但本地无缓存`；定位为客户端缓存未命中仍发 `If-None-Match`，提案交 `agent-flow-client` 修复并已落地（客户端用例 12/12，真实运行不再报该错）。收口后暴露下一层问题：技能包 `SKILL.md` 的 `name` 为中文、执行端要求 kebab-case，转 `OQ-31`。见 [`history/works/2026-11-12-client-skill-package-304/result.md`](../history/works/2026-11-12-client-skill-package-304/result.md)。
 - `2026-11-10-scheduler-layer-design`（P1）与 `2026-11-10-harness-node-registry`（P2）：设计工序已收口归档。调度层按 `executor-http-v2` 落 3 组件切分、执行面 6 张场景与组件规格；其中 **失败/超时结果不自动重派**（2026-11-11 用户裁决，只保留未回报的 `S-02` 回队）。节点目录按「Harness 即节点目录、管理员维护」落第一期。见 [`history/works/2026-11-10-scheduler-layer-design/result.md`](../history/works/2026-11-10-scheduler-layer-design/result.md)、[`history/works/2026-11-10-harness-node-registry/result.md`](../history/works/2026-11-10-harness-node-registry/result.md)。
 
 - `2026-11-03-client-boundary`：边界与职责设计收口归档。产品侧确认当时**没有智能体客户端真实执行负载数据**，注册/心跳/租约/session 绑定/清理回执/幂等键等交互预设属过度设计，已被契约 v2 的 at-least-once 模型替换；保留职责、所有权与决策归属。结论见 [`result.md`](../history/works/2026-11-03-client-boundary/result.md)，与 v2 的逐条冲突见 [`v2-alignment.md`](../history/works/2026-11-03-client-boundary/v2-alignment.md)。

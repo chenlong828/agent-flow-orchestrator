@@ -1,7 +1,7 @@
 ---
 layer: works
 module: global
-status: active
+status: frozen
 updated: 2026-11-12
 procedure: 2026-11-12-client-skill-package-304
 ---
@@ -20,6 +20,13 @@ procedure: 2026-11-12-client-skill-package-304
 | 影响面 | `task.skill_set` 历史：`packages=0` 的 run 成功，`packages≥1` 的 run 全部 `failed(asset)` | 100% 复现，与网络/凭据无关 |
 | 客户端代码 | `gateway.ts:64-73`、`package-cache.ts:26-36` | 缓存未命中仍传 `etag` |
 | 文档 | `OQ-17` 由「待定」改为「已实测触发 + 修复归属」 | 见 [`open-questions.md`](../../plan/open-questions.md) |
+
+### 2.1 客户端实施后的复核（2026-11-12）
+
+- 客户端已在 `src/components/assets/package-cache.ts` 按提案修改（缓存未命中时 `options.download({ ...pkg, etag: undefined })`），并补了「缓存未命中不做条件请求」的用例。
+- 本机复跑客户端用例：`bun test tests/components/assets` → **12 pass / 0 fail**。
+- 真实运行复核：同一工作流的下一次运行不再出现 `download_failed`，错误推进到下一个校验点 `invalid_skill_format`（技能 `name` 非 kebab-case），说明 304 这一层已通过。
+- 遗留（不属本提案）：技能包内 `SKILL.md` 的 `name` 由编排侧按技能展示名生成（含中文），执行端要求 kebab-case；作为新问题转出 `OQ-31`。
 
 ## 3 结论落点
 
