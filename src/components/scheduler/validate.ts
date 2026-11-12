@@ -46,7 +46,14 @@ export function validateDraft(draft: TaskDraft): TaskDraft {
   if (!Array.isArray(draft.skillIds)) throw new ValidationError("skillIds", "必须是字符串数组");
   const skillIds = [...new Set(draft.skillIds)];
   for (const id of skillIds) ensureUuid(id, "skillIds");
-  return { instanceId, nodeId: draft.nodeId, prompt: draft.prompt, timeoutMs, skillIds };
+  return {
+    instanceId,
+    nodeId: draft.nodeId,
+    prompt: draft.prompt,
+    timeoutMs,
+    skillIds,
+    ...(draft.taskSpacePath === undefined ? {} : { taskSpacePath: draft.taskSpacePath }),
+  };
 }
 
 const ERROR_CLASSES = [

@@ -108,11 +108,12 @@ describe("任务派发与容量（S-01/S-04/S-05/S-06）", () => {
     await bindNode(clientId);
     const instanceId = await enroll(clientId);
     const skillId = await createSkill("派发技能");
+    const taskSpacePath = `/work/${instanceId}/.agent-flow/task/0191f2f0-7777-7000-8000-000000000001`;
     const enqueued = await ctx.scheduler.enqueue({
       tasks: [
-        { instanceId, nodeId: "n1", prompt: "任务一", timeoutMs: 1800000, skillIds: [skillId] },
-        { instanceId, nodeId: "n2", prompt: "任务二", timeoutMs: 1800000, skillIds: [skillId] },
-        { instanceId, nodeId: "n3", prompt: "任务三", timeoutMs: 1800000, skillIds: [skillId] },
+        { instanceId, nodeId: "n1", prompt: "任务一", taskSpacePath, timeoutMs: 1800000, skillIds: [skillId] },
+        { instanceId, nodeId: "n2", prompt: "任务二", taskSpacePath, timeoutMs: 1800000, skillIds: [skillId] },
+        { instanceId, nodeId: "n3", prompt: "任务三", taskSpacePath, timeoutMs: 1800000, skillIds: [skillId] },
       ],
     });
     expect(enqueued.taskIds).toHaveLength(3);
@@ -128,6 +129,7 @@ describe("任务派发与容量（S-01/S-04/S-05/S-06）", () => {
       attempt: 1,
       prompt: "任务一",
       workspacePath: `/work/${instanceId}`,
+      taskSpacePath,
       timeoutMs: 1800000,
     });
     expect(decision.tasks[0]!.skillSet.digest).toBe(enqueued.skillSets[0]!.skillSet.digest);

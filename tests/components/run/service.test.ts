@@ -62,21 +62,26 @@ function graphConfirm(expertId: string): WorkflowGraph {
   };
 }
 
-function fakeScheduler(): SchedulerService & { cancelled: string[] } {
+function fakeScheduler(): SchedulerService & { cancelled: string[]; enqueued: EnqueueInput[] } {
   let counter = 0;
   const tasks = new Map<string, { state: string }>();
   const cancelled: string[] = [];
+  const enqueued: EnqueueInput[] = [];
   return {
     cancelled,
-    enqueue: async (input: EnqueueInput) => ({
-      taskIds: input.tasks.map(() => {
-        counter += 1;
-        const id = `0191f2f0-9999-7000-8000-${String(counter).padStart(12, "0")}`;
-        tasks.set(id, { state: "queued" });
-        return id;
-      }),
-      skillSets: [],
-    }),
+    enqueued,
+    enqueue: async (input: EnqueueInput) => {
+      enqueued.push(input);
+      return {
+        taskIds: input.tasks.map(() => {
+          counter += 1;
+          const id = `0191f2f0-9999-7000-8000-${String(counter).padStart(12, "0")}`;
+          tasks.set(id, { state: "queued" });
+          return id;
+        }),
+        skillSets: [],
+      };
+    },
     acceptResult: async (_clientId: string, result: TaskResult) => {
       const task = tasks.get(result.taskId);
       if (task !== undefined) task.state = "done";
@@ -99,7 +104,7 @@ function fakeScheduler(): SchedulerService & { cancelled: string[] } {
     },
     poll: async () => ({ tasks: [], stop: false, cancelInstances: [], nextPollAfterMs: 0 }),
     requestStop: async () => {},
-  } as unknown as SchedulerService & { cancelled: string[] };
+  } as unknown as SchedulerService & { cancelled: string[]; enqueued: EnqueueInput[] };
 }
 
 function sha256(bytes: Uint8Array): string {
@@ -232,6 +237,7 @@ describe("CMP-run 启动与推进", () => {
     });
     expect(run.state).toBe("running");
     expect(run.taskSpacePath).toBe(`/work/linear/.agent-flow/task/${run.runId}`);
+    expect(h.scheduler.enqueued[0]!.tasks[0]!.taskSpacePath).toBe(run.taskSpacePath);
     expect(run.nodes).toHaveLength(1);
     expect(run.nodes[0]!.nodeId).toBe("n1");
     expect(run.nodes[0]!.state).toBe("dispatched");

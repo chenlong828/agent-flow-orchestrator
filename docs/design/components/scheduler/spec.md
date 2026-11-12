@@ -234,7 +234,7 @@ enqueue ──▶ queued ──dispatch──▶ dispatched ──settle──�
 
 ### 4.4 快照冻结与技能集
 
-- 入队时冻结 `prompt`、`workspacePath`、`timeoutMs`、`skillSet` 四要素；`workspacePath` 取自 `CMP-instance` 的实例登记，不由任务改。
+- 入队时冻结 `prompt`、`taskSpacePath`、`workspacePath`、`timeoutMs`、`skillSet` 五要素；`workspacePath` 取自 `CMP-instance` 的实例登记，`taskSpacePath` 由上游编排传入（v3 起），二者不由任务改。
 - 入队时按「实例」冻结技能集：同一批里指向同一实例的任务必须解析出同一 `skillIds` 投影；不同实例各自冻结，互不影响。
 - `skillSet` 由 `skillIds` 解析为不可变包引用（经 `SkillPackageSource.currentForSkill`）：
 
