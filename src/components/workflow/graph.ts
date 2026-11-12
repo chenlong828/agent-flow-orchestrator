@@ -1,6 +1,6 @@
 import { MultiFieldValidationError } from "../../core/kernel/index.ts";
 
-export type NodeType = "start" | "end" | "agent" | "review" | "confirm" | "fanout" | "fanin";
+export type NodeType = "start" | "end" | "agent" | "split" | "review" | "confirm" | "fanout";
 export type EdgeKind = "seq" | "rollback";
 
 export type JsonObject = Record<string, unknown>;
@@ -53,10 +53,10 @@ const NODE_TYPES: readonly NodeType[] = [
   "start",
   "end",
   "agent",
+  "split",
   "review",
   "confirm",
   "fanout",
-  "fanin",
 ];
 const EDGE_KINDS: readonly EdgeKind[] = ["seq", "rollback"];
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;

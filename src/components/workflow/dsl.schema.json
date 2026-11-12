@@ -94,7 +94,7 @@
       "properties": {
         "id": { "$ref": "#/$defs/id" },
         "type": {
-          "enum": ["start", "end", "agent", "review", "confirm", "fanout", "fanin"]
+          "enum": ["start", "end", "agent", "split", "review", "confirm", "fanout"]
         },
         "name": { "type": "string", "minLength": 1, "maxLength": 80 },
         "stageId": {

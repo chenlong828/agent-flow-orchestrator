@@ -3213,11 +3213,11 @@ components:
       - start
       - end
       - agent
+      - split
       - review
       - confirm
       - fanout
-      - fanin
-      description: 工作流节点类型；start/end/agent/review/fanout/fanin 必须绑定专家，confirm 禁止绑定。
+      description: 工作流节点类型；start/end/agent/split/review/fanout 必须绑定专家，confirm 禁止绑定；fanout 的唯一前驱必须是 split。
     WorkflowEdgeKind:
       type: string
       enum:

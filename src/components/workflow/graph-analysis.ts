@@ -58,7 +58,7 @@ function buildTopologyIndex(graph: WorkflowGraph): TopologyIndex {
   };
 }
 
-/** 拓扑检查：start/end、seq 链、可达、环、fanout/fanin 与回退。 */
+/** 拓扑检查：start/end、seq 链、可达、环、fanout 前驱与回退。 */
 export function analyzeTopology(graph: WorkflowGraph): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const index = buildTopologyIndex(graph);
@@ -198,7 +198,6 @@ function checkRollbackTarget(
 function checkFanout(index: TopologyIndex, issues: ValidationIssue[]): void {
   for (const node of index.graph.nodes) {
     if (node.type === "fanout") checkFanoutNode(index, issues, node);
-    if (node.type === "fanin") checkFaninNode(index, issues, node);
   }
 }
 
@@ -207,22 +206,10 @@ function checkFanoutNode(
   issues: ValidationIssue[],
   node: WorkflowNode,
 ): void {
-  const out = index.seqOut.get(node.id) ?? [];
-  const target = out.length === 1 ? index.nodes.get(out[0]?.to ?? "") : undefined;
-  if (target?.type !== "fanin") {
-    addIssue(issues, "fanout_fanin_unpaired", index.nodePath(node.id), "fanout 必须唯一指向一个 fanin");
-  }
-}
-
-function checkFaninNode(
-  index: TopologyIndex,
-  issues: ValidationIssue[],
-  node: WorkflowNode,
-): void {
   const incoming = index.seqIn.get(node.id) ?? [];
   const source = incoming.length === 1 ? index.nodes.get(incoming[0]?.from ?? "") : undefined;
-  if (source?.type !== "fanout") {
-    addIssue(issues, "fanout_fanin_unpaired", index.nodePath(node.id), "fanin 必须唯一来自一个 fanout");
+  if (source?.type !== "split") {
+    addIssue(issues, "fanout_requires_split", index.nodePath(node.id), "fanout 的唯一前驱必须是 split");
   }
 }
 
@@ -235,8 +222,8 @@ export function analyzeBindings(graph: WorkflowGraph): ValidationIssue[] {
       node.type === "end" ||
       node.type === "agent" ||
       node.type === "review" ||
-      node.type === "fanout" ||
-      node.type === "fanin";
+      node.type === "split" ||
+      node.type === "fanout";
     if (requiresExpert && node.expertId === null) {
       addIssue(issues, "expert_required", path, `${node.type} 节点必须绑定专家`);
     }

@@ -29,10 +29,10 @@ describe("工作流 DSL JSON Schema 资产", () => {
       "start",
       "end",
       "agent",
+      "split",
       "review",
       "confirm",
       "fanout",
-      "fanin",
     ]);
     expect(schema.$defs.edge?.required).toEqual(["id", "from", "to", "kind"]);
     expect(schema.$defs.edge?.properties?.kind?.enum).toEqual(["seq", "rollback"]);

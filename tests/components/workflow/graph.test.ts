@@ -143,22 +143,36 @@ describe("工作流图语义校验", () => {
     expect(analyzeTopology(graph).some((item) => item.code === "broken_chain")).toBe(true);
   });
 
-  test("fanout/fanin 必须成对", () => {
+  test("fanout 的唯一前驱必须是 split", () => {
     const graph: WorkflowGraph = {
       stages: [{ id: "s1", name: "设计" }],
       nodes: [
         { id: "n1", type: "start", name: "开始", stageId: "s1", expertId: EXPERT },
-        { id: "n2", type: "fanout", name: "分叉", stageId: "s1", expertId: EXPERT },
-        { id: "n3", type: "agent", name: "分支", stageId: "s1", expertId: EXPERT },
-        { id: "n4", type: "end", name: "结束", stageId: "s1", expertId: EXPERT },
+        { id: "n2", type: "fanout", name: "展开", stageId: "s1", expertId: EXPERT },
+        { id: "n3", type: "end", name: "结束", stageId: "s1", expertId: EXPERT },
       ],
       edges: [
         { id: "e1", from: "n1", to: "n2", kind: "seq" },
         { id: "e2", from: "n2", to: "n3", kind: "seq" },
-        { id: "e3", from: "n3", to: "n4", kind: "seq" },
       ],
     };
-    expect(analyzeTopology(graph).some((item) => item.code === "fanout_fanin_unpaired")).toBe(true);
+    expect(analyzeTopology(graph).some((item) => item.code === "fanout_requires_split")).toBe(true);
+
+    const withSplit: WorkflowGraph = {
+      ...graph,
+      nodes: [
+        graph.nodes[0]!,
+        { id: "ns", type: "split", name: "拆分", stageId: "s1", expertId: EXPERT },
+        { id: "n2", type: "fanout", name: "展开", stageId: "s1", expertId: EXPERT },
+        graph.nodes[2]!,
+      ],
+      edges: [
+        { id: "e1", from: "n1", to: "ns", kind: "seq" },
+        { id: "e2", from: "ns", to: "n2", kind: "seq" },
+        { id: "e3", from: "n2", to: "n3", kind: "seq" },
+      ],
+    };
+    expect(analyzeTopology(withSplit).some((item) => item.code === "fanout_requires_split")).toBe(false);
   });
 
   test("回退目标必须是 seq 路径上的祖先", () => {
