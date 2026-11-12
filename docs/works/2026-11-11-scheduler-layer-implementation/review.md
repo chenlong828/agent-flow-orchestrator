@@ -9,7 +9,7 @@ procedure: 2026-11-11-scheduler-layer-implementation
 # 评审：执行面调度层实现（P1，四档裁决）
 
 > 对象：本工序的 `src/`、`db/migrations/0001_baseline.sql`、`tests/` 与组件规格增补。
-> 基线：已冻结的 [`executor-http-v2`](../../design/contracts/executor-http-v2.md) 与调度层设计规格。
+> 基线：已冻结的 [`executor-http-v2`](../../history/works/2026-11-10-executor-contract-v2/executor-http-v2.md) 与调度层设计规格。
 > 裁决口径见 `arch-design-spec` 第 8 步。
 
 ## 1 结论
