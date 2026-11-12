@@ -1,4 +1,4 @@
-import { ConfigError } from "./errors.ts";
+import { boundedInteger, integerEnv, isRecord, type Fail } from "./helpers.ts";
 
 export type ExecutorConfig = {
   taskMaxAttempts: number;
@@ -13,34 +13,6 @@ export type ExecutorFileConfig = {
 const DEFAULT_TASK_MAX_ATTEMPTS = 3;
 const DEFAULT_TASK_RETRY_DELAY_MS = 5000;
 export const EXECUTOR_KEYS = new Set(["max_attempts", "retry_delay_ms"]);
-
-type Fail = (
-  code: ConfigError["code"],
-  source: string,
-  field: string | undefined,
-  message: string,
-) => never;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-type BoundedInput = {
-  value: number;
-  source: string;
-  field: string;
-  min: number;
-  max: number;
-  fail: Fail;
-};
-
-function boundedInteger(input: BoundedInput): number {
-  const { value, source, field, min, max, fail } = input;
-  if (!Number.isInteger(value) || value < min || value > max) {
-    fail("config_validation_error", source, field, `${field} 必须是 ${min}–${max} 的整数`);
-  }
-  return value;
-}
 
 export function parseExecutor(
   value: unknown,
@@ -81,14 +53,6 @@ export function parseExecutor(
     });
   }
   return executor;
-}
-
-function integerEnv(value: string, field: string, fail: Fail): number {
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed)) {
-    fail("config_validation_error", "env", field, `${field} 必须是整数`);
-  }
-  return parsed;
 }
 
 export function resolveExecutorConfig(

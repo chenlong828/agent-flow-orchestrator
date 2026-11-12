@@ -37,21 +37,24 @@ export type LoadConfigOptions = {
   configDir?: string;
 };
 
-type FileConfig = {
-  server?: {
+/** 配置文件允许出现的分节；整体可缺省，由解析函数逐节校验。 */
+type FileSections = {
+  server: {
     host?: string;
     port?: number;
   };
-  app?: {
+  app: {
     actor?: string;
   };
-  log?: {
+  log: {
     level?: LogLevel;
   };
-  executor?: ExecutorFileConfig;
-  run?: RunFileConfig;
-  archive?: ArchiveFileConfig;
+  executor: ExecutorFileConfig;
+  run: RunFileConfig;
+  archive: ArchiveFileConfig;
 };
+
+type FileConfig = Partial<FileSections>;
 
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_PORT = 3000;

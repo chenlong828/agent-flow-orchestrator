@@ -1,4 +1,4 @@
-import { ConfigError } from "./errors.ts";
+import { boundedInteger, integerEnv, isRecord, nonEmptyString, type Fail } from "./helpers.ts";
 
 export type RunConfig = {
   runDefaultTimeoutMs: number;
@@ -21,51 +21,8 @@ export type ArchiveFileConfig = {
 const DEFAULT_RUN_TIMEOUT_MS = 1800000;
 const DEFAULT_RUN_MAX_NODE_VISITS = 5;
 const DEFAULT_ARCHIVE_ROOT = ".local/archive";
-export const RUN_KEYS = new Set(["default_timeout_ms", "max_node_visits"]);
-export const ARCHIVE_KEYS = new Set(["root"]);
-
-type Fail = (
-  code: ConfigError["code"],
-  source: string,
-  field: string | undefined,
-  message: string,
-) => never;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-type BoundedInput = {
-  value: number;
-  source: string;
-  field: string;
-  min: number;
-  max: number;
-  fail: Fail;
-};
-
-function boundedInteger(input: BoundedInput): number {
-  const { value, source, field, min, max, fail } = input;
-  if (!Number.isInteger(value) || value < min || value > max) {
-    fail("config_validation_error", source, field, `${field} 必须是 ${min}–${max} 的整数`);
-  }
-  return value;
-}
-
-function integerEnv(value: string, field: string, fail: Fail): number {
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed)) {
-    fail("config_validation_error", "env", field, `${field} 必须是整数`);
-  }
-  return parsed;
-}
-
-function nonEmptyString(value: string, source: string, field: string, fail: Fail): string {
-  if (value.trim() === "") {
-    fail("config_validation_error", source, field, `${field} 不能为空`);
-  }
-  return value;
-}
+const RUN_KEYS = new Set(["default_timeout_ms", "max_node_visits"]);
+const ARCHIVE_KEYS = new Set(["root"]);
 
 export function parseRun(
   value: unknown,

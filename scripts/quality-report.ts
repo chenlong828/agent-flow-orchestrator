@@ -662,9 +662,9 @@ let tableColumnsMax = 0;
 let tableColumnsName = "";
 let nullableRatioMax = 0;
 let nullableTableName = "";
-const sqlFiles = walk(join(root, "db/migrations"), (file) => file.endsWith(".sql"));
+const sqlFiles = walk(join(root, "db/migrations"), (file) => file.endsWith(".sql")).sort();
 const sqlErrors: string[] = [];
-const tableStats = new Map<string, { total: number; nullable: number }>();
+const tableStats = new Map<string, Map<string, boolean>>();
 for (const path of sqlFiles) {
   let ast: any[] = [];
   try {
@@ -677,34 +677,52 @@ for (const path of sqlFiles) {
     if (statement.type !== "create table") continue;
     const name = statement.name?.name ?? basename(path);
     const columns = statement.columns ?? [];
-    if (columns.length > tableColumnsMax) {
-      tableColumnsMax = columns.length;
-      tableColumnsName = name;
-    }
-    if (columns.length === 0) continue;
-    const nullable = columns.filter((column: any) => {
+    const state = new Map<string, boolean>();
+    for (const column of columns) {
       const constraints = column.constraints ?? [];
-      return !constraints.some((constraint: any) =>
+      const nullable = !constraints.some((constraint: any) =>
         ["not null", "primary key"].includes(constraint.type),
       );
-    }).length;
-    tableStats.set(name, { total: columns.length, nullable });
+      state.set(column.name?.name ?? "", nullable);
+    }
+    tableStats.set(name, state);
   }
   for (const statement of ast) {
     if (statement.type !== "alter table") continue;
     const name = statement.table?.name;
     if (typeof name !== "string") continue;
-    const stats = tableStats.get(name);
-    if (stats === undefined) continue;
+    const state = tableStats.get(name);
+    if (state === undefined) continue;
     for (const change of statement.changes ?? []) {
-      if (change.type === "alter column" && change.alter?.type === "set not null") {
-        stats.nullable = Math.max(0, stats.nullable - 1);
+      const rawName = change.column?.name;
+      const columnName =
+        typeof rawName === "string" ? rawName : typeof rawName?.name === "string" ? rawName.name : undefined;
+      if (columnName === undefined) continue;
+      if (change.type === "add column") {
+        const constraints = change.column?.constraints ?? [];
+        state.set(
+          columnName,
+          !constraints.some((constraint: any) =>
+            ["not null", "primary key"].includes(constraint.type),
+          ),
+        );
+      } else if (change.type === "drop column") {
+        state.delete(columnName);
+      } else if (change.type === "alter column" && change.alter?.type === "set not null") {
+        state.set(columnName, false);
       }
     }
   }
 }
-for (const [name, stats] of tableStats) {
-  const ratio = stats.nullable / stats.total;
+for (const [name, state] of tableStats) {
+  const total = state.size;
+  if (total === 0) continue;
+  if (total > tableColumnsMax) {
+    tableColumnsMax = total;
+    tableColumnsName = name;
+  }
+  const nullable = [...state.values()].filter(Boolean).length;
+  const ratio = nullable / total;
   if (ratio > nullableRatioMax) {
     nullableRatioMax = ratio;
     nullableTableName = name;
