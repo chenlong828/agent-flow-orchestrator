@@ -1,7 +1,11 @@
+import { createHash } from "node:crypto";
 import {
   EXECUTOR_PROTOCOL_VERSION,
+  MAX_ARCHIVE_BYTES,
+  MAX_SESSION_LOG_BYTES,
   POLL_HOLD_MS,
   PackageNotFoundError,
+  PayloadTooLargeError,
   UnauthorizedError,
   UnsupportedProtocolError,
   ValidationError,
@@ -79,6 +83,13 @@ async function route(ctx: ExecutorContext, clientId: string): Promise<Response> 
   if (segments[1] === "tasks" && segments[3] === "result" && taskId !== undefined && request.method === "POST") {
     return acceptResult(ctx, clientId, taskId);
   }
+  if (segments[1] === "tasks" && segments[3] === "session-log" && taskId !== undefined && request.method === "POST") {
+    return uploadSessionLog(ctx, clientId, taskId);
+  }
+  const runId = segments[2];
+  if (segments[1] === "runs" && segments[3] === "archive" && runId !== undefined && request.method === "POST") {
+    return uploadArchive(ctx, clientId, runId);
+  }
   const packageId = segments[2];
   if (segments[1] === "skill-packages" && segments.length === 3 && packageId !== undefined && request.method === "GET") {
     return skillPackage(ctx, packageId);
@@ -104,10 +115,15 @@ async function poll(ctx: ExecutorContext, clientId: string): Promise<Response> {
   const decision = await ctx.deps.backend.poll(clientId, report, {
     holdMs: ctx.deps.pollHoldMs ?? POLL_HOLD_MS,
   });
+  if (report.archivedRuns !== undefined) {
+    // 归档确认只做电平确认，失败不影响本次 poll。
+    await ctx.deps.backend.ackArchived?.(clientId, report.archivedRuns);
+  }
   return json({
     tasks: decision.tasks.map(withDownloadUrl),
     stop: decision.stop,
     cancelInstances: decision.cancelInstances,
+    archiveRequests: decision.archiveRequests ?? [],
     nextPollAfterMs: decision.nextPollAfterMs,
   });
 }
@@ -115,6 +131,45 @@ async function poll(ctx: ExecutorContext, clientId: string): Promise<Response> {
 async function acceptResult(ctx: ExecutorContext, clientId: string, taskId: string): Promise<Response> {
   const result = parseResultBody(await readJson(ctx.request, RESULT_FIELDS), taskId);
   return json(await ctx.deps.backend.acceptResult(clientId, result));
+}
+
+function queryAttempt(url: string): number {
+  const attempt = Number(new URL(url).searchParams.get("attempt"));
+  if (!Number.isInteger(attempt) || attempt < 1 || attempt > 100) {
+    throw new ValidationError("attempt", "必须是 1–100 的整数");
+  }
+  return attempt;
+}
+
+async function readBinary(request: Request, limit: number, name: "session_log_bytes" | "archive_bytes"): Promise<Uint8Array> {
+  const declared = Number(request.headers.get("content-length") ?? "0");
+  if (Number.isFinite(declared) && declared > limit) {
+    throw new PayloadTooLargeError(name, limit, declared);
+  }
+  const bytes = new Uint8Array(await request.arrayBuffer());
+  if (bytes.byteLength > limit) {
+    throw new PayloadTooLargeError(name, limit, bytes.byteLength);
+  }
+  return bytes;
+}
+
+async function uploadSessionLog(ctx: ExecutorContext, clientId: string, taskId: string): Promise<Response> {
+  const attempt = queryAttempt(ctx.request.url);
+  const upload = ctx.deps.backend.uploadSessionLog;
+  if (upload === undefined) throw new ValidationError("path", "执行面未装配运行编排");
+  const bytes = await readBinary(ctx.request, MAX_SESSION_LOG_BYTES, "session_log_bytes");
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  const ack = await upload({ clientId, taskId, attempt, bytes, sha256 });
+  return json({ taskId, attempt, bytes: bytes.byteLength, sha256, stored: ack.stored });
+}
+
+async function uploadArchive(ctx: ExecutorContext, clientId: string, runId: string): Promise<Response> {
+  const upload = ctx.deps.backend.uploadArchive;
+  if (upload === undefined) throw new ValidationError("path", "执行面未装配运行编排");
+  const bytes = await readBinary(ctx.request, MAX_ARCHIVE_BYTES, "archive_bytes");
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  const ack = await upload({ clientId, runId, bytes, sha256 });
+  return json({ runId, bytes: bytes.byteLength, sha256, stored: ack.stored });
 }
 
 async function skillPackage(ctx: ExecutorContext, packageId: string): Promise<Response> {

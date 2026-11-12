@@ -24,6 +24,7 @@ import {
 } from "../validation.ts";
 import { toYaml } from "../yaml.ts";
 import type { RouteContext } from "./types.ts";
+import { startRun } from "./run.ts";
 
 export async function handleWorkflow(ctx: RouteContext): Promise<Response> {
   const { segments } = ctx;
@@ -100,6 +101,9 @@ async function workflowSubresource(
   subresource: string | undefined,
 ): Promise<Response> {
   switch (subresource) {
+    case "runs":
+      if (ctx.request.method !== "POST") throw new NotFoundError("路径", ctx.path);
+      return startRun(ctx, id);
     case "copy":
       return copyWorkflow(ctx, id);
     case "definition":

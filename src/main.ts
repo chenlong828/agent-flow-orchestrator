@@ -23,6 +23,7 @@ import {
 } from "./components/skill/index.ts";
 import { createInstanceService } from "./components/instance/index.ts";
 import { createScheduler } from "./components/scheduler/index.ts";
+import { createRunService } from "./components/run/index.ts";
 import { createExecutorBackend } from "./executor-backend.ts";
 import {
   createExpertRead,
@@ -70,6 +71,21 @@ const scheduler = createScheduler({
   maxAttempts: config.taskMaxAttempts,
   retryDelayMs: config.taskRetryDelayMs,
 });
+const archiveStore = createFileStore(config.archiveRoot);
+const runService = createRunService({
+  db,
+  clock: systemClock,
+  ids: uuidv7Ids,
+  fileStore: archiveStore,
+  workflowRead,
+  expertRead,
+  harnessRead,
+  instance: instanceService,
+  scheduler,
+  defaultTimeoutMs: config.runDefaultTimeoutMs,
+  maxNodeVisits: config.runMaxNodeVisits,
+});
+await runService.resumePending();
 const executorAuthenticator = createHarnessAuthenticator({ db });
 
 const catalog = createCatalog({
@@ -137,7 +153,9 @@ const app = createHttpApp({
     scheduler,
     packages: skillPackageSource,
     authenticator: executorAuthenticator,
+    run: runService,
   }),
+  runService,
   harnessService,
   toolService,
   skillDraftService,

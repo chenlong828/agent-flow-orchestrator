@@ -1,5 +1,5 @@
 /** `executor-http-v2` §3 的常量；不通过配置协商，调度器与网关共用同一来源。 */
-export const EXECUTOR_PROTOCOL_VERSION = 2;
+export const EXECUTOR_PROTOCOL_VERSION = 3;
 export const POLL_HOLD_MS = 30000;
 export const MAX_TASKS_PER_POLL = 10;
 export const CLIENT_SILENT_MS = 120000;

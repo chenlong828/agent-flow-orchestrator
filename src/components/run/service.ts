@@ -176,6 +176,7 @@ export function createRunService(deps: RunDeps): RunService {
           instanceId: run.instance_id,
           nodeId: node.id,
           prompt,
+          taskSpacePath: run.task_space_path,
           timeoutMs: deps.defaultTimeoutMs,
           skillIds: expert.skillIds,
         },
@@ -677,7 +678,7 @@ export function createRunService(deps: RunDeps): RunService {
     nodeId: string;
     visit?: number;
     attempt?: number;
-  }): Promise<{ stream: ReadableStream<Uint8Array>; sizeBytes: number } | null> {
+  }): Promise<{ stream: ReadableStream<Uint8Array>; sizeBytes: number; sha256: string } | null> {
     const artifact = await store.findArtifact(deps.db, {
       runId: input.runId,
       kind: "session_log",
@@ -686,7 +687,11 @@ export function createRunService(deps: RunDeps): RunService {
       ...(input.attempt === undefined ? {} : { attempt: input.attempt }),
     });
     if (artifact === null) return null;
-    return { stream: await deps.fileStore.get(artifact.store_key), sizeBytes: artifact.size_bytes };
+    return {
+      stream: await deps.fileStore.get(artifact.store_key),
+      sizeBytes: artifact.size_bytes,
+      sha256: artifact.sha256,
+    };
   }
 
   async function resumePending(): Promise<{ resumed: number }> {

@@ -51,7 +51,7 @@ async function createSkill(name: string): Promise<string> {
   return skill.id;
 }
 
-const PROTOCOL = { "x-executor-protocol": "2" } as const;
+const PROTOCOL = { "x-executor-protocol": "3" } as const;
 
 function exec(token: string, headers: Record<string, string> = {}): Record<string, string> {
   return { ...headers, ...PROTOCOL, authorization: `Bearer ${token}` };
@@ -137,7 +137,7 @@ describe("执行面协议与凭据闸门", () => {
 
   test("TC-EXV-003 缺失或无效 Bearer 返回 401，响应不含凭据", async () => {
     const missing = await call(ctx.app, "POST", "/api/v1/executor/poll", {
-      headers: { "x-executor-protocol": "2" },
+      headers: { "x-executor-protocol": "3" },
       body: { capacity: { free: 0 }, running: [], finished: [] },
     });
     expect(missing.status).toBe(401);

@@ -69,4 +69,6 @@ export const WORKFLOW_IMPORT_FIELDS = [
   "edges",
   "layout",
 ] as const;
+export const RUN_START_FIELDS = ["harnessId", "workspacePath", "intentMarkdown", "autoConfirm"] as const;
+export const RUN_DECISION_FIELDS = ["decision", "comment"] as const;
 export const WORKFLOW_SORT = HARNESS_SORT;

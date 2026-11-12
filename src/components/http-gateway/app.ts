@@ -7,12 +7,14 @@ import type { HarnessService } from "../harness/index.ts";
 import type { SkillDraftService } from "../skill/contract.ts";
 import type { ToolService } from "../tool/index.ts";
 import type { WorkflowService } from "../workflow/index.ts";
+import type { RunService } from "../run/index.ts";
 import type { ApiDocs } from "./docs.ts";
 import { errorResponse, json } from "./respond.ts";
 import { assertUuid } from "./validation.ts";
 import { handleExecutor, type ExecutorDeps } from "./routes/executor.ts";
 import { handleExpert } from "./routes/expert.ts";
 import { handleHarness } from "./routes/harness.ts";
+import { handleRun } from "./routes/run.ts";
 import { handleSkillDrafts } from "./routes/skill-drafts.ts";
 import { handleSkills } from "./routes/skills.ts";
 import { handleTool } from "./routes/tool.ts";
@@ -29,6 +31,7 @@ export type HttpDeps = {
   skillDraftService: SkillDraftService;
   expertService: ExpertService;
   workflowService: WorkflowService;
+  runService?: RunService;
   health: Health;
   actor: string;
   docs?: ApiDocs;
@@ -59,6 +62,7 @@ function toRouteDeps(deps: HttpDeps): RouteDeps {
     skillDraftService: deps.skillDraftService,
     expertService: deps.expertService,
     workflowService: deps.workflowService,
+    runService: deps.runService,
     actor: deps.actor,
   };
 }
@@ -170,6 +174,8 @@ function dispatch(
       return handleExpert(ctx);
     case "workflows":
       return handleWorkflow(ctx);
+    case "runs":
+      return handleRun(ctx);
     default:
       throw new NotFoundError("路径", path);
   }

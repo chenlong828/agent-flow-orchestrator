@@ -109,7 +109,7 @@ describe("节点登记与派发门禁", () => {
     });
 
     const headers = {
-      "x-executor-protocol": "2",
+      "x-executor-protocol": "3",
       authorization: `Bearer ${token}`,
     };
     const first = await call(ctx.app, "POST", "/api/v1/executor/poll", {

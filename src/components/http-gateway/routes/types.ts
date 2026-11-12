@@ -1,6 +1,7 @@
 import type { CatalogRead } from "../../catalog/index.ts";
 import type { ExpertService } from "../../expert/index.ts";
 import type { HarnessService } from "../../harness/index.ts";
+import type { RunService } from "../../run/index.ts";
 import type { SkillDraftService } from "../../skill/contract.ts";
 import type { ToolService } from "../../tool/index.ts";
 import type { WorkflowService } from "../../workflow/index.ts";
@@ -12,6 +13,7 @@ export type RouteDeps = {
   skillDraftService: SkillDraftService;
   expertService: ExpertService;
   workflowService: WorkflowService;
+  runService?: RunService;
   actor: string;
 };
 

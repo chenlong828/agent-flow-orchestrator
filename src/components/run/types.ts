@@ -111,7 +111,7 @@ export type RunService = {
     nodeId: string;
     visit?: number;
     attempt?: number;
-  }): Promise<{ stream: ReadableStream<Uint8Array>; sizeBytes: number } | null>;
+  }): Promise<{ stream: ReadableStream<Uint8Array>; sizeBytes: number; sha256: string } | null>;
   resumePending(): Promise<{ resumed: number }>;
 };
 

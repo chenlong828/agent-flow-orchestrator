@@ -6,7 +6,7 @@ import {
 import { assertAllowedFields, isPlainObject } from "../validation.ts";
 import type { ExecutorResult, ExecutorReport, ExecutorTaskError } from "./executor-types.ts";
 
-export const POLL_FIELDS = ["capacity", "running", "finished"] as const;
+export const POLL_FIELDS = ["capacity", "running", "finished", "archivedRuns"] as const;
 export const RESULT_FIELDS = [
   "taskId",
   "attempt",
@@ -71,6 +71,15 @@ function parseFinished(value: unknown): ExecutorReport["finished"] {
   });
 }
 
+function parseArchivedRuns(value: unknown): string[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) throw new ValidationError("archivedRuns", "必须是数组");
+  return value.map((item, index) => {
+    if (typeof item !== "string") throw new ValidationError(`archivedRuns[${index}]`, "必须是字符串");
+    return item;
+  });
+}
+
 export function parsePollBody(body: Record<string, unknown>): ExecutorReport {
   const capacity = body.capacity;
   if (!isPlainObject(capacity)) throw new ValidationError("capacity", "必须是对象");
@@ -82,6 +91,9 @@ export function parsePollBody(body: Record<string, unknown>): ExecutorReport {
     free: capacity.free,
     running: parseRunning(body.running),
     finished: parseFinished(body.finished),
+    ...(parseArchivedRuns(body.archivedRuns) === undefined
+      ? {}
+      : { archivedRuns: parseArchivedRuns(body.archivedRuns) }),
   };
 }
 

@@ -28,6 +28,7 @@ export type ExecutorReport = {
   free: number;
   running: ExecutorRunning[];
   finished: ExecutorFinished[];
+  archivedRuns?: string[];
 };
 
 export type ExecutorTask = {
@@ -37,6 +38,7 @@ export type ExecutorTask = {
   attempt: number;
   prompt: string;
   workspacePath: string;
+  taskSpacePath: string;
   timeoutMs: number;
   skillSet: { digest: string; packages: ExecutorPackageRef[] };
 };
@@ -45,8 +47,18 @@ export type ExecutorDecision = {
   tasks: ExecutorTask[];
   stop: boolean;
   cancelInstances: string[];
+  archiveRequests: ExecutorArchiveRequest[];
   nextPollAfterMs: number;
 };
+
+export type ExecutorArchiveRequest = {
+  runId: string;
+  instanceId: string;
+  workspacePath: string;
+  taskSpacePath: string;
+};
+
+export type ExecutorStored = "created" | "replaced" | "unchanged";
 
 export type ExecutorResult = {
   taskId: string;
@@ -68,6 +80,21 @@ export type ExecutorBackend = {
   acceptResult(clientId: string, result: ExecutorResult): Promise<{ taskId: string; accepted: boolean }>;
   describePackage(packageId: string): Promise<ExecutorPackageRef | null>;
   openPackage(packageId: string): Promise<{ ref: ExecutorPackageRef; data: Uint8Array }>;
+  archiveRequests?(clientId: string): Promise<ExecutorArchiveRequest[]>;
+  uploadSessionLog?(input: {
+    clientId: string;
+    taskId: string;
+    attempt: number;
+    bytes: Uint8Array;
+    sha256: string;
+  }): Promise<{ stored: ExecutorStored }>;
+  ackArchived?(clientId: string, runIds: string[]): Promise<void>;
+  uploadArchive?(input: {
+    clientId: string;
+    runId: string;
+    bytes: Uint8Array;
+    sha256: string;
+  }): Promise<{ stored: ExecutorStored }>;
 };
 
 export type ExecutorDeps = {
