@@ -25,6 +25,7 @@ updated: 2026-11-12
 
 | 工序 | 级别 | 范围 | 状态 |
 |---|---|---|---|
+| [`2026-11-12-skill-slug`](../works/2026-11-12-skill-slug/brief.md) | P1 | 技能系统标识 `slug`：`skill.slug` 列、包内 frontmatter 与下载文件名改用 slug、读模型/OpenAPI/种子同步；安装布局与 UI 输入框不在本轮 | 实现完成（2026-11-12）：390 pass、quality 0 违规；真实运行通过 |
 | [`2026-11-10-node-registry-implementation`](../works/2026-11-10-node-registry-implementation/brief.md) | P2 | 落 `harness.client_id`/`client_token`、`API-41`、`NodeDirectory`/`ExecutorAuthenticator`、凭据落库与测试；派生状态与调度器不在此列 | 实现完成，待用户验收 |
 | [`2026-11-11-scheduler-layer-implementation`](../works/2026-11-11-scheduler-layer-implementation/brief.md) | P1 | 落 `instance`/`task`/`task_attempt`、`CMP-scheduler`、`CMP-instance`、执行面三端点、制品供给与派生状态 | 实现完成，待 P1 验收（`bun run check` 334 pass、`quality:gate` 0 违规） |
 | [`2026-11-11-executor-joint-debug`](../works/2026-11-11-executor-joint-debug/brief.md) | P2 | 与 `agent-flow-client` 联调：登记 → 鉴权 → 派发 → 真实执行 → 回报 → 结算 | 实测完成（2026-11-11）：8 条用例 7 通过、`stop` 无外部触发面（`OQ-25`） |

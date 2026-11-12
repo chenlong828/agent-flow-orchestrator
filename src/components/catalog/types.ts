@@ -86,6 +86,8 @@ export type ToolDetailView = ToolListItem & {
 export type SkillListItem = {
   id: string;
   name: string;
+  /** 系统标识（DSH 技能名）；展示名仍是 `name`。 */
+  slug: string;
   categoryCode: string;
   categoryLabel: string;
   description: string;

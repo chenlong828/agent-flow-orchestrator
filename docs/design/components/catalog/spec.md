@@ -119,7 +119,8 @@ type ToolDetailView = ToolListItem & {
 
 type SkillListItem = {
   id: string;
-  name: string;
+  name: string;              // 展示名
+  slug: string;              // 系统标识（DSH 技能名）
   categoryCode: string;
   categoryLabel: string;
   description: string;

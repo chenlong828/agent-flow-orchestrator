@@ -6,7 +6,7 @@ import {
   ValidationError,
   toIso,
 } from "../../core/kernel/index.ts";
-import { isUniqueViolation, type Db } from "../../core/platform/index.ts";
+import { isUniqueViolation, violationConstraint, type Db } from "../../core/platform/index.ts";
 import { SKILL_MD, buildSkillPackage } from "./package.ts";
 import { sha256Hex } from "./digest.ts";
 import type { SaveSkill, SaveSkillResult } from "./contract.ts";
@@ -46,10 +46,12 @@ export async function saveDraft(
   if (draft === null) throw new NotFoundError("SkillDraft", id);
   assertNotExpired(draft, deps);
 
-  const version = await prepareSave(deps, draft, proposed, baseRevision);
+  const skillId = draft.skill_id ?? deps.ids.next();
+  const { version, slug } = await prepareSave(deps, draft, proposed, baseRevision, skillId);
   const attachments = await collectAttachments(deps, id);
   const packageBytes = buildSkillPackage({
-    name: proposed.name,
+    // SKILL.md 的 name 必须是 DSH 技能名（kebab-case），展示名不进包。
+    name: slug,
     description: proposed.description,
     version,
     body: proposed.body,
@@ -65,6 +67,8 @@ export async function saveDraft(
     const result = await deps.db.transaction((tx) =>
       applySave(deps, tx, {
         id,
+        skillId,
+        slug,
         proposed,
         packageKey,
         packageDigest,
@@ -87,9 +91,19 @@ export async function saveDraft(
     };
   } catch (error) {
     await deps.store.delete(`packages/${packageKey}`).catch(() => undefined);
-    if (isUniqueViolation(error)) throw new NameConflictError(proposed.name);
+    if (isUniqueViolation(error)) {
+      if (violationConstraint(error) === "skill_slug_lower_key") {
+        throw new NameConflictError(slug, "slug");
+      }
+      throw new NameConflictError(proposed.name);
+    }
     throw error;
   }
+}
+
+/** 缺省系统标识：取 UUIDv7 的随机尾段（前 8 位是毫秒时间戳，同一毫秒内会撞）。 */
+function derivedSlug(skillId: string): string {
+  return `skill-${skillId.replaceAll("-", "").slice(-8)}`;
 }
 
 async function prepareSave(
@@ -97,8 +111,10 @@ async function prepareSave(
   draft: DraftRow,
   proposed: Proposed,
   baseRevision: number | null,
-): Promise<string> {
+  skillId: string,
+): Promise<{ version: string; slug: string }> {
   let version = "v1.0";
+  let slug = proposed.slug ?? derivedSlug(skillId);
   if (draft.skill_id === null) {
     if (baseRevision !== null) {
       throw new ValidationError("If-Match", "新建草稿不能带 If-Match");
@@ -106,7 +122,7 @@ async function prepareSave(
   } else {
     if (baseRevision === null) throw new PreconditionRequiredError();
     const current = await deps.db.one<CurrentSkill>(
-      "select id, name, package_key, version, revision from skill where id = $1",
+      "select id, name, package_key, version, revision, slug from skill where id = $1",
       [draft.skill_id],
     );
     if (current === null) throw new NotFoundError("Skill", draft.skill_id);
@@ -114,6 +130,7 @@ async function prepareSave(
       throw new RevisionConflictError(current.revision);
     }
     version = nextVersion(current.version);
+    slug = proposed.slug ?? current.slug;
   }
 
   const category = await deps.db.one<{ code: string }>(
@@ -121,7 +138,7 @@ async function prepareSave(
     [proposed.categoryCode],
   );
   if (category === null) throw new ValidationError("categoryCode", "分类不存在");
-  return version;
+  return { version, slug };
 }
 
 async function collectAttachments(
@@ -139,6 +156,9 @@ async function collectAttachments(
 
 type ApplyArgs = {
   id: string;
+  /** 新建时预先分配，插入与 slug 派生共用同一个 id。 */
+  skillId: string;
+  slug: string;
   proposed: Proposed;
   packageKey: string;
   packageDigest: string;
@@ -165,9 +185,9 @@ async function applyCreatedSave(
   args: ApplyArgs,
   now: Date,
 ): Promise<{ skillId: string; revision: number; created: boolean }> {
-  const skillId = deps.ids.next();
   await insertSkill(tx, {
-    skillId,
+    skillId: args.skillId,
+    slug: args.slug,
     proposed: args.proposed,
     packageKey: args.packageKey,
     packageDigest: args.packageDigest,
@@ -176,7 +196,7 @@ async function applyCreatedSave(
     now,
     actorValue: args.actorValue,
   });
-  return { skillId, revision: 1, created: true };
+  return { skillId: args.skillId, revision: 1, created: true };
 }
 
 async function applyUpdatedSave(
@@ -195,6 +215,7 @@ async function applyUpdatedSave(
   }
   await updateSkill(tx, {
     skillId,
+    slug: args.slug,
     latestRevision: latest.revision,
     proposed: args.proposed,
     packageKey: args.packageKey,
@@ -242,6 +263,7 @@ async function insertSkill(
   tx: Db,
   args: {
     skillId: string;
+    slug: string;
     proposed: Proposed;
     packageKey: string;
     packageDigest: string;
@@ -253,12 +275,13 @@ async function insertSkill(
 ): Promise<void> {
   await tx.query(
     `insert into skill
-      (id, name, category_code, description, package_key, package_digest, package_size,
+      (id, name, slug, category_code, description, package_key, package_digest, package_size,
        version, enabled, revision, created_at, updated_at, created_by, updated_by)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, true, 1, $9, $9, $10, $10)`,
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, 1, $10, $10, $11, $11)`,
     [
       args.skillId,
       args.proposed.name,
+      args.slug,
       args.proposed.categoryCode,
       args.proposed.description,
       args.packageKey,
@@ -275,6 +298,7 @@ async function updateSkill(
   tx: Db,
   args: {
     skillId: string;
+    slug: string;
     latestRevision: number;
     proposed: Proposed;
     packageKey: string;
@@ -287,14 +311,15 @@ async function updateSkill(
 ): Promise<void> {
   const changed = await tx.query<{ id: string }>(
     `update skill set
-       name = $1, category_code = $2, description = $3,
-       package_key = $4, package_digest = $5, package_size = $6,
-       version = $7, revision = revision + 1,
-       updated_at = $8, updated_by = $9
-     where id = $10 and revision = $11
+       name = $1, slug = $2, category_code = $3, description = $4,
+       package_key = $5, package_digest = $6, package_size = $7,
+       version = $8, revision = revision + 1,
+       updated_at = $9, updated_by = $10
+     where id = $11 and revision = $12
      returning id`,
     [
       args.proposed.name,
+      args.slug,
       args.proposed.categoryCode,
       args.proposed.description,
       args.packageKey,

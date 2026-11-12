@@ -26,6 +26,7 @@ import type {
 type SkillRow = {
   id: string;
   name: string;
+  slug: string;
   category_code: string;
   description: string;
   package_key: string;
@@ -53,7 +54,7 @@ function buildFilters(query: SkillQuery): { where: string; params: unknown[] } {
   if (query.q !== undefined && query.q !== "") {
     params.push(`%${escapeLike(query.q)}%`);
     clauses.push(
-      `(s.name ilike $${params.length} escape '\\' or s.description ilike $${params.length} escape '\\')`,
+      `(s.name ilike $${params.length} escape '\\' or s.slug ilike $${params.length} escape '\\' or s.description ilike $${params.length} escape '\\')`,
     );
   }
   if (query.categoryCode !== undefined) {
@@ -129,7 +130,7 @@ export function createSkillRead(db: Db, store: FileStore): SkillRead {
 
 async function findRow(ctx: SkillReadContext, id: string): Promise<SkillRow | null> {
   return ctx.db.one<SkillRow>(
-    `select id, name, category_code, description, package_key, version,
+    `select id, name, slug, category_code, description, package_key, version,
             enabled, revision, created_at, updated_at
      from skill where id = $1`,
     [id],
@@ -148,6 +149,7 @@ async function toSummary(ctx: SkillReadContext, row: SkillRow): Promise<SkillSum
   return {
     id: row.id,
     name: row.name,
+    slug: row.slug,
     categoryCode: row.category_code,
     description: row.description,
     version: row.version,
@@ -187,7 +189,7 @@ async function listSkills(
     params,
   );
   const rows = await ctx.db.query<SkillRow>(
-    `select s.id, s.name, s.category_code, s.description, s.package_key,
+    `select s.id, s.name, s.slug, s.category_code, s.description, s.package_key,
             s.version, s.enabled, s.revision, s.created_at, s.updated_at
      from skill s ${where} ${orderBy(query.sort)}
      limit $${params.length + 1} offset $${params.length + 2}`,
@@ -256,7 +258,8 @@ async function getSkillPackage(
   const row = await requireRow(ctx, id);
   const contents = await readPackage(ctx, row);
   return {
-    fileName: sanitizeFileName(row.name, row.version),
+    // 下载文件名用系统标识：ASCII、稳定，避免中文在 Content-Disposition 里被编码成乱码。
+    fileName: sanitizeFileName(row.slug, row.version),
     data: contents.data,
   };
 }

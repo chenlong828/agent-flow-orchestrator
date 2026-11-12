@@ -79,12 +79,12 @@ describe("Skill 读路径", () => {
     ]);
 
     const document = await reader.getDocument(row!.id);
-    expect(parseSkillMarkdown(document.markdown).name).toBe("CRES 技能");
+    expect(parseSkillMarkdown(document.markdown).name).toBe("cres");
     expect(document.revision).toBe(detail.revision);
     expect(document.markdown.endsWith("\n")).toBe(true);
 
     const pkg = await reader.getPackage(row!.id);
-    expect(pkg.fileName).toBe("CRES 技能-v1.4.zip");
+    expect(pkg.fileName).toBe("cres-v1.4.zip");
     expect(readSkillPackage(pkg.data)[0]!.path).toBe("SKILL.md");
   });
 

@@ -24,7 +24,7 @@ Skill 有两种消费方式：
 | 表/存储 | 关键字段/键 | 说明 |
 |---|---|---|
 | `skill_category` | `code`、`label`、`position` | 参考数据，种子只读，无写接口 |
-| `skill` | `id`、`name`、`category_code`、`description`、`package_key`、`version`、`enabled`、`revision`、审计字段 | 聚合根；`package_key` 非空唯一，指向当前 zip |
+| `skill` | `id`、`name`、`slug`、`category_code`、`description`、`package_key`、`version`、`enabled`、`revision`、审计字段 | 聚合根；`package_key` 非空唯一，指向当前 zip；`name` 是展示名，`slug` 是 DSH 技能名 |
 | `skill_tag` | `skill_id`、`position`、`tag` | 有序，级联删除 |
 | `skill_draft` | `id`、`skill_id`、`base_revision`、`base_version`、`expires_at`、`created_at`、`created_by`、`updated_by` | 草稿元数据；目录键为 `id` |
 | `packages/` | `package_key` | 已保存 zip；唯一键，数据库提交前不切换 |
@@ -33,11 +33,12 @@ Skill 有两种消费方式：
 
 不变量：
 
-- `name` 大小写不敏感唯一；`category_code` 必须存在；`description` 1–400 字。
+- `name`（展示名，可中文）与 `slug`（系统标识）各自大小写不敏感唯一；`category_code` 必须存在；`description` 1–400 字。
+- `slug` 形如 kebab-case（`^[a-z0-9]+(-[a-z0-9]+)*$`，1–64 字）；新建缺省派生为 `skill-<uuid 尾 8 位>`，显式给出时以显式值为准，更新缺省沿用原值；改名会重建包并推进 `revision`。
 - `version` 形如 `vX.Y`；新建 `v1.0`；更新 minor+1，`v1.9` → `v2.0`；客户端不可写。
 - **zip 是内容唯一真相**；数据库只存 brief 与当前包指针，不存五章、踩坑、引用正文，不存文件内容。
 - 包根必须且只能有 `SKILL.md`；只允许 `scripts/`、`references/` 及其子目录；空目录不写入包。
-- `SKILL.md` frontmatter 只允许 `name`/`description`/`version` 三键；正文是 frontmatter 结束后的原始内容，读取时不 trim。
+- `SKILL.md` frontmatter 只允许 `name`/`description`/`version` 三键；其中 `name` 是**系统标识 `slug`**（kebab-case），不是展示名；正文是 frontmatter 结束后的原始内容，读取时不 trim。
 - `SKILL.md` 含 frontmatter ≤16384 UTF-8 字节；单文件未压缩 ≤20 MiB；文件数含 `SKILL.md` ≤100（附件 ≤99）；包总量未压缩 ≤100 MiB。
 - 包内条目不接受目录条目、符号链接、绝对路径、`..`、反斜杠与控制字符；路径规则见契约 §9.3。
 - 草稿是服务端完整包副本：已有 Skill 创建时复制当前包，包含只读 `SKILL.md`；新建草稿为空；`SKILL.md` 只能由保存生成，不能上传、改名或删除。
@@ -48,7 +49,7 @@ Skill 有两种消费方式：
 - 删除 Skill 前调用 `ReferenceGuard`；有专家引用则抛 `ReferencedError`；通过后删 brief、当前包与草稿。
 - 读列表不读 zip；详情只读 zip 中央目录与 `SKILL.md`，不读附件内容；文档与下载只读 zip。
 - 停用 Skill 仍可读、可下载、可建草稿；启停不改变包与 `SKILL.md`。
-- 数据结构按单基线落成：`db/migrations/0001_baseline.sql`；当前 16 张业务表、1 个迁移。
+- 数据结构按增量迁移落成：基线 `0001_baseline.sql` 之后有 `0002`–`0006`；`slug` 由 `0006_skill_slug.sql` 加入并回填 `skill-<id8>`。
 
 ## 3 公共契约
 
@@ -113,6 +114,19 @@ type SkillFile = {
   readOnly: boolean;
 };
 
+type SkillSummary = {
+  id: string;
+  name: string;              // 展示名
+  slug: string;              // DSH 技能名（kebab-case）
+  categoryCode: string;
+  description: string;
+  version: string;
+  enabled: boolean;
+  tags: string[];
+  revision: number;
+  updatedAt: string;
+};
+
 type SkillDetail = SkillSummary & {
   body: string;              // SKILL.md 去掉 frontmatter 后的正文
   files: SkillFile[];        // 含 SKILL.md；SKILL.md 首项
@@ -149,7 +163,8 @@ type SkillPackage = {
 };
 
 type SaveSkill = {
-  name: string;
+  name: string;                  // 展示名
+  slug?: string;                 // 系统标识；缺省新建派生 skill-<id8>，更新沿用原值
   categoryCode: string;
   description: string;
   tags?: string[];
@@ -184,7 +199,7 @@ type SkillQuery = {
 };
 ```
 
-`SkillDetail` 的 `name`、`description`、`version` 以包内 `SKILL.md` frontmatter 为准；`categoryCode`、`tags`、`enabled`、`revision`、时间来自 brief。`SkillSummary` 由列表从 brief 读取，不读 zip。`SkillDetail.files` 在已保存状态全部 `readOnly: true`；`SkillDraft.files` 中 `SKILL.md` 为 `true`，附件为 `false`。
+`SkillDetail` 的 `name`、`slug`、`description`、`version` 全部来自库内行；只有 `body` 与 `files` 来自包内 `SKILL.md`。`SkillSummary` 由列表从库内行读取，不读 zip。`SkillDetail.files` 在已保存状态全部 `readOnly: true`；`SkillDraft.files` 中 `SKILL.md` 为 `true`，附件为 `false`。
 
 `SkillPackage.size` 是包文件字节数，用于下载 `content-length`；`getPackage` 不把整包读入业务内存，返回存储流。`FileData` 来自 `kernel`：`Uint8Array | ReadableStream<Uint8Array>`。
 
@@ -247,7 +262,7 @@ type SkillPackageSource = {
 ## 5 验证
 
 - 规则：名称唯一、分类存在、描述 1–400、版本进位、标签去重、`SKILL.md` 16 KiB、文件数/大小/路径限额。
-- 构建：`SKILL.md` frontmatter 三键、正文归一化、最终一个换行；zip 根只有 `SKILL.md`，附件在 `scripts/`/`references/`，无目录条目/符号链接。
+- 构建：`SKILL.md` frontmatter 三键（`name` 取 `slug`）、正文归一化、最终一个换行；zip 根只有 `SKILL.md`，附件在 `scripts/`/`references/`，无目录条目/符号链接。
 - 草稿：新建空草稿、已有 Skill 复制完整包、附件上传/覆盖/改名/删除、`SKILL.md` 保留、TTL 过期、取消、多个草稿并存。
 - 保存：新建/更新、版本、`If-Match`/baseRevision、名称冲突、并发保存、成功后草稿 404、失败保留草稿、数据库失败清理新包。
 - 读：列表不读 zip；详情 `body` 与 `files` 顺序；文档与 `SKILL.md` 逐字一致；下载 zip 可解压、文件名合规；停用可读。
@@ -288,6 +303,7 @@ version: "v1.0"
 
 - frontmatter 只允许 `name`、`description`、`version` 三键，值为 YAML 双引号标量；由服务端生成，客户端不能直接写 `SKILL.md`。
 - 正文是 frontmatter 结束后的剩余字节；保存时换行统一为 `\n`，生成后保证文件以且仅以一个 `\n` 结尾。
-- 保存时按 `name`/`description`/`version` 生成 frontmatter；`description` 来自 brief，`version` 由服务端计算。
+- 保存时按 `slug`/`description`/`version` 生成 frontmatter；`description` 来自 brief，`version` 由服务端计算。
+- 下载文件名使用 `slug`（`<slug>-<version>.zip`），避免中文名在 `Content-Disposition` 里被额外编码。
 - 包内 `SKILL.md` 首项；附件按 `scripts/`、`references/` 存放；空目录不写入包；不写目录条目。
 - 下载文件名为 `<name>-<version>.zip`，与包内路径无关；文件名清洗引号、CRLF、路径分隔符。

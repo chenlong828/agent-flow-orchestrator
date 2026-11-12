@@ -47,7 +47,7 @@ describe("数据库结构", () => {
     expect(names).toEqual([...BUSINESS_TABLES, "schema_migrations"].sort());
   });
 
-  test("5 个迁移按顺序记录，分类参考数据为 4 条", async () => {
+  test("6 个迁移按顺序记录，分类参考数据为 4 条", async () => {
     const migrations = await db.query<{ version: string }>(
       "select version from schema_migrations order by version",
     );
@@ -57,6 +57,7 @@ describe("数据库结构", () => {
       "0003_task_space.sql",
       "0004_archive_state_backfill.sql",
       "0005_workflow_run_width.sql",
+      "0006_skill_slug.sql",
     ]);
 
     const categories = await db.query<{ code: string; position: number }>(
@@ -224,6 +225,7 @@ describe("数据库结构", () => {
       { table_name: "skill", column_name: "updated_at" },
       { table_name: "skill", column_name: "created_by" },
       { table_name: "skill", column_name: "updated_by" },
+      { table_name: "skill", column_name: "slug" },
       { table_name: "skill_draft", column_name: "id" },
       { table_name: "skill_draft", column_name: "skill_id" },
       { table_name: "skill_draft", column_name: "base_revision" },

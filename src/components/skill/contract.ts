@@ -2,7 +2,10 @@ import type { FileData, Page, PageQuery } from "../../core/kernel/index.ts";
 
 export type SkillSummary = {
   id: string;
+  /** 展示名，可中文。 */
   name: string;
+  /** 系统标识（DSH 技能名）：kebab-case，进 SKILL.md 的 `name`。 */
+  slug: string;
   categoryCode: string;
   description: string;
   version: string;
@@ -77,6 +80,8 @@ export type SkillRead = {
 
 export type SaveSkill = {
   name: string;
+  /** 系统标识；新建缺省由服务端派生（`skill-<id8>`），创建后允许显式改名。 */
+  slug?: string;
   categoryCode: string;
   description: string;
   tags?: string[];

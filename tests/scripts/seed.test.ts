@@ -78,7 +78,7 @@ describe("演示种子", () => {
     );
     expect(entries[0]!.path).toBe("SKILL.md");
     expect(parseSkillMarkdown(new TextDecoder().decode(entries[0]!.data))).toMatchObject({
-      name: "CRES 技能",
+      name: "cres",
       version: "v1.4",
     });
   });

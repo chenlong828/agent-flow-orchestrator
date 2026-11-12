@@ -21,6 +21,7 @@ export const TOOL_WRITE_FIELDS = [
 ] as const;
 export const SKILL_SAVE_FIELDS = [
   "name",
+  "slug",
   "categoryCode",
   "description",
   "tags",

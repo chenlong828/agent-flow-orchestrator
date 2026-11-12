@@ -2670,6 +2670,7 @@ components:
       required:
       - id
       - name
+      - slug
       - categoryCode
       - categoryLabel
       - description
@@ -2688,7 +2689,13 @@ components:
           type: string
           minLength: 1
           maxLength: 80
-          description: 名称，大小写不敏感唯一
+          description: 展示名，可中文；大小写不敏感唯一
+        slug:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
+          description: 系统标识（DSH 技能名），进 SKILL.md frontmatter 的 name；缺省由服务端派生
         categoryCode:
           type: string
           description: 分类代码
@@ -2746,7 +2753,7 @@ components:
             type: string
             format: date-time
             description: 创建时间，ISO-8601 UTC
-      description: Skill 详情；列表项字段加 body、files 与创建时间；名称/描述/版本以包内 SKILL.md 为准。
+      description: Skill 详情；列表项字段加 body、files 与创建时间；展示名、描述、版本以库内数据为准，包内 frontmatter 的 name 是 slug。
     SkillDraft:
       type: object
       required:
@@ -2839,7 +2846,13 @@ components:
           type: string
           minLength: 1
           maxLength: 80
-          description: 名称，1–80 字，大小写不敏感唯一
+          description: 展示名，1–80 字，大小写不敏感唯一
+        slug:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
+          description: 系统标识（DSH 技能名）；新建缺省为 skill-<id8>，更新缺省沿用原值
         categoryCode:
           type: string
           description: 分类代码，必须存在

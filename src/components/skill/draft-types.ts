@@ -36,6 +36,7 @@ export type SkillRow = {
 export type CurrentSkill = {
   id: string;
   name: string;
+  slug: string;
   package_key: string;
   version: string;
   revision: number;
@@ -133,8 +134,22 @@ export function nextVersion(version: string): string {
   return minor === 9 ? `v${major + 1}.0` : `v${major}.${minor + 1}`;
 }
 
+const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+/** 系统标识：显式给出时校验形状；缺省由调用方派生。 */
+function normalizeSlug(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "string") throw new ValidationError("slug", "必须是字符串");
+  const slug = value.trim();
+  if (slug.length < 1 || slug.length > 64 || !SLUG_PATTERN.test(slug)) {
+    throw new ValidationError("slug", "必须是 kebab-case（示例 workflow-init）");
+  }
+  return slug;
+}
+
 export function normalizeSave(input: SaveSkill): {
   name: string;
+  slug?: string;
   categoryCode: string;
   description: string;
   tags: string[];
@@ -166,8 +181,10 @@ export function normalizeSave(input: SaveSkill): {
     }
     return tag.trim();
   });
+  const slug = normalizeSlug(input.slug);
   return {
     name,
+    ...(slug === undefined ? {} : { slug }),
     categoryCode,
     description,
     tags: [...new Set(tags)],

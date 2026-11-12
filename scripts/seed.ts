@@ -36,6 +36,8 @@ type LegacyTool = {
 type LegacySkill = {
   id: string;
   name: string;
+  /** DSH 技能名（kebab-case），进 SKILL.md 的 name；展示名是 name。 */
+  slug: string;
   category: string;
   tags: string[];
   description: string;
@@ -83,18 +85,18 @@ const TOOLS: LegacyTool[] = [
 ];
 
 const SKILLS: LegacySkill[] = [
-  { id: "sk-cres", name: "CRES 技能", category: "编码", tags: ["CRES", "规范"], description: "遵循 CRES 专属框架规范完成代码编写，三大要点齐备；触发：CRES、代码生成", pitfalls: ["严格禁止绕过基类直接操作数据层", "禁止在 Skill 中硬编码环境配置"], version: "v1.4", enabled: true, updatedM: 30 },
-  { id: "sk-ldp", name: "LDP 技能", category: "编码", tags: ["LDP", "低代码"], description: "按低代码 DSL 规范生成页面与后台服务代码；触发：LDP、低代码、DSL", pitfalls: ["禁止手改生成器产物中的标记段"], version: "v2.0", enabled: true, updatedM: 1440 },
-  { id: "sk-callchain", name: "调用链分析", category: "检索", tags: ["调用链", "Trace"], description: "基于 Call Trace 定位符号引用链，圈定影响面；触发：调用链、影响面、trace", pitfalls: ["禁止只看单点调用就下结论，必须追完整链"], version: "v2.1", enabled: true, updatedM: 120 },
-  { id: "sk-meta", name: "元数据查询", category: "检索", tags: ["元数据", "Metadata"], description: "查询实体/字段/服务元数据，补全上下文；触发：元数据、字段", pitfalls: ["查询结果必须记录版本号，禁止使用过期元数据"], version: "v1.2", enabled: true, updatedM: 2880 },
-  { id: "sk-btree", name: "业务功能树检索", category: "检索", tags: ["功能树", "业务域"], description: "沿 业务域→价值流→场景 定位代码入口，防大海捞针；触发：功能树、业务域、场景", pitfalls: ["禁止跳过功能树直接全文搜索"], version: "v1.6", enabled: true, updatedM: 90 },
-  { id: "sk-dsl", name: "DSL 检索", category: "检索", tags: ["DSL"], description: "在低代码 DSL 资产中检索扩展点与配置；触发：DSL、扩展点", pitfalls: ["禁止假设 DSL 节点存在，必须检索确认"], version: "v1.0", enabled: true, updatedM: 4320 },
-  { id: "sk-ab", name: "AB 交叉审视", category: "审视", tags: ["AB", "交叉"], description: "两个独立上下文交叉审视产物，不一致时升级；触发：交叉审视、AB", pitfalls: ["禁止两个视角共享上下文，必须隔离"], version: "v1.3", enabled: true, updatedM: 60 },
-  { id: "sk-lint", name: "Linter 代码体检", category: "审视", tags: ["Linter", "静态检查"], description: "静态检查优先于模型判断，工具能解决的不依赖模型；触发：lint、静态检查", pitfalls: ["禁止人工解释 Linter 告警为误报而不留证据"], version: "v3.1", enabled: true, updatedM: 15 },
-  { id: "sk-contract", name: "契约断言", category: "审视", tags: ["契约", "接口"], description: "对接口契约生成断言并守护业务契约；触发：契约、断言、接口", pitfalls: ["契约变更必须同步功能树，禁止静默改契约"], version: "v1.1", enabled: true, updatedM: 720 },
-  { id: "sk-svo", name: "SVO 拆分", category: "测试", tags: ["SVO"], description: "把验证目标拆到 SVO 事实锚，对接黄金标准；触发：SVO、验证目标", pitfalls: ["禁止没有事实锚就编写用例"], version: "v2.2", enabled: true, updatedM: 200 },
-  { id: "sk-factory", name: "业务造数工具", category: "测试", tags: ["造数"], description: "按场景生成业务测试数据；触发：造数、数据", pitfalls: ["生产数据禁止直接回灌，必须清洗"], version: "v1.5", enabled: true, updatedM: 600 },
-  { id: "sk-replay", name: "回放数据清洗", category: "测试", tags: ["回放", "流量"], description: "流量回放数据清洗与脱敏；触发：回放、清洗", pitfalls: ["清洗前禁止回放，防止脏数据污染环境"], version: "v0.9", enabled: false, updatedM: 7200 },
+  { id: "sk-cres", slug: "cres", name: "CRES 技能", category: "编码", tags: ["CRES", "规范"], description: "遵循 CRES 专属框架规范完成代码编写，三大要点齐备；触发：CRES、代码生成", pitfalls: ["严格禁止绕过基类直接操作数据层", "禁止在 Skill 中硬编码环境配置"], version: "v1.4", enabled: true, updatedM: 30 },
+  { id: "sk-ldp", slug: "ldp", name: "LDP 技能", category: "编码", tags: ["LDP", "低代码"], description: "按低代码 DSL 规范生成页面与后台服务代码；触发：LDP、低代码、DSL", pitfalls: ["禁止手改生成器产物中的标记段"], version: "v2.0", enabled: true, updatedM: 1440 },
+  { id: "sk-callchain", slug: "call-chain", name: "调用链分析", category: "检索", tags: ["调用链", "Trace"], description: "基于 Call Trace 定位符号引用链，圈定影响面；触发：调用链、影响面、trace", pitfalls: ["禁止只看单点调用就下结论，必须追完整链"], version: "v2.1", enabled: true, updatedM: 120 },
+  { id: "sk-meta", slug: "metadata", name: "元数据查询", category: "检索", tags: ["元数据", "Metadata"], description: "查询实体/字段/服务元数据，补全上下文；触发：元数据、字段", pitfalls: ["查询结果必须记录版本号，禁止使用过期元数据"], version: "v1.2", enabled: true, updatedM: 2880 },
+  { id: "sk-btree", slug: "business-tree", name: "业务功能树检索", category: "检索", tags: ["功能树", "业务域"], description: "沿 业务域→价值流→场景 定位代码入口，防大海捞针；触发：功能树、业务域、场景", pitfalls: ["禁止跳过功能树直接全文搜索"], version: "v1.6", enabled: true, updatedM: 90 },
+  { id: "sk-dsl", slug: "dsl", name: "DSL 检索", category: "检索", tags: ["DSL"], description: "在低代码 DSL 资产中检索扩展点与配置；触发：DSL、扩展点", pitfalls: ["禁止假设 DSL 节点存在，必须检索确认"], version: "v1.0", enabled: true, updatedM: 4320 },
+  { id: "sk-ab", slug: "ab-review", name: "AB 交叉审视", category: "审视", tags: ["AB", "交叉"], description: "两个独立上下文交叉审视产物，不一致时升级；触发：交叉审视、AB", pitfalls: ["禁止两个视角共享上下文，必须隔离"], version: "v1.3", enabled: true, updatedM: 60 },
+  { id: "sk-lint", slug: "linter", name: "Linter 代码体检", category: "审视", tags: ["Linter", "静态检查"], description: "静态检查优先于模型判断，工具能解决的不依赖模型；触发：lint、静态检查", pitfalls: ["禁止人工解释 Linter 告警为误报而不留证据"], version: "v3.1", enabled: true, updatedM: 15 },
+  { id: "sk-contract", slug: "contract-assert", name: "契约断言", category: "审视", tags: ["契约", "接口"], description: "对接口契约生成断言并守护业务契约；触发：契约、断言、接口", pitfalls: ["契约变更必须同步功能树，禁止静默改契约"], version: "v1.1", enabled: true, updatedM: 720 },
+  { id: "sk-svo", slug: "svo", name: "SVO 拆分", category: "测试", tags: ["SVO"], description: "把验证目标拆到 SVO 事实锚，对接黄金标准；触发：SVO、验证目标", pitfalls: ["禁止没有事实锚就编写用例"], version: "v2.2", enabled: true, updatedM: 200 },
+  { id: "sk-factory", slug: "test-data", name: "业务造数工具", category: "测试", tags: ["造数"], description: "按场景生成业务测试数据；触发：造数、数据", pitfalls: ["生产数据禁止直接回灌，必须清洗"], version: "v1.5", enabled: true, updatedM: 600 },
+  { id: "sk-replay", slug: "replay-cleanse", name: "回放数据清洗", category: "测试", tags: ["回放", "流量"], description: "流量回放数据清洗与脱敏；触发：回放、清洗", pitfalls: ["清洗前禁止回放，防止脏数据污染环境"], version: "v0.9", enabled: false, updatedM: 7200 },
 ];
 
 const EXPERTS: LegacyExpert[] = [
@@ -297,7 +299,7 @@ export async function seedAll(db: Db, store: FileStore): Promise<SeedResult> {
       const updatedAt = minutesAgo(now, skill.updatedM);
       const packageKey = skillPackageKey(skill);
       const packageBytes = buildSkillPackage({
-        name: skill.name,
+        name: skill.slug,
         description: skill.description,
         version: skill.version,
         body: skillPackageBody(skill),
@@ -307,11 +309,11 @@ export async function seedAll(db: Db, store: FileStore): Promise<SeedResult> {
       await store.put(`packages/${packageKey}`, packageBytes);
       await tx.query(
         `insert into skill
-          (id, name, category_code, description, package_key, package_digest, package_size,
+          (id, name, slug, category_code, description, package_key, package_digest, package_size,
            version, enabled, revision, created_at, updated_at, created_by, updated_by)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 1, $10, $10, 'seed', 'seed')
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 1, $11, $11, 'seed', 'seed')
          on conflict (id) do update set
-           name = excluded.name, category_code = excluded.category_code,
+           name = excluded.name, slug = excluded.slug, category_code = excluded.category_code,
            description = excluded.description, package_key = excluded.package_key,
            package_digest = excluded.package_digest, package_size = excluded.package_size,
            version = excluded.version, enabled = excluded.enabled,
@@ -319,6 +321,7 @@ export async function seedAll(db: Db, store: FileStore): Promise<SeedResult> {
         [
           id,
           skill.name,
+          skill.slug,
           CATEGORY[skill.category]!,
           skill.description,
           packageKey,

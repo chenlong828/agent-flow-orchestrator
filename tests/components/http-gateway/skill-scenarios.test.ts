@@ -200,7 +200,7 @@ describe("SCN-0002 Skill 草稿与发布", () => {
     expect(document.headers.get("etag")).toBe('"2"');
     const markdown = await document.text();
     expect(parseSkillMarkdown(markdown)).toMatchObject({
-      name: "场景迭代技能",
+      name: detail.body.slug,
       version: "v1.1",
       body: "## 适用场景\n\n第二版正文\n",
     });
@@ -208,7 +208,7 @@ describe("SCN-0002 Skill 草稿与发布", () => {
     const download = await downloadSkill(created.id);
     expect(download.status).toBe(200);
     expect(download.headers.get("content-disposition")).toContain(
-      encodeURIComponent("场景迭代技能-v1.1.zip"),
+      `${detail.body.slug}-v1.1.zip`,
     );
     const entries = readSkillPackage(new Uint8Array(await download.arrayBuffer()));
     expect(entries.map((entry) => entry.path)).toEqual(["SKILL.md", "references/new.sh"]);
@@ -357,8 +357,9 @@ describe("SCN-0003 Skill 检索与供给", () => {
     expect(document.headers.get("etag")).toBe('"2"');
     const markdown = await document.text();
     expect(markdown.endsWith("\n")).toBe(true);
+    const skill = await call(ctx.app, "GET", `/api/v1/skills/${created.id}`);
     expect(parseSkillMarkdown(markdown)).toMatchObject({
-      name: "场景文档技能",
+      name: skill.body.slug,
       description: "基于 Call Trace 定位符号引用链",
       version: "v1.1",
       body: "## 适用场景\n\n文档正文\n",
@@ -389,9 +390,10 @@ describe("SCN-0003 Skill 检索与供给", () => {
     const download = await downloadSkill(created.id);
     expect(download.status).toBe(200);
     expect(download.headers.get("content-type")).toBe("application/zip");
+    const skill = await call(ctx.app, "GET", `/api/v1/skills/${created.id}`);
     const disposition = download.headers.get("content-disposition") ?? "";
     expect(disposition).toContain("attachment;");
-    expect(disposition).toContain(encodeURIComponent("场景下载技能-v1.1.zip"));
+    expect(disposition).toContain(`${skill.body.slug}-v1.1.zip`);
     expect(download.headers.get("etag")).toBe('"2"');
     const entries = readSkillPackage(new Uint8Array(await download.arrayBuffer()));
     expect(entries.map((entry) => entry.path)).toEqual(["SKILL.md", "scripts/run.sh"]);

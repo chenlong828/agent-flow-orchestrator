@@ -79,9 +79,10 @@ export class NotFoundError extends AppError {
 }
 
 export class NameConflictError extends AppError {
-  constructor(name: string) {
-    super("name_conflict", `名称 ${name} 已存在`, {
-      details: { field: "name", value: name },
+  /** `field` 区分撞的是展示名还是系统标识（`skill.slug`）。 */
+  constructor(value: string, field: "name" | "slug" = "name") {
+    super("name_conflict", `${field === "slug" ? "系统标识" : "名称"} ${value} 已存在`, {
+      details: { field, value },
     });
   }
 }

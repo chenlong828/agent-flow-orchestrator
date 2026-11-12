@@ -31,6 +31,7 @@ function projectSkillSummary(
   return {
     id: skill.id,
     name: skill.name,
+    slug: skill.slug,
     categoryCode: skill.categoryCode,
     categoryLabel: requireCategoryLabel(labels, skill.categoryCode),
     description: skill.description,
