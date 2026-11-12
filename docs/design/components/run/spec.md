@@ -1,16 +1,16 @@
 ---
 layer: design
 module: run
-status: planned
+status: active
 component: CMP-run
-updated: 2026-11-11
+updated: 2026-11-12
 ---
 
 # `CMP-run` 组件规格
 
 > 范围：一次工作流运行（run）的编排——启动快照、节点推进、判定与回退、人工确认、取消、制品登记与归档指令。
 > 不包含：任务列表与派发（[`CMP-scheduler`](../scheduler/spec.md)）、图定义与校验（[`CMP-workflow`](../workflow/spec.md)）、实例登记（[`CMP-instance`](../instance/spec.md)）、执行面 HTTP 传输（[`CMP-http-gateway`](../http-gateway/spec.md)）、client 侧 session 与日志采集。
-> 状态：`planned`（2026-11-11 设计冻结）。2026-11-12 服务与组件测试已落盘（`src/components/run/`、`tests/components/run/`），待 `T-RUN-06` 接入组合根与 HTTP 后转 `active`。
+> 状态：`active`（2026-11-11 设计冻结，2026-11-12 `T-RUN-05`/`T-RUN-06` 实现）。服务与组件测试见 `src/components/run/`、`tests/components/run/` 与 `tests/components/http-gateway/run-*.test.ts`。
 > 契约：产品面见 §3；执行面增量见 [`executor-http-v3`](../../contracts/executor-http-v3.md)。
 
 ## 1 主目标
@@ -46,7 +46,7 @@ updated: 2026-11-11
 
 | 表 | 关键字段 | 说明 |
 |---|---|---|
-| `workflow_run` | `id`、`workflow_id`、`workflow_revision`、`graph_snapshot`、`intent_markdown`、`harness_id`、`client_id`、`instance_id`、`workspace_path`、`task_space_path`、`auto_confirm`、`state`、`outcome`、`current_node_id`、`final_message`、`error`、`archive_state`、`started_at`、`finished_at`、审计字段 | 运行聚合根；`graph_snapshot` 是启动时冻结的 `WorkflowGraph` |
+| `workflow_run` | `id`、`workflow_id`、`workflow_revision`、`graph_snapshot`、`intent_markdown`、`harness_id`、`client_id`、`instance_id`、`workspace_path`、`task_space_path`、`auto_confirm`、`state`、`outcome`、`current_node_id`、`result`（`finalMessage`/`error`）、`archive_state`、`finished_at`、`created_at`/`updated_at`/`created_by` | 运行聚合根；`graph_snapshot` 是启动时冻结的 `WorkflowGraph`；运行创建即开始，`startedAt` 对外取 `created_at`（`0005` 迁移收敛表宽） |
 | `run_node` | `run_id`、`node_id`、`visit`、`node_type`、`expert_id`、`state`、`task_id`、`verdict`、`message`、`error`、`dispatched_at`、`finished_at` | 追加写为主：同一节点每次重访新增一行，旧行保留；`attempt` 归调度器，不在本表留第二真相 |
 | `run_artifact` | `run_id`、`node_id`（归档为 null）、`visit`、`attempt`（归档为 null）、`kind`（`session_log` / `archive`）、`store_key`、`size_bytes`、`sha256`、`created_at` | 制品元数据；一次尝试一份日志，字节在 `FileStore`，本组件不持有字节 |
 
@@ -201,7 +201,7 @@ type RunService = {
 
 | 方法 | 目的 | 输入 | 输出 | 错误 | 并发/事务 |
 |---|---|---|---|---|---|
-| `start` | 建 run 并推进首节点 | `StartRun` | `RunDetail` | `ValidationError`、`NotFoundError`（工作流/节点/专家）、`BindingConflictError`（实例登记）、`RunConflictError`（同工作区已有活跃 run）、`PayloadTooLargeError`（intent 或 prompt 超限） | 校验与建 run 两段：校验只读；建 run + 首节点单事务；`enqueue` 在事务外 |
+| `start` | 建 run 并推进首节点 | `StartRun` | `RunDetail` | `ValidationError`（图/专家/字段）、`NotFoundError`（工作流/节点）、`BindingConflictError`（实例登记）、`RunConflictError`（同工作区已有活跃 run）、`PayloadTooLargeError`（intent 或 prompt 超限） | 校验与建 run 两段：校验只读；建 run + 首节点单事务；`enqueue` 在事务外 |
 | `advance` | 推进一个节点 | `runId` | `void` | `NotFoundError` | 同一 run 进程内单飞；状态迁移单事务 |
 | `handleTaskResult` | 结算并推进 | `clientId`、`TaskResult` | `ResultAck` | `TaskNotFoundError`、`ValidationError` | 同一 run 单飞；`acceptResult` 与 `run_node` 结算分属两个事务，先调度器后编排 |
 | `attachSessionLog` | 登记日志 | `clientId`、`taskId`、`attempt`、`bytes`、`sha256` | `{stored}` | `TaskNotFoundError`、`PayloadTooLargeError` | 先写临时键、校验后原子改名；同键后到覆盖，`stored` 为 `created`/`replaced`/`unchanged` |
@@ -300,9 +300,9 @@ dispatched ──失败/超时/verdict 非法──▶ failed ──▶ run.fail
 
 ### 4.7 归档
 
-1. run 进入 `done`：**只有存在成功结算节点**（`run_node.state='succeeded'`）时置 `archive_state = pending`；从未成功过的取消/失败 run 置 `none`，不下发归档指令（客户端本地没有可打包的 task-space）。置 `pending` 时同时把该 run 已有的日志副本复制到 `history/<instanceId>/<runId>/logs/`。
+1. run 进入 `done`：**只有存在成功结算节点**（`run_node.state='succeeded'`）时置 `archive_state = pending`；从未成功过的取消/失败 run 置 `none`，不下发归档指令（客户端本地没有可打包的 task-space）。
 2. `archiveRequestsFor(clientId)` 返回 `pending` 且属于该 client 的 run；`poll` 按电平持续下发。
-3. `storeArchive` 落盘 `history/<instanceId>/<runId>/task-space.tar.gz` 并置 `stored`；日志副本按 `logs/<nodeId>-<visit>-a<attempt>.jsonl.gz` 存放；`ackArchived` 后不再下发。
+3. `storeArchive` 落盘 `history/<instanceId>/<runId>/task-space.tar.gz`、把该 run 已有的日志副本复制到同目录 `logs/<nodeId>-<visit>-a<attempt>.jsonl.gz`，并置 `stored`；`ackArchived` 后不再下发。
 4. `storeArchive` 失败（超限/解包非法）置 `failed`，不再自动重试；运维处理。
 5. **超时降级**：`pending` 且 `finished_at` 超过 `archivePendingTtlMs`（默认 10 分钟）仍未被确认 → 置 `failed` 并停止下发，避免客户端离线或本地目录被删导致电平长期空转；之后 client 若真的补传，`storeArchive` 仍会把状态改回 `stored`。
 
@@ -344,8 +344,8 @@ dispatched ──失败/超时/verdict 非法──▶ failed ──▶ run.fail
 | 推进 | 首节点成功→后继入队；`end` 成功→`done(succeeded)`；无出边→`failed` |
 | 判定 | verdict pass 推进；fail 回退到祖先且 `visit+1`；verdict 缺失/非法→`failed(verdict_invalid)`；无回边→`failed` |
 | 轮次 | `visit > max_node_visits` → `failed(visit_limit_exceeded)`，不再入队 |
-| 确认 | `waiting_confirm` 无任务；pass 推进、reject 回退；`auto_confirm` 不等待；非 `waiting_confirm` 决策 400 |
-| 日志 | 缺日志报结果 409 且不结算；补传后接受；同内容重复 200、异内容 409；超限 413 |
+| 确认 | `waiting_confirm` 无任务；pass 推进、reject 回退；`auto_confirm` 不等待；非 `waiting_confirm` 决策 409 |
+| 日志 | 缺日志报结果 409 且不结算；补传后接受；同内容重复 200 `unchanged`、异内容后到覆盖 200 `replaced`；超限 413 |
 | 归档 | 终态后电平下发；上传后落 `history/<instanceId>/<runId>/` 并置 `stored`；`archivedRuns` 确认后停止；损坏包 400；未终态 409 |
 | 取消 | 在跑任务经 `cancelInstances` 取消；`waiting_confirm` 直接取消；重复取消幂等 |
 | 恢复 | `dispatched` 已结算补结算；`queued` 无 `taskId` 重新入队；`waiting_confirm` 保持 |
@@ -355,8 +355,8 @@ dispatched ──失败/超时/verdict 非法──▶ failed ──▶ run.fail
 ## 7 预算与运行
 
 - 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 12 KB。
-- 单独验证入口：`src/components/run/service.ts` 的 `createRunService`（实现后）；命令 `bun test tests/components/run`。
-- 当前状态：`planned`；契约冻结在前（[`executor-http-v3`](../../contracts/executor-http-v3.md)），实现在 [`T-RUN-05`](../../../works/2026-11-11-workflow-run-orchestration/brief.md)。
+- 单独验证入口：`src/components/run/service.ts` 的 `createRunService`；命令 `bun test tests/components/run tests/components/http-gateway/run-*.test.ts`。
+- 当前状态：`active`；契约见 [`executor-http-v3`](../../contracts/executor-http-v3.md)，实现与任务状态见 [`T-RUN-05`/`T-RUN-06`](../../../works/2026-11-11-workflow-run-orchestration/brief.md)。
 
 ## 8 待定
 

@@ -1,14 +1,17 @@
 ---
 layer: design
 module: workflow-orchestration
-status: draft
-updated: 2026-11-11
+status: verified
+updated: 2026-11-12
 flow: FLOW-RUN-003
 scenario: SCN-0303
 domain: 工作流编排
 valueStream: 工作流运行
 title: 人工确认与运行控制
 entries:
+  - component: CMP-run
+    path: src/components/run/service.ts
+    symbol: createRunService
   - component: CMP-http-gateway
     path: src/components/http-gateway/app.ts
     symbol: createHttpApp
@@ -24,7 +27,15 @@ docs:
     heading: 4.6 失败与取消
   - path: docs/design/components/scheduler/spec.md
     heading: 4 状态机与不变量
-tests: []
+tests:
+  - role: R1
+    id: TC-RUN-009
+  - role: R2
+    id: TC-RUN-010
+  - role: R3
+    id: TC-RUN-011
+  - role: N1
+    id: TC-RUN-012
 externalRefs: []
 ---
 
@@ -41,7 +52,7 @@ externalRefs: []
 ## 2 入口
 
 - HTTP：`POST /api/v1/runs/{id}/nodes/{nodeId}/decision`；`POST /api/v1/runs/{id}/cancel`。
-- 领域：`CMP-run` 的 `decide` / `cancel`（`planned`）；取消经 `CMP-scheduler.cancelInstances` 生效。
+- 领域：`CMP-run` 的 `decide` / `cancel`；取消经 `CMP-scheduler.cancelInstances` 生效。
 - 读：`GET /api/v1/runs/{id}` 返回 `waiting_confirm` 与当前节点。
 
 ## 3 运行序
@@ -79,7 +90,7 @@ externalRefs: []
 | R3 | `TC-RUN-011` | 提交 `reject`：节点 `rejected`，回退边目标以 `visit+1` 重新执行 |
 | N1 | `TC-RUN-012` | 取消：`cancelInstances` 电平下发、run `cancelled`、不再入队；重复取消幂等；非 `waiting_confirm` 提交决策返回 `409` |
 
-测试落盘后补齐 frontmatter `tests` 并转 `designed`。
+测试已落盘（`tests/components/http-gateway/`），frontmatter `tests` 已补齐并转 `verified`。
 
 ## 6 覆盖边界
 

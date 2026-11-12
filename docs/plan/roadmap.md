@@ -28,7 +28,7 @@ updated: 2026-11-11
 | [`2026-11-10-node-registry-implementation`](../works/2026-11-10-node-registry-implementation/brief.md) | P2 | 落 `harness.client_id`/`client_token`、`API-41`、`NodeDirectory`/`ExecutorAuthenticator`、凭据落库与测试；派生状态与调度器不在此列 | 实现完成，待用户验收 |
 | [`2026-11-11-scheduler-layer-implementation`](../works/2026-11-11-scheduler-layer-implementation/brief.md) | P1 | 落 `instance`/`task`/`task_attempt`、`CMP-scheduler`、`CMP-instance`、执行面三端点、制品供给与派生状态 | 实现完成，待 P1 验收（`bun run check` 334 pass、`quality:gate` 0 违规） |
 | [`2026-11-11-executor-joint-debug`](../works/2026-11-11-executor-joint-debug/brief.md) | P2 | 与 `agent-flow-client` 联调：登记 → 鉴权 → 派发 → 真实执行 → 回报 → 结算 | 实测完成（2026-11-11）：8 条用例 7 通过、`stop` 无外部触发面（`OQ-25`） |
-| [`2026-11-11-workflow-run-orchestration`](../works/2026-11-11-workflow-run-orchestration/brief.md) | P1 | 工作流运行编排（`REQ-0001`）：`CMP-run`、run 三张表、6 个产品端点、执行面契约 v3、DSL 7 类节点、session-log 与归档 | 设计已确认；`T-RUN-04` 完成，`T-RUN-05`/`06`/`07` 实现完成待收口（openapi、质量门禁），`T-RUN-08`/`09` 待办；`3100` 已起等待 client 接入 |
+| [`2026-11-11-workflow-run-orchestration`](../works/2026-11-11-workflow-run-orchestration/brief.md) | P1 | 工作流运行编排（`REQ-0001`）：`CMP-run`、run 三张表、6 个产品端点、执行面契约 v3、DSL 7 类节点、session-log 与归档 | `T-RUN-04`–`T-RUN-08`、`T-RUN-10` 完成；`SCN-0301`–`SCN-0304` 已转 verified，`bun run check` 369 pass、`quality:gate` 0 违规；`T-RUN-09` 待 `agent-flow-client` 实现 v3 后联调 |
 - M2 只产出裁定与规格，不写实现代码；M2 是 P1，人参与切分与契约评审后才可编码。
 - 跨项目依赖：`T-RUN-09` 联调需 `agent-flow-client` 先同步 `executor-http-v3` 副本并实现 v3（task-space、`P-04`/`P-05`、归档、协议 3）。该工作不在本仓库工序表内，已在 client 仓库建立交接工序 [`2026-11-12-contract-v3-handoff`](../../../agent-flow-client/docs/works/2026-11-12-contract-v3-handoff/brief.md)。
 - 无用户旅程的技术债 / 文档活走旁路，不进 `requirements/`。

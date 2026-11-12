@@ -116,7 +116,7 @@ updated: 2026-11-11
 
 ## 4 端点总表
 
-48 个已实现的产品业务端点（B1 38 个 + B3 工作流 10 个）；运行编排工序另有 6 个 **planned** 端点（`API-42`–`API-47`，§4.1.1），实现后总数 54，`openapi.yaml` 的 `x-api-count` 届时改为 54。`/healthz` 单独列在 §4.2；执行面 3 个已实现端点 + 2 个 planned 端点见 §4.3，不计入产品业务端点；开发者文档端点见 §4.4，不计入业务端点。
+54 个已实现的产品业务端点（B1 38 个 + B3 工作流 10 个 + 运行编排 6 个），`openapi.yaml` 的 `x-api-count` 为 54。`/healthz` 单独列在 §4.2；执行面 5 个已实现端点见 §4.3，不计入产品业务端点；开发者文档端点见 §4.4，不计入业务端点。
 
 ### 4.1 业务端点
 
@@ -171,9 +171,9 @@ updated: 2026-11-11
 | `API-39` | GET | `/workflows/{id}/dsl` | `UC-B3-03` | 导出 JSON/YAML DSL | 200 文件 |
 | `API-40` | POST | `/workflows/import` | `UC-B3-03` | 从严导入 DSL；允许空专家绑定，新建工作流 | 201 `{workflow,idMap,warnings}` |
 
-### 4.1.1 运行编排端点（planned）
+### 4.1.1 运行编排端点
 
-> 设计冻结于 2026-11-11（[`2026-11-11-workflow-run-orchestration`](../../../works/2026-11-11-workflow-run-orchestration/brief.md)），实现随 `T-RUN-06`。领域契约见 [`CMP-run`](../run/spec.md) §3；本节只定传输落点与 DTO 形状。
+> 设计冻结于 2026-11-11，`T-RUN-06` 实现（[`2026-11-11-workflow-run-orchestration`](../../../works/2026-11-11-workflow-run-orchestration/brief.md)）。领域契约见 [`CMP-run`](../run/spec.md) §3；本节只定传输落点与 DTO 形状。
 
 | ID | 方法 | 路径 | 用途 | 成功 |
 |---|---|---|---|---|
@@ -206,10 +206,10 @@ updated: 2026-11-11
 | `EXE-04` | POST | `/api/v1/executor/tasks/{taskId}/session-log?attempt=n` | 上传会话日志（gzip JSONL） | 200 `{taskId,attempt,bytes,sha256}` |
 | `EXE-05` | POST | `/api/v1/executor/runs/{runId}/archive` | 上传运行归档（tar.gz） | 200 `{runId,bytes,sha256}` |
 
-- `EXE-01`–`EXE-03` 已实现（当前按 v2 语义运行）；`EXE-04`/`EXE-05` 与 v3 字段为 **planned**（设计冻结 2026-11-11），随 `T-RUN-06` 与 client 同批升级。契约权威是 [`executor-http-v3`](../../contracts/executor-http-v3.md)。
+- `EXE-01`–`EXE-05` 均已实现，按 [`executor-http-v3`](../../contracts/executor-http-v3.md) 运行；client 侧 v3 实现与联调另立工序（`T-RUN-09`）。
 - 五个端点都不计入产品业务端点计数，也不写入 `openapi.yaml` 的产品 `paths`；它们由 `CMP-http-gateway` 的 `executor` 路由实现：`poll` 调 `CMP-scheduler`，`result` 先经 `CMP-run`（有 run 归属时）再调调度器，`skill-packages` 调 `SkillPackageSource`，`session-log`/`archive` 调 `CMP-run`。
 - 鉴权：`Authorization: Bearer <token>`，token → `clientId` 由 `CMP-harness` 的 `ExecutorAuthenticator` 在 `harness.client_token` 上解析；**产品端点不受影响**，仍无鉴权。
-- 版本闸门：契约现行版本为 `3`，`X-Executor-Protocol` 必须精确等于 `3`；缺失或不等 → `400 unsupported_protocol`，不进入调度。当前代码仍校验 `2`，随 `T-RUN-06` 切到 `3`；双端同批上线，不保留兼容窗口。
+- 版本闸门：契约现行版本为 `3`，`X-Executor-Protocol` 必须精确等于 `3`；缺失或不等 → `400 unsupported_protocol`，不进入调度；不保留 v2 兼容窗口。
 - 常量（代码常量，不通过配置协商）：`maxResultBytes=262144`、`maxPromptBytes=1048576`、`maxSkillPackageBytes=67108864`、`maxTasksPerPoll=10`、`pollHoldMs=30000`、`clientPollTimeoutMs=40000`、`clientSilentMs=120000`、`resultGraceMs=60000`；v3 新增 `maxSessionLogBytes=67108864`、`maxArchiveBytes=536870912`、`maxArchiveEntries=100000`、`maxArchiveUncompressedBytes=2147483648`（`API-42` 的 intent 上限仍是产品面 256 KiB，不是执行面常量）。
 - `P-01` 长轮询：网关按 `pollHoldMs` 调 `SchedulerService.poll`，返回后合并 `CMP-run.archiveRequestsFor(clientId)`；**不因归档指令缩短挂起**（首次下发的同一跳由编排侧唤醒一次）。请求体透传 `capacity`/`running`/`finished`/`archivedRuns`，响应透传 `tasks`/`stop`/`cancelInstances`/`nextPollAfterMs` + `archiveRequests`。
 - `P-02`：网关先调 `CMP-run.handleTaskResult(clientId, result)`；有 run 归属时由编排校验日志并结算，无归属时委托调度器。缺日志 → `409 session_log_missing`，任务不结算。
@@ -706,9 +706,9 @@ type PollRequest = {
 **`SkillPackage`**（下发项与 `P-03` 元数据）：`{packageId, name, version, digest, sizeBytes, downloadUrl, etag?}`；`ETag` 与 `etag` 同源，均来自 `SkillPackageRef.etag`。
 
 - DTO ↔ 领域映射只在路由层完成：`PollRequest` → `ClientReport`，`PollResponse` ← `DispatchDecision` + `ArchiveRequest[]`，`TaskResult` → 领域 `TaskResult`，`SkillPackage` ← `SkillPackageRef`；`P-04`/`P-05` 以流透传给 `CMP-run`，网关不缓冲整包。
-- 执行面 DTO 不写 `openapi.yaml`（契约由 `executor-http-v3` / `executor-http-v3` 文件承载）；`EXE-01`–`EXE-03` 已实现，`EXE-04`/`EXE-05` 为 planned。
+- 执行面 DTO 不写 `openapi.yaml`（契约由 `executor-http-v3` 文件承载）；`EXE-01`–`EXE-05` 均已实现。
 
-### 5.9 运行编排 DTO（planned）
+### 5.9 运行编排 DTO
 
 **`StartRunRequest`**（`API-42`）
 
@@ -774,13 +774,13 @@ B1/B3 不提供的页面动作：Harness 连接测试/心跳刷新、工具调�
 - 工作流：列表/详情、复制后缀、图保存/校验、DSL JSON/YAML、导入缺失专家、revision 冲突、validate 404。
 - 契约快照：响应字段集合与 DTO 表一致；新增字段必须更新本文。
 - 执行面（§4.3）：协议版本闸门、Bearer → `clientId`、未知字段 400、`maxResultBytes` 413、`P-03` 的 ETag/304/`X-Checksum-Sha256`/404/500；三个已实现端点各自 3 正 1 反，断言见场景 `SCN-0201`–`SCN-0205`。
-- 运行编排（planned，`API-42`–`API-47`）：启动校验（含 `split`/`fanout` 拒绝）、run 详情/列表、取消幂等、决策状态校验、日志下载头；断言见场景 `SCN-0301`–`SCN-0304`。
-- 执行面 v3（planned，`EXE-04`/`EXE-05`）：日志先传后报、`409 session_log_missing`、`413`、归档路径安全校验；断言见场景 `SCN-0302`、`SCN-0304` 与契约 v3 §11。
+- 运行编排（`API-42`–`API-47`）：启动校验（含 `split`/`fanout` 拒绝）、run 详情/列表、取消幂等、决策状态校验、日志下载头；断言见场景 `SCN-0301`–`SCN-0304`。
+- 执行面 v3（`EXE-04`/`EXE-05`）：日志先传后报、`409 session_log_missing`、`413`、归档路径安全校验；断言见场景 `SCN-0302`、`SCN-0304` 与契约 v3 §11。
 - 外部 UI 若接入，可用同一份端点/DTO 表做适配层契约测试；不共享代码。
 
 ## 8 依赖与边界
 
-- 允许：`catalog` 读契约；四类资产写服务；工作流写服务；`scheduler` 的 `poll`/`acceptResult`；`run` 的启动/推进/结果/日志/归档方法（planned）；`kernel` 的 `SkillPackageSource` 端口；`platform` 的 `Health`；`kernel` 的错误、分页、ID/时钟类型；Bun 的 multipart/流读取；文档子模块的 Bun 文件读取与本地静态资源。
+- 允许：`catalog` 读契约；四类资产写服务；工作流写服务；`scheduler` 的 `poll`/`acceptResult`；`run` 的启动/推进/结果/日志/归档方法；`kernel` 的 `SkillPackageSource` 端口；`platform` 的 `Health`；`kernel` 的错误、分页、ID/时钟类型；Bun 的 multipart/流读取；文档子模块的 Bun 文件读取与本地静态资源。
 - 禁止：导入任何 store；执行 SQL；直接使用 `FileStore` 或 Bun 文件 API 读写包/草稿；在路由层实现名称唯一、引用保护、版本递增、路径校验等业务规则；直接序列化领域实体；文档子模块接触数据库或领域服务。
 - 执行面路由分工：`poll` 直连 `scheduler` 并合并 `run` 的归档电平；`result` 先经 `run`（无 run 归属时委托调度器）；`session-log`/`archive` 直接经 `run` 透传流；网关不做 verdict/task.db/解包等业务解析。
 - 校验分工：HTTP 校验 multipart/JSON 形状、必填、类型、简单范围、未知字段、请求体大小；领域校验路径、文件数/总量、唯一性、引用、状态与事务不变量。

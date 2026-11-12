@@ -1,14 +1,17 @@
 ---
 layer: design
 module: workflow-orchestration
-status: draft
-updated: 2026-11-11
+status: verified
+updated: 2026-11-12
 flow: FLOW-RUN-004
 scenario: SCN-0304
 domain: 工作流编排
 valueStream: 工作流运行
 title: 运行归档
 entries:
+  - component: CMP-run
+    path: src/components/run/service.ts
+    symbol: createRunService
   - component: CMP-http-gateway
     path: src/components/http-gateway/app.ts
     symbol: createHttpApp
@@ -22,7 +25,15 @@ docs:
     heading: 4.5 `P-05` 上传运行归档
   - path: docs/design/components/run/spec.md
     heading: 4.7 归档
-tests: []
+tests:
+  - role: R1
+    id: TC-RUN-013
+  - role: R2
+    id: TC-RUN-014
+  - role: R3
+    id: TC-RUN-015
+  - role: N1
+    id: TC-RUN-016
 externalRefs: []
 ---
 
@@ -39,7 +50,7 @@ run 进入终态（`succeeded` / `failed` / `cancelled`）后，调度器通过 
 ## 2 入口
 
 - HTTP（执行面）：`P-01` `POST /api/v1/executor/poll` 的 `archiveRequests` / `archivedRuns` 字段；`P-05` `POST /api/v1/executor/runs/{runId}/archive`。
-- 领域：`CMP-run` 的 `archivePending` / `storeArchive`（`planned`）。
+- 领域：`CMP-run` 的 `archiveRequestsFor` / `storeArchive`。
 - 存储：`FileStore`（`CMP-platform` 实现）写 `<archive.root>/history/...`。
 
 ## 3 运行序
@@ -50,7 +61,7 @@ run 进入终态（`succeeded` / `failed` / `cancelled`）后，调度器通过 
 2. 该 client 下一次 `P-01`：响应增 `archiveRequests: [{runId, instanceId, taskSpacePath}]`；电平语义，直到 client 在 `archivedRuns` 中确认。
 3. client 打包 `<workspace>/.agent-flow/task/<runId>/` 为 tar.gz → `POST /runs/{runId}/archive`（`application/gzip`）。
 4. 服务端校验：run 存在且属于该 token 的 `clientId`；大小 ≤ `maxArchiveBytes`（512 MiB）；gzip/tar 可解且不含路径穿越；计算 sha256。
-5. 落盘：`<archive.root>/history/<instanceId>/<runId>/task-space.tar.gz`，并把该 run 各节点日志副本复制到同目录 `logs/<nodeId>-<visit>.jsonl.gz`；写 `run_artifact` 与 `archive_state = stored`。
+5. 落盘：`<archive.root>/history/<instanceId>/<runId>/task-space.tar.gz`，并把该 run 各节点日志副本复制到同目录 `logs/<nodeId>-<visit>-a<attempt>.jsonl.gz`；写 `run_artifact` 与 `archive_state = stored`。
 6. client 下一跳 poll 带 `archivedRuns: [runId]`：服务端停止为该 run 下发归档指令；重复上报幂等。
 7. 本地 `<workspace>/.agent-flow/task/<runId>/` 保留不删除；回收由运维按 `instanceId` 处理（与「工作区默认保留」一致）。
 
@@ -78,7 +89,7 @@ run 进入终态（`succeeded` / `failed` / `cancelled`）后，调度器通过 
 | R3 | `TC-RUN-015` | 重复上传返回 `200`，按后到覆盖只保留一份归档；`stored` 为 `created`/`replaced`/`unchanged` |
 | N1 | `TC-RUN-016` | 未知 run 或非本 client 上传 → `404`；损坏 tar.gz → `400 invalid_archive`；超限 → `413`；均不落盘、不改变 `archive_state` |
 
-测试落盘后补齐 frontmatter `tests` 并转 `designed`。
+测试已落盘（`tests/components/http-gateway/`），frontmatter `tests` 已补齐并转 `verified`。
 
 ## 6 覆盖边界
 

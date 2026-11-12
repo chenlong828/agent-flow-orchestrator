@@ -45,15 +45,15 @@ level: P1
 | ID | 类型 | 组件 | 范围 | 状态 | 出口 |
 |---|---|---|---|---|---|
 | `T-RUN-01` | design | global | P1 设计提案：切分、数据、契约 v3、DSL 变更、分期 | 完成（2026-11-11 已确认） | [`design-proposal.md`](design-proposal.md) |
-| `T-RUN-02` | design | global | 场景卡 `SCN-0301`–`SCN-0304` | 进行中（4 张 `draft` 已落） | `tests`/`entries` 随 `T-RUN-08` 补齐后转 `designed` |
+| `T-RUN-02` | design | global | 场景卡 `SCN-0301`–`SCN-0304` | 完成（2026-11-12，4 张 `verified`） | `tests`/`entries` 已随 `T-RUN-08` 补齐 |
 | `T-RUN-03` | design | global | 组件规格 `CMP-run`、契约 v3 定稿、`CMP-workflow`/`CMP-http-gateway`/`CMP-config`/`CMP-kernel`/`CMP-instance`/`CMP-scheduler`/`architecture` 规格增量 | 完成（2026-11-11，待第二次人工评审确认） | 规格冻结后进入 `T-RUN-04` |
 | `T-RUN-04` | change | kernel / platform / config | 迁移 `0002`：`workflow_run`/`run_node`/`run_artifact` 与活跃 run 唯一索引；`[run]` / `[archive]` 配置 | 完成（2026-11-11） | 迁移可重复执行；`bun run check` 339 pass |
-| `T-RUN-05` | change | run | `CMP-run` 服务：start / advance / verdict / rollback / confirm / cancel / archive | 实现完成，待收口（2026-11-12） | `tests/components/run` 10 例、`bun run check` 349 pass；`quality:gate` 11 项 WARN 待处理（文件拆分/复杂度/孤儿接线/表列数） |
-| `T-RUN-06` | change | http-gateway | 产品面 6 端点 + 执行面 `P-04`/`P-05` + `poll` 字段映射 + 组合根接线 | 实现完成，待收口（2026-11-12） | 3100 已起、协议 3、run 启动/查询/取消冒烟通过；openapi 与 `quality:gate` 待收口 |
+| `T-RUN-05` | change | run | `CMP-run` 服务：start / advance / verdict / rollback / confirm / cancel / archive | 完成（2026-11-12） | `tests/components/run` 13 例；模块拆分为 core/node-ops/dispatch-ops/advance/results/commands/queries/artifacts/store-*；`quality:gate` 0 违规 |
+| `T-RUN-06` | change | http-gateway | 产品面 6 端点 + 执行面 `P-04`/`P-05` + `poll` 字段映射 + 组合根接线 | 完成（2026-11-12） | openapi 已补 `API-42`–`API-47`（54 个业务端点、55 个 operation、38 个 path）；nodeId 校验改为图内稳定 ID；日志响应补 `X-Checksum-Sha256`；`quality:gate` 0 违规 |
 | `T-RUN-07` | change | workflow | DSL 7 类节点、删除 `fanin` 配对、`fanout` 前驱必须是 `split` | 完成（2026-11-12） | workflow 23 例、openapi/DSL schema 同步 |
-| `T-RUN-08` | verify | global | `SCN-0301`–`SCN-0304` 测试落地并转 `verified` | 待开始 | 四个场景全绿 |
-| `T-RUN-09` | verify | global | 与 `agent-flow-client` v3 联调：启动→end、review 回退、confirm 决策、cancel、日志与归档 | 待开始（前置：client 按修订版 v3 确认并实现） | 联调记录写入 `result.md` |
-| `T-RUN-10` | design | global | 按 client 评审修订契约 v3 与交接件（`B-01`–`B-04`、`D-01`–`D-10`） | 完成（2026-11-12） | 契约 §11.4 修订记录；交接件更新 |
+| `T-RUN-08` | verify | global | `SCN-0301`–`SCN-0304` 测试落地并转 `verified` | 完成（2026-11-12） | 4 个场景各 3 正 1 反（`TC-RUN-001`–`016`），`tests/components/http-gateway/run-*.test.ts` 全绿 |
+| `T-RUN-09` | verify | global | 与 `agent-flow-client` v3 联调：启动→end、review 回退、confirm 决策、cancel、日志与归档 | 待开始（阻塞：client 仍是 v2，前置未满足） | 联调记录写入 `result.md`；需用户决定 client 侧改造归属 |
+| `T-RUN-10` | design | global | 按 client 评审修订契约 v3 与交接件（`B-01`–`B-04`、`D-01`–`D-10`） | 完成（2026-11-12） | 契约 §11.4 修订记录；交接件更新；客户端待按修订版重新确认 |
 
 装载清单（开工前必读）：
 
@@ -63,7 +63,8 @@ level: P1
 - 实现记录（2026-11-12）：`CMP-run` 落 `src/components/run/`（`types`/`deps`/`store`/`service`/`prompt`/`verdict`/`archive`/`graph-checks`/`validate`）；DSL 落 `graph.ts`/`graph-analysis.ts`/`dsl.schema.json`/`openapi.yaml`；`instance.getByBinding` 与 kernel 新错误码/常量已落。
 - T-RUN-06 记录（2026-11-12）：新增 `task_space_path`（迁移 `0003_task_space.sql`、scheduler `TaskDraft`/`TaskEnvelope`），执行面协议升 3；`P-04`/`P-05` 与 `archiveRequests`/`archivedRuns` 已接线；产品面 `POST /workflows/{id}/runs`、`GET /runs`、`GET /runs/{id}`、`POST /runs/{id}/cancel`、决策与日志下载已实现；`3100` 已重启并验证 `/healthz`、`/openapi.yaml`、run 启动/取消。
 - 联调问题（2026-11-12）：取消的 run 若从未有成功节点，服务端仍下发 `archiveRequests`，客户端本地无 task-space 只能反复 `archive.skipped`。已修：`finishRun` 仅在存在成功节点时置 `pending`；`archiveRequestsFor` 对 `pending` 超过 10 分钟（`archivePendingTtlMs`）的 run 降级 `failed` 并停止下发；迁移 `0004` 回填存量。测试 13 例，`bun run check` 353 pass。
-- 质量门禁遗留（T-RUN-05/06）：`service.ts` 747 行 / `createRunService` 663 行 / 圈复杂度 24、8 处非空断言、`run/types.ts` 深导入 scheduler、10 个孤儿文件（未接组合根）、`workflow_run` 23 列；在 `T-RUN-06` 接线前先拆分 `run` 模块与收敛表列。
+- 质量门禁收口（2026-11-12）：`run` 模块拆为 `core`/`node-ops`/`dispatch-ops`/`advance`/`results`/`commands`/`queries`/`artifacts` + `store-*`；去掉全部非空断言与深导入；`workflow_run` 由迁移 `0005` 收敛到 20 列（`final_message`/`error` 合入 `result`，去掉冗余 `started_at`/`updated_by`）；`quality:gate` 0 违规。
+- 实现期修正（2026-11-12）：决策/日志端点的 `nodeId` 改为图内稳定 ID（不再按 UUID 校验）；图引用专家不存在改为 400；访问轮次用尽不再抛 409（结果已接受，仅置 run failed）；`RunSummary` 列表按契约移除 `workspacePath`/`taskSpacePath`/`autoConfirm`/`error`（详情仍返回）。
 - `T-RUN-05`：`T-RUN-03` 冻结的规格、`src/components/scheduler/service.ts`、`src/components/instance/service.ts`。
 - `T-RUN-06`：`T-RUN-03` 冻结的契约、`src/components/http-gateway/routes/executor.ts`、`src/components/http-gateway/routes/workflow.ts`。
 - `T-RUN-07`：`src/components/workflow/graph.ts`、`graph-analysis.ts`、`dsl.ts`、`dsl.schema.json`。
@@ -94,7 +95,7 @@ level: P1
 | session-log 体积 | 单节点日志可能上百 MB | 压缩上传 + 64 MiB 上限；超限时 client 先传 0 行空日志再报 `session_log_too_large`，任务正常失败结算，真实日志不保留（`R-001` 已接受） |
 | 节点失败语义 | 失败即终态，运维只能重开 run | 先按「失败即终态」实现；是否支持重试转 `OQ-28` |
 | 同一工作区并发 run | `S-06` 要求同实例并发任务同一技能集，不同 run 的专家不同 → 第二个 run 的 `enqueue` 会被拒 | 同工作区同一时刻只允许一个活跃 run，启动第二个返回 `409 run_conflict`；fan-out 在同一 run 内并发（第二期） |
-| client 契约副本与实现未同步 | `T-RUN-09` 阻塞：client 仓库仍是 `executor-http-v2`，没有 task-space、日志与归档 | 在本仓库交付调度器侧后，于 `agent-flow-client` 另立工序：同步契约 v3 副本 + 实现 `P-04`/`P-05`、`taskSpacePath`、归档与协议 3；联调排最后 |
+| client 契约副本与实现未同步 | `T-RUN-09` 阻塞：client 仓库 HEAD 仍是 `executor-http-v2`；工作区已有未提交的 v3 实现与部分联调记录（`agent-flow-client/docs/works/2026-11-12-contract-v3-handoff/result.md`），但未提交、未确认 | 联调前需确认 client 工作区 v3 版本可作为被测版本，并补 review 回退/confirm/cancel 场景 |
 
 ## 8 领取的开放问题
 

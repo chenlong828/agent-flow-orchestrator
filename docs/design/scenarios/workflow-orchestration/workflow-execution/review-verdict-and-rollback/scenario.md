@@ -1,14 +1,17 @@
 ---
 layer: design
 module: workflow-orchestration
-status: draft
-updated: 2026-11-11
+status: verified
+updated: 2026-11-12
 flow: FLOW-RUN-002
 scenario: SCN-0302
 domain: 工作流编排
 valueStream: 工作流运行
 title: 节点判定、回退与会话日志回传
 entries:
+  - component: CMP-run
+    path: src/components/run/service.ts
+    symbol: createRunService
   - component: CMP-http-gateway
     path: src/components/http-gateway/app.ts
     symbol: createHttpApp
@@ -24,7 +27,15 @@ docs:
     heading: 4.5 判定与回退
   - path: docs/design/components/scheduler/spec.md
     heading: 4 状态机与不变量
-tests: []
+tests:
+  - role: R1
+    id: TC-RUN-005
+  - role: R2
+    id: TC-RUN-006
+  - role: R3
+    id: TC-RUN-007
+  - role: N1
+    id: TC-RUN-008
 externalRefs: []
 ---
 
@@ -41,7 +52,7 @@ externalRefs: []
 ## 2 入口
 
 - HTTP（执行面）：`POST /api/v1/executor/tasks/{taskId}/session-log?attempt=n`（`P-04`）；`POST /api/v1/executor/tasks/{taskId}/result`（`P-02`，经 `CMP-run` 包装）。
-- 领域：`CMP-run` 的 `attachSessionLog` / `handleTaskResult`（`planned`）；`CMP-scheduler.acceptResult`（不变）。
+- 领域：`CMP-run` 的 `attachSessionLog` / `handleTaskResult`；`CMP-scheduler.acceptResult`（不变）。
 - 读：`GET /api/v1/runs/{id}/nodes/{nodeId}/session-log`（产品面）。
 
 ## 3 运行序
@@ -82,7 +93,7 @@ externalRefs: []
 | R3 | `TC-RUN-007` | 回退轮次用尽（`visit > max_node_visits`）→ `run.failed(visit_limit_exceeded)`，不再入队 |
 | N1 | `TC-RUN-008` | 未上传日志直接报结果 → `409 session_log_missing`，任务不结算；补传后重试成功；verdict 非法 → 节点 `failed(verdict_invalid)`，run 失败 |
 
-测试落盘后补齐 frontmatter `tests` 并转 `designed`。
+测试已落盘（`tests/components/http-gateway/`），frontmatter `tests` 已补齐并转 `verified`。
 
 ## 6 覆盖边界
 

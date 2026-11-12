@@ -7,16 +7,16 @@ updated: 2026-11-11
 
 # B1+B3 架构与契约边界
 
-> 范围：B1 资产注册中心（Harness、工具、Skill、专家）+ B3 工作流定义。B4 实例/运行不在本文。
+> 范围：B1 资产注册中心（Harness、工具、Skill、专家）、B3 工作流定义与 B4 运行编排。
 > 本文冻结组件边界、依赖方向、数据所有权与契约规则；列级数据库设计已落入 [`db/migrations/`](../../db/migrations/)。REST API 明细见 [`components/http-gateway/spec.md`](components/http-gateway/spec.md)，实施结果见 [`result.md`](../history/works/2026-10-24-db-backend-infra/result.md)（归档件，仅作追溯）。
 
 ## 1 结论
 
-1. 一个 Bun 进程、一个 PostgreSQL 数据库、13 个组件：共享契约、启动配置、运行时平台、四类资产、工作流定义、只读目录、HTTP 网关，以及执行面的运行编排、调度器与实例登记（运行编排 `planned`，调度器与实例 `active`，见 §3）。
+1. 一个 Bun 进程、一个 PostgreSQL 数据库、13 个组件：共享契约、启动配置、运行时平台、四类资产、工作流定义、只读目录、HTTP 网关，以及执行面的运行编排、调度器与实例登记（运行编排、调度器与实例均 `active`，见 §3）。
 2. 外部契约只有 **REST API `/api/v1`**；本仓库不提供 CLI、库或产品 UI。UI 是独立项目，若接入只按契约调用；双方互不进入对方项目改代码。Swagger UI 仅作为开发者文档，不是产品界面。
 3. 内部契约按同一原则逐层收窄：函数/类 → 组件 → 模块 → 进程/项目；每层只通过公开契约交互，不越过边界读写对方内部。
 4. 每个组件只有一个主目标；数据只有一个写入口；读模型通过公开读契约组合。
-5. 38 个 B1 业务端点 + 10 个 B3 工作流端点 = 48 个已实现产品业务端点；运行编排另有 6 个 planned 端点（实现后 54）。执行面另有 3 个已实现端点（`/api/v1/executor/*`）与 2 个 planned 端点（`EXE-04`/`EXE-05`），均不计入产品端点；另有 `/healthz` 与开发者文档端点 `/docs`、`/docs/*`、`/openapi.yaml`，不计入业务端点。
+5. 38 个 B1 业务端点 + 10 个 B3 工作流端点 + 6 个运行编排端点 = 54 个已实现产品业务端点。执行面另有 5 个已实现端点（`/api/v1/executor/*`），不计入产品端点；另有 `/healthz` 与开发者文档端点 `/docs`、`/docs/*`、`/openapi.yaml`，不计入业务端点。
 
 ## 2 契约边界原则
 
@@ -59,11 +59,11 @@ updated: 2026-11-11
 | `CMP-catalog` | 组合跨资产的列表/详情/文档/整包/引用只读投影，并实现 `ReferenceGuard`；Harness 节点状态按调度器 presence 派生 | 无 | 四类资产与工作流的公开读契约、`scheduler` 的 presence 读、`kernel` |
 | `CMP-scheduler` | 维护执行面任务列表（`queued`/`dispatched`/`done`）、派发裁决、重派与结果接受 | `task`、`task_attempt` | `instance`（读）、`kernel`（`SkillPackageSource` 端口）、`platform` |
 | `CMP-instance` | 维护执行实例：工作区路径、client 绑定与可用性状态 | `instance` | `platform`、`kernel` |
-| `CMP-run`（planned） | 维护一次工作流运行的编排：启动快照、节点推进、判定与回退、人工确认、取消、制品登记与归档指令 | `workflow_run`、`run_node`、`run_artifact`；`archive.root` 下的归档与日志 | `workflow`（读）、`expert`（读）、`harness`（读）、`instance`、`scheduler`、`kernel`、`platform` |
+| `CMP-run` | 维护一次工作流运行的编排：启动快照、节点推进、判定与回退、人工确认、取消、制品登记与归档指令 | `workflow_run`、`run_node`、`run_artifact`；`archive.root` 下的归档与日志 | `workflow`（读）、`expert`（读）、`harness`（读）、`instance`、`scheduler`、`kernel`、`platform` |
 | `CMP-http-gateway` | 把 HTTP 请求翻译为用例调用、映射 DTO/错误，处理 multipart/下载，并托管开发者 API 文档；含执行面 `executor` 路由 | 无 | `catalog`、四类资产与工作流写服务、`run`、`scheduler`、`kernel`（`SkillPackageSource` 端口）、`platform`（健康检查）、Bun HTTP/流 API |
 
-- `CMP-scheduler` 与 `CMP-instance` 是执行面组件，状态 `active`（2026-11-11 实现）；`CMP-run` 是运行编排组件，状态 `planned`（2026-11-11 设计冻结）；其余 10 个组件状态 `current`。
-- 执行面端点 `EXE-01`–`EXE-03` 由 `CMP-http-gateway` 承载，契约权威是 [`contracts/executor-http-v3.md`](contracts/executor-http-v3.md)；`EXE-04`/`EXE-05` 与运行编排端点按 [`contracts/executor-http-v3.md`](contracts/executor-http-v3.md) 设计冻结、尚未实现。组件落点见 [`components/scheduler/spec.md`](components/scheduler/spec.md)、[`components/instance/spec.md`](components/instance/spec.md) 与 [`components/run/spec.md`](components/run/spec.md)。
+- `CMP-scheduler`、`CMP-instance` 与 `CMP-run` 是执行面组件，状态 `active`（调度器/实例 2026-11-11、运行编排 2026-11-12 实现）；其余 10 个组件状态 `current`。
+- 执行面端点 `EXE-01`–`EXE-05` 由 `CMP-http-gateway` 承载，运行编排端点 `API-42`–`API-47` 由 `CMP-run` 承载；契约权威分别是 [`contracts/executor-http-v3.md`](contracts/executor-http-v3.md) 与 [`components/http-gateway/spec.md`](components/http-gateway/spec.md) §4.1.1。组件落点见 [`components/scheduler/spec.md`](components/scheduler/spec.md)、[`components/instance/spec.md`](components/instance/spec.md) 与 [`components/run/spec.md`](components/run/spec.md)。
 - 节点目录（Harness 绑定 `clientId`、`NodeDirectory` 端口、Harness 派生在线状态）见 [`components/harness/spec.md`](components/harness/spec.md) §3.3、[`components/catalog/spec.md`](components/catalog/spec.md) §4。
 
 组件 ID 与目录：`CMP-*` 对应 `docs/design/components/<short-name>/spec.md`；任务表可用去掉 `CMP-` 的简称。`kernel`、`config`、`platform` 是三个独立组件；物理目录可用 `src/core/{kernel,config,platform}` 收口，但 `core` 只是容器，不是组件。
@@ -161,7 +161,7 @@ config
 ## 6 外部 REST 契约
 
 - 基础路径：`/api/v1`；健康检查：`/healthz`（不在 `/api/v1` 下）。
-- 48 个已实现的产品业务端点：B1 38 个（Harness 8、工具 6、Skill 15、专家 9）+ B3 工作流 10 个；运行编排工序另有 6 个 planned 端点（`API-42`–`API-47`，实现后 54）。执行面另有 3 个已实现端点（`EXE-01`–`EXE-03`）与 2 个 planned 端点（`EXE-04`/`EXE-05`），不计入产品端点；语义权威为 [`contracts/executor-http-v3.md`](contracts/executor-http-v3.md)。
+- 54 个已实现的产品业务端点：B1 38 个（Harness 8、工具 6、Skill 15、专家 9）+ B3 工作流 10 个 + 运行编排 6 个（`API-42`–`API-47`）。执行面另有 5 个已实现端点（`EXE-01`–`EXE-05`），不计入产品端点；语义权威为 [`contracts/executor-http-v3.md`](contracts/executor-http-v3.md)。
 - 开发者文档：Swagger UI `/docs`、静态资源 `/docs/*`、OpenAPI `/openapi.yaml`；OpenAPI 资产由 `CMP-http-gateway` 直接提供，不在 `docs/` 维护设计副本；不计入业务端点，不写入 OpenAPI `paths`。
 - 契约明细：方法、路径、查询参数、请求/响应 DTO、错误码、并发头、删除引用列表，全部在 [`components/http-gateway/spec.md`](components/http-gateway/spec.md)。
 - 外部 UI 页面映射（参考）：Harness 页、工具页、Skill 页、专家页、工作流页；本仓库无 Key/工作区/实例/看板端点。
@@ -196,12 +196,13 @@ config
 
 ## 10 实施状态
 
-- 当前 12 个已实现组件、22 张表、2 个只向前迁移（`0001_baseline.sql` + `0002_workflow_run.sql`）；`CMP-run` 仍为 `planned`（三张表已落库，服务未实现）；REST 48 个已实现产品业务端点（另有 6 个 planned）+ `/healthz`；执行面 3 个已实现端点（另有 2 个 planned）。
-- B1 资产注册中心与 B3 工作流定义已实现并通过验证；节点目录（`API-41` + `client_id`/`client_token` + `NodeDirectory`/`ExecutorAuthenticator` + 派生 `health`/`lastHeartbeatAt`）与执行面调度层（`P-01`–`P-03` + `S-01`–`S-08`）已实现；B4 运行编排已设计冻结、未实现；B2 Key/工作区、看板与 ACP 执行模型未实现。
+- 当前 13 个已实现组件、22 张表、5 个只向前迁移（`0001_baseline.sql`、`0002_workflow_run.sql`、`0003_task_space.sql`、`0004_archive_state_backfill.sql`、`0005_workflow_run_width.sql`）；REST 54 个已实现产品业务端点 + `/healthz`；执行面 5 个已实现端点。
+- B1 资产注册中心与 B3 工作流定义已实现并通过验证；节点目录（`API-41` + `client_id`/`client_token` + `NodeDirectory`/`ExecutorAuthenticator` + 派生 `health`/`lastHeartbeatAt`）、执行面调度层（`P-01`–`P-03` + `S-01`–`S-08`）与 B4 运行编排（`API-42`–`API-47`、`P-04`/`P-05`、DSL 7 类节点）已实现；B2 Key/工作区、看板与 ACP 执行模型未实现。
 - Skill 包形态 v2 已落地：草稿/保存/下载与 `GET /skills/{id}/document`；不再提供 `POST /skills`、`PUT /skills/{id}`。
 - `ReferenceGuard` 按端口方案实现：端口在 `kernel`，由 `catalog` 实现，领域删除服务经组合根注入。
-- 组件状态：10 个 `current` + `CMP-scheduler`/`CMP-instance` 两个 `active` + `CMP-run` 一个 `planned`；历史实现见 [`result.md`](../history/works/2026-10-24-db-backend-infra/result.md)（归档件，仅作追溯）。
+- 组件状态：10 个 `current` + `CMP-scheduler`/`CMP-instance`/`CMP-run` 三个 `active`；历史实现见 [`result.md`](../history/works/2026-10-24-db-backend-infra/result.md)（归档件，仅作追溯）。
 - 2026-10-29：`CMP-workflow` P1 冻结，10 个端点与三张表已实现；B4 运行不在本批。
 - 2026-11-11：节点类型收敛为 7 类（删 `fanin`），运行编排与执行面 v3 设计冻结；见 [`decisions/2026-11-11-workflow-run-orchestration.md`](../history/decisions/2026-11-11-workflow-run-orchestration.md)。
+- 2026-11-12：运行编排服务与 6 个产品端点、执行面 `P-04`/`P-05` 落地；`workflow_run` 表由 `0005` 收敛到 20 列（`final_message`/`error` 合入 `result`，去掉冗余的 `started_at`/`updated_by`）。
 - 2026-10-29：`http-gateway` 协议件与按资源路由分离，`app.ts` 只保留入口、健康检查与分派；REST 契约不变。
 - `CMP-config` 已从 `CMP-platform` 拆出；启动配置历史见 [`core-config/result.md`](../history/works/2026-10-25-core-config/result.md)（归档件，仅作追溯）。

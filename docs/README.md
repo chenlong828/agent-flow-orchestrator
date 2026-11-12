@@ -30,7 +30,7 @@ docs/
 │   │   ├── http-gateway/spec.md
 │   │   ├── scheduler/spec.md               ← 执行面任务列表与派发（active）
 │   │   ├── instance/spec.md                ← 执行面实例与工作区登记（active）
-│   │   └── run/spec.md                     ← 工作流运行编排（planned）
+│   │   └── run/spec.md                     ← 工作流运行编排（active）
 │   └── scenarios/
 │       ├── _index.md
 │       ├── agent-capability-assets/
@@ -57,7 +57,7 @@ docs/
 │           │   ├── executor-control-signals/scenario.md
 │           │   ├── executor-protocol-gate/scenario.md
 │           │   └── executor-node-registry/scenario.md
-│           └── workflow-execution/         ← 工作流运行（draft，随 REQ-0001）
+│           └── workflow-execution/         ← 工作流运行（4 张 verified）
 │               ├── run-start-and-node-advance/scenario.md
 │               ├── review-verdict-and-rollback/scenario.md
 │               ├── confirm-and-run-control/scenario.md
@@ -96,7 +96,7 @@ docs/
 8. [`design/components/kernel/spec.md`](design/components/kernel/spec.md) 与 [`config/spec.md`](design/components/config/spec.md) —— 共享错误/分页/端口，以及 TOML 启动配置
 9. [`design/components/http-gateway/spec.md`](design/components/http-gateway/spec.md) —— 对外 REST 契约；运行时 `/openapi.yaml` 与 Swagger UI `/docs` 由 `CMP-http-gateway` 直接提供；外部项目若接入按此消费
 10. [`design/components/workflow/spec.md`](design/components/workflow/spec.md) —— `CMP-workflow` 的聚合、图保存/校验、DSL 与专家引用投影
-    - 执行面：[`design/components/scheduler/spec.md`](design/components/scheduler/spec.md) 与 [`instance/spec.md`](design/components/instance/spec.md) —— 任务列表、派发/重派/结果接受，以及实例与工作区登记（`active`）；[`design/components/run/spec.md`](design/components/run/spec.md) —— 运行编排、判定回退、确认、取消与归档（`planned`）
+    - 执行面：[`design/components/scheduler/spec.md`](design/components/scheduler/spec.md) 与 [`instance/spec.md`](design/components/instance/spec.md) —— 任务列表、派发/重派/结果接受，以及实例与工作区登记（`active`）；[`design/components/run/spec.md`](design/components/run/spec.md) —— 运行编排、判定回退、确认、取消与归档（`active`）
 11. [`design/contracts/executor-http-v3.md`](design/contracts/executor-http-v3.md) —— 执行面契约（现行）：五个端点、at-least-once、task-space、会话日志与运行归档、客户端承诺与调度器职责；调度器侧落点见 [`components/scheduler/spec.md`](design/components/scheduler/spec.md)、[`components/instance/spec.md`](design/components/instance/spec.md) 与 [`components/run/spec.md`](design/components/run/spec.md)；决策记录见 [`history/decisions/2026-11-11-workflow-run-orchestration.md`](history/decisions/2026-11-11-workflow-run-orchestration.md)
 12. [`history/works/2026-10-28-workflow-definition/result.md`](history/works/2026-10-28-workflow-definition/result.md) —— B3 工作流定义实现结果与验证记录
 13. [`playbook/backend-contract-boundaries.md`](playbook/backend-contract-boundaries.md) —— 后端聚合写、列表读模型与 BFF 边界的可复用判定；与现行规格冲突时以规格为准

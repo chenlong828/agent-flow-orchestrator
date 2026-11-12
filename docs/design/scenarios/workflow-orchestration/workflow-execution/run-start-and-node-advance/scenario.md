@@ -1,14 +1,17 @@
 ---
 layer: design
 module: workflow-orchestration
-status: draft
-updated: 2026-11-11
+status: verified
+updated: 2026-11-12
 flow: FLOW-RUN-001
 scenario: SCN-0301
 domain: 工作流编排
 valueStream: 工作流运行
 title: 运行启动与节点推进
 entries:
+  - component: CMP-run
+    path: src/components/run/service.ts
+    symbol: createRunService
   - component: CMP-http-gateway
     path: src/components/http-gateway/app.ts
     symbol: createHttpApp
@@ -32,7 +35,15 @@ docs:
     heading: 3 公共契约
   - path: docs/design/components/workflow/spec.md
     heading: 5.1 节点类型与执行语义
-tests: []
+tests:
+  - role: R1
+    id: TC-RUN-001
+  - role: R2
+    id: TC-RUN-002
+  - role: R3
+    id: TC-RUN-003
+  - role: N1
+    id: TC-RUN-004
 externalRefs: []
 ---
 
@@ -49,7 +60,7 @@ externalRefs: []
 ## 2 入口
 
 - HTTP：`CMP-http-gateway` 的 `createHttpApp` → `POST /api/v1/workflows/{id}/runs`。
-- 领域：`CMP-run` 的 `createRunService`（`planned`，实现后补 `entries`）：`start` / `advance`。
+- 领域：`CMP-run` 的 `createRunService`：`start` / `advance`。
 - 读：`CMP-workflow` 的 `createWorkflowRead`：取当前定义与图；`CMP-harness` 的节点目录读：`harnessId` → `clientId`。
 - 执行面：`CMP-instance.enroll` 登记实例；`CMP-scheduler.enqueue` 入队节点任务。
 
