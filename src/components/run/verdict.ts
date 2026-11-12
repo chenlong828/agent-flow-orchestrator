@@ -2,10 +2,11 @@
 export function parseVerdict(message: string): { verdict: "pass" | "fail"; reason?: string } | null {
   const blocks = [...message.matchAll(/```json\s*([\s\S]*?)```/g)];
   const last = blocks.at(-1);
-  if (last === undefined) return null;
+  const body = last?.[1];
+  if (body === undefined) return null;
   let parsed: unknown;
   try {
-    parsed = JSON.parse(last[1]!.trim());
+    parsed = JSON.parse(body.trim());
   } catch {
     return null;
   }

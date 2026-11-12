@@ -20,6 +20,7 @@ import { createSkillDraftService } from "../../src/components/skill/draft-servic
 import { createSkillPackageSource } from "../../src/components/skill/package-source.ts";
 import { createInstanceService } from "../../src/components/instance/index.ts";
 import { createScheduler } from "../../src/components/scheduler/index.ts";
+import { createRunService } from "../../src/components/run/index.ts";
 import { createExecutorBackend } from "../../src/executor-backend.ts";
 import { createExpertRead, createExpertService } from "../../src/components/expert/index.ts";
 import {
@@ -48,6 +49,8 @@ export type TestContext = {
   instanceService: ReturnType<typeof createInstanceService>;
   packages: ReturnType<typeof createSkillPackageSource>;
   scheduler: ReturnType<typeof createScheduler>;
+  runService: ReturnType<typeof createRunService>;
+  archiveRoot: string;
   authenticator: ReturnType<typeof createHarnessAuthenticator>;
   backend: ReturnType<typeof createExecutorBackend>;
 };
@@ -56,9 +59,9 @@ export async function createTestContext(): Promise<TestContext> {
   const db = await getTestDb();
   const harnessRead = createHarnessRead({ db });
   const toolRead = createToolRead({ db });
-  const skillStore = createFileStore(
-    join(await mkdtemp(join(tmpdir(), "agentflow-app-")), "skills"),
-  );
+  const storageRoot = await mkdtemp(join(tmpdir(), "agentflow-app-"));
+  const skillStore = createFileStore(join(storageRoot, "skills"));
+  const archiveRoot = join(storageRoot, "archive");
   const catalogSkillRead = createSkillRead(db, skillStore);
   const expertRead = createExpertRead({ db });
   const workflowRead = createWorkflowRead({ db });
@@ -79,6 +82,19 @@ export async function createTestContext(): Promise<TestContext> {
     retryDelayMs: 0,
   });
   const authenticator = createHarnessAuthenticator({ db });
+  const runService = createRunService({
+    db,
+    clock: systemClock,
+    ids: uuidv7Ids,
+    fileStore: createFileStore(archiveRoot),
+    workflowRead,
+    expertRead,
+    harnessRead,
+    instance: instanceService,
+    scheduler,
+    defaultTimeoutMs: 60000,
+    maxNodeVisits: 5,
+  });
   const catalog = createCatalog({
     harnessRead,
     presence: scheduler,
@@ -148,7 +164,7 @@ export async function createTestContext(): Promise<TestContext> {
     expertStatus: expertRead,
   });
 
-  const backend = createExecutorBackend({ scheduler, packages, authenticator });
+  const backend = createExecutorBackend({ scheduler, packages, authenticator, run: runService });
   const app = createHttpApp({
     catalog,
     backend,
@@ -158,6 +174,7 @@ export async function createTestContext(): Promise<TestContext> {
     skillDraftService,
     expertService,
     workflowService,
+    runService,
     health: createHealth(db),
     actor: "tester",
   });
@@ -180,6 +197,8 @@ export async function createTestContext(): Promise<TestContext> {
     instanceService,
     packages,
     scheduler,
+    runService,
+    archiveRoot,
     authenticator,
     backend,
   };

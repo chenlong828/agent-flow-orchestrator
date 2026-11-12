@@ -13,13 +13,6 @@ export function ensureAbsolutePath(field: string, value: unknown): string {
   return value.replace(/\/+$/, "");
 }
 
-export function ensureRunSelector(value: unknown, field: string): string {
-  if (typeof value !== "string" || !/^[0-9a-f-]{36}$/i.test(value)) {
-    throw new ValidationError(field, "必须是 UUID");
-  }
-  return value;
-}
-
 export function ensureAttempt(value: unknown): number {
   const attempt = Number(value);
   if (!Number.isInteger(attempt) || attempt < 1 || attempt > 100) {

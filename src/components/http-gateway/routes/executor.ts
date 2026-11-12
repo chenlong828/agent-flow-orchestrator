@@ -74,25 +74,53 @@ async function authenticate(
   return clientId;
 }
 
+type Matcher = (ctx: ExecutorContext, clientId: string) => Promise<Response> | null;
+
+function matchPoll(ctx: ExecutorContext, clientId: string): Promise<Response> | null {
+  if (ctx.segments.length !== 2 || ctx.segments[1] !== "poll") return null;
+  if (ctx.request.method !== "POST") return null;
+  return poll(ctx, clientId);
+}
+
+function matchResult(ctx: ExecutorContext, clientId: string): Promise<Response> | null {
+  const taskId = ctx.segments[2];
+  if (ctx.segments[1] !== "tasks" || ctx.segments[3] !== "result") return null;
+  if (taskId === undefined || ctx.request.method !== "POST") return null;
+  return acceptResult(ctx, clientId, taskId);
+}
+
+function matchSessionLog(ctx: ExecutorContext, clientId: string): Promise<Response> | null {
+  const taskId = ctx.segments[2];
+  if (ctx.segments[1] !== "tasks" || ctx.segments[3] !== "session-log") return null;
+  if (taskId === undefined || ctx.request.method !== "POST") return null;
+  return uploadSessionLog(ctx, clientId, taskId);
+}
+
+function matchArchive(ctx: ExecutorContext, clientId: string): Promise<Response> | null {
+  const runId = ctx.segments[2];
+  if (ctx.segments[1] !== "runs" || ctx.segments[3] !== "archive") return null;
+  if (runId === undefined || ctx.request.method !== "POST") return null;
+  return uploadArchive(ctx, clientId, runId);
+}
+
+function matchSkillPackage(ctx: ExecutorContext, clientId: string): Promise<Response> | null {
+  const packageId = ctx.segments[2];
+  if (ctx.segments[1] !== "skill-packages" || ctx.segments.length !== 3) return null;
+  if (packageId === undefined || ctx.request.method !== "GET") return null;
+  return skillPackage(ctx, packageId);
+}
+
 async function route(ctx: ExecutorContext, clientId: string): Promise<Response> {
-  const { request, segments } = ctx;
-  if (segments.length === 2 && segments[1] === "poll" && request.method === "POST") {
-    return poll(ctx, clientId);
-  }
-  const taskId = segments[2];
-  if (segments[1] === "tasks" && segments[3] === "result" && taskId !== undefined && request.method === "POST") {
-    return acceptResult(ctx, clientId, taskId);
-  }
-  if (segments[1] === "tasks" && segments[3] === "session-log" && taskId !== undefined && request.method === "POST") {
-    return uploadSessionLog(ctx, clientId, taskId);
-  }
-  const runId = segments[2];
-  if (segments[1] === "runs" && segments[3] === "archive" && runId !== undefined && request.method === "POST") {
-    return uploadArchive(ctx, clientId, runId);
-  }
-  const packageId = segments[2];
-  if (segments[1] === "skill-packages" && segments.length === 3 && packageId !== undefined && request.method === "GET") {
-    return skillPackage(ctx, packageId);
+  const matchers: Matcher[] = [
+    matchPoll,
+    matchResult,
+    matchSessionLog,
+    matchArchive,
+    matchSkillPackage,
+  ];
+  for (const matcher of matchers) {
+    const response = await matcher(ctx, clientId);
+    if (response !== null) return response;
   }
   throw new ValidationError("path", "执行面路径不支持");
 }

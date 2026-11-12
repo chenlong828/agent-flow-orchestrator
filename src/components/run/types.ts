@@ -1,5 +1,5 @@
 import type { Page, PageQuery } from "../../core/kernel/index.ts";
-import type { TaskResult } from "../scheduler/types.ts";
+import type { TaskResult } from "../scheduler/index.ts";
 import type { NodeType, WorkflowGraph } from "../workflow/index.ts";
 
 export type RunState = "created" | "running" | "waiting_confirm" | "done";
@@ -20,7 +20,7 @@ export type StartRun = {
   workspacePath: string;
   intentMarkdown: string;
   autoConfirm?: boolean;
-  actor?: string;
+  actor: string | null;
 };
 
 export type RunNodeView = {
@@ -36,29 +36,30 @@ export type RunNodeView = {
   finishedAt: string | null;
 };
 
-export type RunDetail = {
+export type RunSummary = {
   runId: string;
   workflowId: string;
   workflowRevision: number;
   harnessId: string;
   clientId: string;
   instanceId: string;
-  workspacePath: string;
-  taskSpacePath: string;
-  autoConfirm: boolean;
   state: RunState;
   outcome: RunOutcome | null;
   currentNodeId: string | null;
   archiveState: ArchiveState;
-  nodes: RunNodeView[];
-  finalMessage: string | null;
-  error: { code: string; message: string } | null;
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
 };
 
-export type RunSummary = Omit<RunDetail, "nodes" | "finalMessage">;
+export type RunDetail = RunSummary & {
+  workspacePath: string;
+  taskSpacePath: string;
+  autoConfirm: boolean;
+  finalMessage: string | null;
+  error: { code: string; message: string } | null;
+  nodes: RunNodeView[];
+};
 
 export type RunQuery = { workflowId?: string; state?: RunState; page: PageQuery };
 
@@ -90,8 +91,8 @@ export type DecideInput = {
   runId: string;
   nodeId: string;
   decision: "pass" | "reject";
-  comment?: string;
-  actor?: string;
+  comment: string | null;
+  actor: string | null;
 };
 
 export type RunService = {

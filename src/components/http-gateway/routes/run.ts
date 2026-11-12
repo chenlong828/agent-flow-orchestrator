@@ -3,7 +3,7 @@ import type { RunService, RunState } from "../../run/index.ts";
 import { RUN_START_FIELDS, RUN_DECISION_FIELDS } from "../fields.ts";
 import { pagePayload } from "../queries.ts";
 import { json } from "../respond.ts";
-import { actorFrom, assertUuid, parsePageQuery, queryValue, readJsonObject } from "../validation.ts";
+import { actorFrom, assertNodeId, assertUuid, parsePageQuery, queryValue, readJsonObject } from "../validation.ts";
 import type { RouteContext } from "./types.ts";
 
 const RUN_STATES: RunState[] = ["created", "running", "waiting_confirm", "done"];
@@ -19,7 +19,7 @@ export async function handleRun(ctx: RouteContext): Promise<Response> {
   }
   if (segments.length === 3 && segments[2] === "cancel") return cancelRun(ctx, runService, id);
   if (segments.length === 5 && segments[2] === "nodes" && segments[4] === "decision") {
-    return decide(ctx, runService, id, assertUuid(segments[3], "nodeId"));
+    return decide(ctx, runService, id, assertNodeId(segments[3], "nodeId"));
   }
   if (segments.length === 5 && segments[2] === "nodes" && segments[4] === "session-log") {
     return sessionLog(ctx, runService, id, segments[3] ?? "");
@@ -36,9 +36,7 @@ export async function startRun(ctx: RouteContext, workflowId: string): Promise<R
     workspacePath: String(body.workspacePath ?? ""),
     intentMarkdown: String(body.intentMarkdown ?? ""),
     ...(body.autoConfirm === undefined ? {} : { autoConfirm: body.autoConfirm === true }),
-    ...(actorFrom(ctx.request, ctx.deps.actor) === undefined
-      ? {}
-      : { actor: actorFrom(ctx.request, ctx.deps.actor) }),
+    actor: actorFrom(ctx.request, ctx.deps.actor),
   });
   return json({ runId: detail.runId }, 201, { Location: `/api/v1/runs/${detail.runId}` });
 }
@@ -85,10 +83,8 @@ async function decide(
       runId,
       nodeId,
       decision: body.decision,
-      ...(typeof body.comment === "string" ? { comment: body.comment } : {}),
-      ...(actorFrom(ctx.request, ctx.deps.actor) === undefined
-        ? {}
-        : { actor: actorFrom(ctx.request, ctx.deps.actor) }),
+      comment: typeof body.comment === "string" ? body.comment : null,
+      actor: actorFrom(ctx.request, ctx.deps.actor) ?? null,
     }),
   );
 }
@@ -100,7 +96,7 @@ async function sessionLog(
   nodeId: string,
 ): Promise<Response> {
   if (ctx.request.method !== "GET") throw new NotFoundError("路径", ctx.path);
-  assertUuid(nodeId, "nodeId");
+  assertNodeId(nodeId, "nodeId");
   const visit = queryValue(ctx.url, "visit");
   const attempt = queryValue(ctx.url, "attempt");
   const parsedVisit = visit === undefined ? undefined : Number(visit);
@@ -124,6 +120,7 @@ async function sessionLog(
       "content-type": "application/x-ndjson",
       "content-encoding": "gzip",
       "content-length": String(log.sizeBytes),
+      "x-checksum-sha256": log.sha256,
       "x-content-type-options": "nosniff",
     },
   });

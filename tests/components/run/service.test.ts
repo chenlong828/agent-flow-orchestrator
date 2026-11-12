@@ -234,6 +234,7 @@ describe("CMP-run 启动与推进", () => {
       harnessId: h.harnessId,
       workspacePath: "/work/linear",
       intentMarkdown: "写一个函数",
+      actor: null,
     });
     expect(run.state).toBe("running");
     expect(run.taskSpacePath).toBe(`/work/linear/.agent-flow/task/${run.runId}`);
@@ -266,6 +267,7 @@ describe("CMP-run 启动与推进", () => {
       harnessId: h.harnessId,
       workspacePath: "/work/missing-log",
       intentMarkdown: "x",
+      actor: null,
     });
     const taskId = await dispatchedTaskId(h.runService, run.runId);
     await expect(report(h.runService, h.clientId, taskId, "succeeded", "ok")).rejects.toMatchObject({
@@ -282,6 +284,7 @@ describe("CMP-run 启动与推进", () => {
       harnessId: h.harnessId,
       workspacePath: "/work/conflict",
       intentMarkdown: "x",
+      actor: null,
     });
     await expect(
       h.runService.start({
@@ -289,6 +292,7 @@ describe("CMP-run 启动与推进", () => {
         harnessId: h.harnessId,
         workspacePath: "/work/conflict",
         intentMarkdown: "y",
+      actor: null,
       }),
     ).rejects.toMatchObject({ code: "run_conflict" });
   });
@@ -302,6 +306,7 @@ describe("CMP-run 判定与回退", () => {
       harnessId: h.harnessId,
       workspacePath: "/work/review",
       intentMarkdown: "x",
+      actor: null,
     });
     await driveSucceeded(h, run.runId, 2);
     const reviewTask = await dispatchedTaskId(h.runService, run.runId);
@@ -332,6 +337,7 @@ describe("CMP-run 判定与回退", () => {
       harnessId: h.harnessId,
       workspacePath: "/work/verdict",
       intentMarkdown: "x",
+      actor: null,
     });
     await driveSucceeded(h, run.runId, 2);
     const reviewTask = await dispatchedTaskId(h.runService, run.runId);
@@ -353,6 +359,7 @@ describe("CMP-run 人工确认与取消", () => {
       harnessId: h.harnessId,
       workspacePath: "/work/confirm",
       intentMarkdown: "x",
+      actor: null,
     });
     await driveSucceeded(h, run.runId, 1);
 
@@ -360,7 +367,7 @@ describe("CMP-run 人工确认与取消", () => {
     expect(detail.state).toBe("waiting_confirm");
     expect(detail.nodes.find((n) => n.nodeId === "n2")?.state).toBe("waiting_confirm");
 
-    detail = await h.runService.decide({ runId: run.runId, nodeId: "n2", decision: "pass" });
+    detail = await h.runService.decide({ runId: run.runId, nodeId: "n2", decision: "pass", comment: null, actor: null });
     expect(detail.state).toBe("running");
     expect(detail.nodes.find((n) => n.nodeId === "n2")?.state).toBe("succeeded");
     expect(detail.nodes.find((n) => n.nodeId === "n3")?.state).toBe("dispatched");
@@ -373,6 +380,7 @@ describe("CMP-run 人工确认与取消", () => {
       harnessId: h.harnessId,
       workspacePath: "/work/cancel",
       intentMarkdown: "x",
+      actor: null,
     });
     const detail = await h.runService.cancel(run.runId, "tester");
     expect(detail.state).toBe("done");
@@ -389,6 +397,7 @@ describe("CMP-run 制品与归档", () => {
       harnessId: h.harnessId,
       workspacePath: "/work/log",
       intentMarkdown: "x",
+      actor: null,
     });
     const taskId = await dispatchedTaskId(h.runService, run.runId);
     const empty = Bun.gzipSync(new Uint8Array());
@@ -426,6 +435,7 @@ describe("CMP-run 制品与归档", () => {
       harnessId: h.harnessId,
       workspacePath: "/work/archive",
       intentMarkdown: "x",
+      actor: null,
     });
     await driveSucceeded(h, run.runId, 3);
     const detail = await h.runService.get(run.runId);
@@ -461,6 +471,7 @@ describe("CMP-run 制品与归档", () => {
       harnessId: h.harnessId,
       workspacePath: "/work/bad-archive",
       intentMarkdown: "x",
+      actor: null,
     });
     await driveSucceeded(h, run.runId, 3);
     const bad = new Uint8Array([1, 2, 3]);
@@ -483,6 +494,7 @@ describe("CMP-run 归档电平（取消与超时）", () => {
       harnessId: h.harnessId,
       workspacePath: "/work/cancel-archive",
       intentMarkdown: "x",
+      actor: null,
     });
     await h.runService.cancel(run.runId, "tester");
     const detail = await h.runService.get(run.runId);
@@ -499,6 +511,7 @@ describe("CMP-run 归档电平（取消与超时）", () => {
       harnessId: h.harnessId,
       workspacePath: "/work/cancel-after-success",
       intentMarkdown: "x",
+      actor: null,
     });
     await driveSucceeded(h, run.runId, 1);
     await h.runService.cancel(run.runId, "tester");
@@ -515,6 +528,7 @@ describe("CMP-run 归档电平（取消与超时）", () => {
       harnessId: h.harnessId,
       workspacePath: "/work/archive-ttl",
       intentMarkdown: "x",
+      actor: null,
     });
     await driveSucceeded(h, run.runId, 3);
     expect((await h.runService.get(run.runId)).archiveState).toBe("pending");

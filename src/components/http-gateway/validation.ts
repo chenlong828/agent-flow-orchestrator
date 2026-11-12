@@ -15,6 +15,14 @@ export function assertUuid(value: string | undefined, field: string): string {
   return value;
 }
 
+/** 图内节点 ID 是工作流内稳定字符串（不是 UUID），规则与图校验一致。 */
+export function assertNodeId(value: string | undefined, field: string): string {
+  if (value === undefined || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(value)) {
+    throw new ValidationError(field, "必须是 1–64 位的字母、数字、下划线或连字符");
+  }
+  return value;
+}
+
 export function assertAllowedFields(
   value: Record<string, unknown>,
   allowed: readonly string[],
