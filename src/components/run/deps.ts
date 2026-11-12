@@ -20,4 +20,6 @@ export type RunDeps = {
   defaultTimeoutMs: number;
   /** 单节点最大重访轮次。 */
   maxNodeVisits: number;
+  /** 归档 pending 超时降级为 failed 的阈值；默认 10 分钟。 */
+  archivePendingTtlMs?: number;
 };

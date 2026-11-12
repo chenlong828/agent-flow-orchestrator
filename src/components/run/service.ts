@@ -660,6 +660,9 @@ export function createRunService(deps: RunDeps): RunService {
   }
 
   async function archiveRequestsFor(clientId: string): Promise<{ runId: string; instanceId: string; workspacePath: string; taskSpacePath: string }[]> {
+    const ttl = deps.archivePendingTtlMs ?? 600000;
+    const cutoff = new Date(deps.clock.now().getTime() - ttl);
+    await deps.db.transaction((tx) => store.expirePendingArchives(tx, cutoff));
     const rows = await store.listArchivePending(deps.db, clientId);
     return rows.map((row) => ({
       runId: row.id,

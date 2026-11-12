@@ -282,7 +282,14 @@ export function createRunStore() {
         `update workflow_run
             set state = 'done', outcome = $2, error = $3::jsonb, final_message = $4,
                 finished_at = $5, updated_at = $5,
-                archive_state = case when archive_state = 'none' then 'pending' else archive_state end
+                archive_state = case
+                  when archive_state <> 'none' then archive_state
+                  when exists (
+                    select 1 from run_node n
+                     where n.run_id = workflow_run.id and n.state = 'succeeded'
+                  ) then 'pending'
+                  else 'none'
+                end
           where id = $1 and state <> 'done'`,
         [runId, input.outcome, input.error, input.finalMessage, input.now],
       );
@@ -368,6 +375,18 @@ export function createRunStore() {
         `select * from run_artifact where run_id = $1 and kind = $2 order by created_at`,
         [runId, kind],
       );
+    },
+
+    async expirePendingArchives(tx: Db, cutoff: Date): Promise<number> {
+      const rows = await tx.query<{ id: string }>(
+        `update workflow_run
+            set archive_state = 'failed', updated_at = now()
+          where archive_state = 'pending' and state = 'done'
+            and finished_at is not null and finished_at < $1
+          returning id`,
+        [cutoff],
+      );
+      return rows.length;
     },
 
     async listArchivePending(

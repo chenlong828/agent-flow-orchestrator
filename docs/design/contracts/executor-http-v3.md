@@ -192,7 +192,7 @@ v3 在此之上加两件事：**执行前有 task-space**（工作区内按 run 
 - 空结果不返回 204：始终 `200` + `tasks: []`，client 按 `nextPollAfterMs` 决定何时再拉（缺省 0 = 立即再拉，服务端已挂起过一个周期）。
 - `stop: true`：完成手上任务后停止领取并退出（优雅停）。
 - `cancelInstances: [instanceId]`：中止这些实例的在跑任务，并丢弃 `tasks` 里属于这些实例的条目。
-- `archiveRequests`：缺省视为 `[]`；条目含 `runId`、`instanceId`、`workspacePath`、`taskSpacePath`。**电平信号**：同一 `runId` 会持续下发，直到 client 在 `archivedRuns` 中确认或该 run 记录被清理。
+- `archiveRequests`：缺省视为 `[]`；条目含 `runId`、`instanceId`、`workspacePath`、`taskSpacePath`。**电平信号**：同一 `runId` 会持续下发，直到 client 在 `archivedRuns` 中确认，或服务端判定该 run 无需归档（从未有成功节点、或 pending 超时降级）。客户端本地没有对应 task-space 时只需忽略该条目，不必回报；服务端会在超时后自行停止下发。
 - **归档不改变挂起行为**：服务端不因存在待归档 run 而缩短 `pollHoldMs`。唯一例外是某个 `runId` 首次进入待归档状态的那一跳可立即返回一次；之后按正常长轮询挂起。client 在**后台**打包上传，不阻塞 poll，否则会因归档耗时触发 `S-02` 静默重派。
 - `stop` / `cancelInstances` / `archiveRequests` 是**电平信号**：调度器会持续下发直到 client 侧生效（`running` 不再包含对应任务 / `archivedRuns` 确认）。
 

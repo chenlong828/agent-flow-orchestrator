@@ -300,10 +300,11 @@ dispatched ──失败/超时/verdict 非法──▶ failed ──▶ run.fail
 
 ### 4.7 归档
 
-1. run 进入 `done`：`archive_state = pending`；把该 run 已有的日志副本复制到 `history/<instanceId>/<runId>/logs/`。
+1. run 进入 `done`：**只有存在成功结算节点**（`run_node.state='succeeded'`）时置 `archive_state = pending`；从未成功过的取消/失败 run 置 `none`，不下发归档指令（客户端本地没有可打包的 task-space）。置 `pending` 时同时把该 run 已有的日志副本复制到 `history/<instanceId>/<runId>/logs/`。
 2. `archiveRequestsFor(clientId)` 返回 `pending` 且属于该 client 的 run；`poll` 按电平持续下发。
 3. `storeArchive` 落盘 `history/<instanceId>/<runId>/task-space.tar.gz` 并置 `stored`；日志副本按 `logs/<nodeId>-<visit>-a<attempt>.jsonl.gz` 存放；`ackArchived` 后不再下发。
 4. `storeArchive` 失败（超限/解包非法）置 `failed`，不再自动重试；运维处理。
+5. **超时降级**：`pending` 且 `finished_at` 超过 `archivePendingTtlMs`（默认 10 分钟）仍未被确认 → 置 `failed` 并停止下发，避免客户端离线或本地目录被删导致电平长期空转；之后 client 若真的补传，`storeArchive` 仍会把状态改回 `stored`。
 
 ### 4.8 并发与恢复
 

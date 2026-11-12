@@ -474,3 +474,65 @@ describe("CMP-run 制品与归档", () => {
     ).rejects.toMatchObject({ code: "invalid_archive" });
   });
 });
+
+describe("CMP-run 归档电平（取消与超时）", () => {
+  test("从未有成功节点的取消 run 不下发归档请求", async () => {
+    const h = await makeHarness(graphLinear);
+    const run = await h.runService.start({
+      workflowId: h.workflowId,
+      harnessId: h.harnessId,
+      workspacePath: "/work/cancel-archive",
+      intentMarkdown: "x",
+    });
+    await h.runService.cancel(run.runId, "tester");
+    const detail = await h.runService.get(run.runId);
+    expect(detail.state).toBe("done");
+    expect(detail.outcome).toBe("cancelled");
+    expect(detail.archiveState).toBe("none");
+    expect(await h.runService.archiveRequestsFor(h.clientId)).toHaveLength(0);
+  });
+
+  test("已有成功节点的取消 run 仍需归档", async () => {
+    const h = await makeHarness(graphLinear);
+    const run = await h.runService.start({
+      workflowId: h.workflowId,
+      harnessId: h.harnessId,
+      workspacePath: "/work/cancel-after-success",
+      intentMarkdown: "x",
+    });
+    await driveSucceeded(h, run.runId, 1);
+    await h.runService.cancel(run.runId, "tester");
+    const detail = await h.runService.get(run.runId);
+    expect(detail.archiveState).toBe("pending");
+    const requests = await h.runService.archiveRequestsFor(h.clientId);
+    expect(requests.map((item) => item.runId)).toEqual([run.runId]);
+  });
+
+  test("pending 超过阈值后降级为 failed 并停止下发", async () => {
+    const h = await makeHarness(graphLinear);
+    const run = await h.runService.start({
+      workflowId: h.workflowId,
+      harnessId: h.harnessId,
+      workspacePath: "/work/archive-ttl",
+      intentMarkdown: "x",
+    });
+    await driveSucceeded(h, run.runId, 3);
+    expect((await h.runService.get(run.runId)).archiveState).toBe("pending");
+
+    const expiring = createRunService({
+      db: ctx.db,
+      clock: { now: () => new Date(Date.now() + 11 * 60 * 1000) },
+      ids: uuidv7Ids,
+      fileStore: createFileStore(await mkdtemp(join(tmpdir(), "agentflow-ttl-"))),
+      workflowRead: ctx.workflowRead,
+      expertRead: ctx.expertRead,
+      harnessRead: ctx.harnessRead,
+      instance: ctx.instanceService,
+      scheduler: h.scheduler,
+      defaultTimeoutMs: 60000,
+      maxNodeVisits: 5,
+    });
+    expect(await expiring.archiveRequestsFor(h.clientId)).toHaveLength(0);
+    expect((await h.runService.get(run.runId)).archiveState).toBe("failed");
+  });
+});

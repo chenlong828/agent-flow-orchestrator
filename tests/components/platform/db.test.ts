@@ -117,6 +117,7 @@ describe("platform 迁移执行", () => {
       "0001_baseline.sql",
       "0002_workflow_run.sql",
       "0003_task_space.sql",
+      "0004_archive_state_backfill.sql",
     ]);
     const after = await db.query("select version, checksum from schema_migrations order by version");
     expect(after).toEqual(before);

@@ -62,6 +62,7 @@ level: P1
 - `T-RUN-04`：迁移 `0001_baseline.sql`、[`config/spec.md`](../../design/components/config/spec.md)、[`platform/spec.md`](../../design/components/platform/spec.md)。
 - 实现记录（2026-11-12）：`CMP-run` 落 `src/components/run/`（`types`/`deps`/`store`/`service`/`prompt`/`verdict`/`archive`/`graph-checks`/`validate`）；DSL 落 `graph.ts`/`graph-analysis.ts`/`dsl.schema.json`/`openapi.yaml`；`instance.getByBinding` 与 kernel 新错误码/常量已落。
 - T-RUN-06 记录（2026-11-12）：新增 `task_space_path`（迁移 `0003_task_space.sql`、scheduler `TaskDraft`/`TaskEnvelope`），执行面协议升 3；`P-04`/`P-05` 与 `archiveRequests`/`archivedRuns` 已接线；产品面 `POST /workflows/{id}/runs`、`GET /runs`、`GET /runs/{id}`、`POST /runs/{id}/cancel`、决策与日志下载已实现；`3100` 已重启并验证 `/healthz`、`/openapi.yaml`、run 启动/取消。
+- 联调问题（2026-11-12）：取消的 run 若从未有成功节点，服务端仍下发 `archiveRequests`，客户端本地无 task-space 只能反复 `archive.skipped`。已修：`finishRun` 仅在存在成功节点时置 `pending`；`archiveRequestsFor` 对 `pending` 超过 10 分钟（`archivePendingTtlMs`）的 run 降级 `failed` 并停止下发；迁移 `0004` 回填存量。测试 13 例，`bun run check` 353 pass。
 - 质量门禁遗留（T-RUN-05/06）：`service.ts` 747 行 / `createRunService` 663 行 / 圈复杂度 24、8 处非空断言、`run/types.ts` 深导入 scheduler、10 个孤儿文件（未接组合根）、`workflow_run` 23 列；在 `T-RUN-06` 接线前先拆分 `run` 模块与收敛表列。
 - `T-RUN-05`：`T-RUN-03` 冻结的规格、`src/components/scheduler/service.ts`、`src/components/instance/service.ts`。
 - `T-RUN-06`：`T-RUN-03` 冻结的契约、`src/components/http-gateway/routes/executor.ts`、`src/components/http-gateway/routes/workflow.ts`。
