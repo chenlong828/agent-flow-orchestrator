@@ -3,7 +3,7 @@ import {
   ReferencedError,
   RevisionConflictError,
 } from "../../core/kernel/index.ts";
-import { isForeignKeyViolation } from "../../core/platform/index.ts";
+import { isReferenceViolation } from "../../core/platform/index.ts";
 import { removeDraftTree, type CurrentSkill, type SkillDraftDeps } from "./draft-types.ts";
 
 export async function setSkillEnabled(
@@ -58,7 +58,7 @@ export async function deleteSkill(
       if (changed.length === 0) throw new RevisionConflictError(current.revision);
     });
   } catch (error) {
-    if (isForeignKeyViolation(error)) {
+    if (isReferenceViolation(error)) {
       const latest = await deps.guard.check("skill", id);
       throw new ReferencedError({ type: "skill", id, name: current.name }, latest);
     }

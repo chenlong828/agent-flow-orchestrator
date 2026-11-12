@@ -53,6 +53,15 @@ export function isForeignKeyViolation(error: unknown): boolean {
   return pgCode(error) === "23503";
 }
 
+/**
+ * 删除/改键被引用行拦下：`ON DELETE RESTRICT` 抛 `23001`（restrict_violation），
+ * `NO ACTION` 与插入期的非法外键抛 `23503`（foreign_key_violation）。
+ * 删除路径必须两者都认，否则会退化成 500。
+ */
+export function isReferenceViolation(error: unknown): boolean {
+  return pgCode(error) === "23503" || pgCode(error) === "23001";
+}
+
 export function isCheckViolation(error: unknown): boolean {
   return pgCode(error) === "23514";
 }

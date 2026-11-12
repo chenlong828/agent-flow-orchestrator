@@ -8,6 +8,7 @@ import {
 } from "../../core/kernel/index.ts";
 import {
   isForeignKeyViolation,
+  isReferenceViolation,
   isUniqueViolation,
   type Db,
 } from "../../core/platform/index.ts";
@@ -301,7 +302,7 @@ export async function deleteExpert(
       await ctx.store.deleteRoot(tx, id, revision);
     });
   } catch (error) {
-    if (isForeignKeyViolation(error)) {
+    if (isReferenceViolation(error)) {
       throw new ReferencedError({ type: "expert", id, name: current.name }, []);
     }
     throw error;

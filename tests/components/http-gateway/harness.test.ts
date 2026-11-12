@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { closeTestDb, resetBusinessData } from "../../helpers/test-db.ts";
 import { call, createTestContext, withRevision, type TestContext } from "../../helpers/app.ts";
+import { createRunFixture, startRun } from "../../helpers/run.ts";
+import type { WorkflowGraph } from "../../../src/components/workflow/index.ts";
 
 let ctx: TestContext;
 
@@ -23,6 +25,21 @@ async function createHarness(name = "build-01") {
   });
   expect(response.status).toBe(201);
   return response.body as Record<string, any>;
+}
+
+function graphLinear(expertId: string): WorkflowGraph {
+  return {
+    stages: [{ id: "s1", name: "设计" }],
+    nodes: [
+      { id: "n1", type: "start", name: "开始", stageId: "s1", expertId },
+      { id: "n2", type: "agent", name: "实现", stageId: "s1", expertId },
+      { id: "n3", type: "end", name: "结束", stageId: "s1", expertId },
+    ],
+    edges: [
+      { id: "e1", from: "n1", to: "n2", kind: "seq" },
+      { id: "e2", from: "n2", to: "n3", kind: "seq" },
+    ],
+  };
 }
 
 beforeAll(async () => {
@@ -537,5 +554,19 @@ describe("Harness HTTP 契约", () => {
     );
     expect(missing.status).toBe(404);
     expect(missing.body.error.code).toBe("not_found");
+  });
+
+  test("DELETE 被运行记录引用的 Harness 返回 409 referenced（RESTRICT 不能退化成 500）", async () => {
+    const fixture = await createRunFixture(ctx, graphLinear);
+    const started = await startRun(ctx, fixture, { workspacePath: "/tmp/af-run-archive-test" });
+    expect(started.status).toBe(201);
+
+    const node = await call(ctx.app, "GET", `/api/v1/harnesses/${fixture.harnessId}`);
+    const blocked = await call(ctx.app, "DELETE", `/api/v1/harnesses/${fixture.harnessId}`, {
+      headers: withRevision(node.body.revision as number),
+    });
+    expect(blocked.status).toBe(409);
+    expect(blocked.body.error.code).toBe("referenced");
+    expect(blocked.body.error.details.asset).toMatchObject({ type: "harness", id: fixture.harnessId });
   });
 });

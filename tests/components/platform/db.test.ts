@@ -7,6 +7,7 @@ import {
   isCheckViolation,
   isConnectionError,
   isForeignKeyViolation,
+  isReferenceViolation,
   isUniqueViolation,
   MigrationError,
   violationConstraint,
@@ -83,6 +84,12 @@ describe("platform 数据库错误分类", () => {
 
     expect(isForeignKeyViolation({ code: "23503" })).toBe(true);
     expect(isForeignKeyViolation({ code: "23505" })).toBe(false);
+
+    // ON DELETE RESTRICT 抛 23001，删除路径必须与 23503 同等对待。
+    expect(isReferenceViolation({ errno: "23001" })).toBe(true);
+    expect(isReferenceViolation({ errno: "23503" })).toBe(true);
+    expect(isReferenceViolation({ errno: "23505" })).toBe(false);
+    expect(isForeignKeyViolation({ errno: "23001" })).toBe(false);
 
     expect(isCheckViolation({ code: "23514" })).toBe(true);
     expect(isCheckViolation({ code: "23503" })).toBe(false);

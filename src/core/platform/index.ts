@@ -5,6 +5,7 @@ export {
   isCheckViolation,
   isConnectionError,
   isForeignKeyViolation,
+  isReferenceViolation,
   isUniqueViolation,
   violationConstraint,
 } from "./db.ts";

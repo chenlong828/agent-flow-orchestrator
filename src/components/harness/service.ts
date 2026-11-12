@@ -19,7 +19,7 @@ import {
   type ReferenceGuard,
 } from "../../core/kernel/index.ts";
 import {
-  isForeignKeyViolation,
+  isReferenceViolation,
   isUniqueViolation,
   violationConstraint,
   type Db,
@@ -406,7 +406,7 @@ async function deleteHarness(
       }
     });
   } catch (error) {
-    if (isForeignKeyViolation(error)) {
+    if (isReferenceViolation(error)) {
       const latestReferences = await ctx.guard.check("harness", id);
       throw new ReferencedError(
         { type: "harness", id, name: current.name },
