@@ -30,31 +30,28 @@ updated: 2026-11-11
 
 | 实体 | 说明 |
 |---|---|
-| `Instance` | 执行实例：`instanceId`、`clientId`、`workspacePath`、`state`、`blockReason`、`enrolledAt`、`updatedAt`、审计字段 |
+| `Instance` | 执行实例：`instanceId`、`clientId`、`workspacePath`、`state`、`enrolledAt`、`updatedAt`、审计字段 |
 
 不变量：
 
 - `instanceId` 全局唯一（UUIDv7），创建后不可变；重复登记同 `instanceId` 时 `clientId` 与 `workspacePath` 必须完全一致，否则拒绝（见 §3.2 `enroll`）。
 - 同一 `clientId` 下 `workspacePath` 唯一（`(clientId, workspacePath)` 唯一约束）；不同 client 上出现相同路径字符串是合法的（不同机器）。
 - `workspacePath` 必须是绝对路径字符串：非空、以 `/` 开头、不含 NUL 与控制字符；不做目录存在性检查。
-- `state` 三值闭集：`active`（可派发）/ `blocked`（暂不派发，可恢复）/ `retired`（终态，不再派发也不再登记）。
+- `state` 两值闭集：`active`（可派发）/ `retired`（终态，不再派发也不再登记）。**没有 `blocked`**：失败即终态、不自动重派，下一次显式启动直接重跑即可，跨 run 的静默拦截比重复失败更有害（2026-11-12 裁决）。
 - 实例与 client 的绑定关系是派发粘性的唯一依据：`CMP-scheduler` 不得把任务发给非绑定 client。
-- `blocked` 不删除实例，其 `queued` 任务由调度器结算为失败；恢复（`unblock`）后实例重新可派发，历史任务不自动复活。
 
 ## 3 公共契约
 
 ### 3.1 类型
 
 ```ts
-type InstanceState = "active" | "blocked" | "retired";
-type BlockReason = "workspace_failure" | "operator";
+type InstanceState = "active" | "retired";
 
 type Instance = {
   instanceId: string;
   clientId: string;
   workspacePath: string;   // 绝对路径字符串；存在性由 client 校验
   state: InstanceState;
-  blockReason: BlockReason | null;
   enrolledAt: string;
   updatedAt: string;
 };
@@ -81,12 +78,6 @@ type InstanceService = {
   /** 派发前复核：实例存在、active、绑定该 client。 */
   isDispatchable(instanceId: string, clientId: string): Promise<boolean>;
 
-  /** 执行失败导致实例不可用：active → blocked（幂等）。 */
-  block(instanceId: string, reason: BlockReason): Promise<void>;
-
-  /** 运维恢复：blocked → active（幂等）。 */
-  unblock(instanceId: string): Promise<void>;
-
   /** 运维回收：任意非 retired → retired（幂等，终态）。 */
   retire(instanceId: string): Promise<void>;
 };
@@ -99,37 +90,33 @@ type InstanceService = {
 | `enroll` | 登记实例 | `EnrollInstance` | `Instance` | `ValidationError`、`BindingConflictError`（同 ID 不同绑定、或同 client 同路径重复）、`DatabaseUnavailableError` | 单事务；唯一约束兜底 |
 | `get` | 读实例 | `instanceId` | `Instance \| null` | 无 | 只读 |
 | `listDispatchable` | 列可派发实例 | `clientId` | `Instance[]` | `ValidationError` | 只读；只回 `active` |
-| `getByBinding` | 按绑定反查 | `clientId`、`workspacePath` | `Instance \| null` | `ValidationError` | 只读；含 `blocked`/`retired`，供运行编排复用 |
+| `getByBinding` | 按绑定反查 | `clientId`、`workspacePath` | `Instance \| null` | `ValidationError` | 只读；含 `retired`，供运行编排复用 |
 | `isDispatchable` | 派发复核 | `instanceId`、`clientId` | `boolean` | 无 | 只读 |
-| `block` | 摘除实例 | `instanceId`、`reason` | `void` | `NotFoundError` | 幂等；`retired` 不回到 `blocked` |
-| `unblock` | 恢复实例 | `instanceId` | `void` | `NotFoundError` | 幂等；`retired` 拒绝恢复（`ValidationError`） |
 | `retire` | 回收实例 | `instanceId` | `void` | `NotFoundError` | 幂等；终态 |
 
 - 错误类型定义在 [`CMP-kernel`](../kernel/spec.md)；`BindingConflictError` 用于「同 `instanceId` 的绑定被改」与「同 client 同路径重复登记」，映射为 `409 binding_conflict`。
 - `enroll` 的调用方向：任务启动用例（上游编排 / 界面）在创建任务列表前登记实例并确保目录已建好；`enroll` 不接受来自执行面 client 的请求（`executor-http-v3` 没有注册端点）。
-- `block` / `unblock` / `retire` 是运维与调度器的写入口；本期没有对外 REST 面，由组合根暴露给运维脚本与调度器。
+- `retire` 是唯一的状态写入口；本期没有对外 REST 面，由组合根暴露给运维脚本。
 
 ## 4 状态机与不变量
 
 ### 4.1 实例状态机
 
 ```
-enroll ──▶ active ──block──▶ blocked ──unblock──▶ active
-              │                  │
-              └──────retire──────┴──────▶ retired
+enroll ──▶ active ──retire──▶ retired
 ```
 
 - `active`：可派发；`scheduler` 只从这里取实例。
-- `blocked`：不派发新任务；调度器在检测到 `failed(workspace)` 时调用 `block(workspace_failure)`；同一实例后续任务按 [`CMP-scheduler` §4.5](../scheduler/spec.md) 结算，不持续重派。
+- 工作区类失败（`failed(workspace)`）**不再改变实例状态**：同一实例剩余的 `queued` 任务由 [`CMP-scheduler` §4.5](../scheduler/spec.md) 结算为失败，实例保持 `active`，下一次 run 在同一工作区照常派发。
 - `retired`：终态；工作区目录与进程由运维按 `instanceId` 回收，本组件不删数据。`retire` 前调度器应先把该实例的 `dispatched` 任务取消、`queued` 任务结算为失败，避免任务停在不可派发的实例上；顺序见 §4.2。
 
 ### 4.2 与其他组件的边界
 
 | 消费方 | 用法 |
 |---|---|
-| `CMP-scheduler` | `get`（取 `workspacePath`）、`isDispatchable`（派发复核）、`listDispatchable`（批量筛选）；`block`（实例失败摘除） |
+| `CMP-scheduler` | `get`（取 `workspacePath`）、`isDispatchable`（派发复核）、`listDispatchable`（批量筛选） |
 | `CMP-run`（运行编排） | `getByBinding`（复用同工作区实例）、`enroll`（首次启动登记实例，目录提前建好） |
-| 运维脚本 | `unblock` / `retire`；`retire` 前先经调度器取消该实例在跑任务、结算排队任务 |
+| 运维脚本 | `retire`；`retire` 前先经调度器取消该实例在跑任务、结算排队任务 |
 | `CMP-http-gateway` | 不直接依赖；执行面三个端点只经 `CMP-scheduler` |
 
 ### 4.3 与 `executor-http-v3` 的对应
@@ -140,7 +127,7 @@ enroll ──▶ active ──block──▶ blocked ──unblock──▶ acti
 | `TaskRequest.workspacePath` | `Instance.workspacePath` 原样透传；client 按 `P-01` §4.1 #3 校验 |
 | `S-02` 重派 | 实例粘性：重派只回 `Instance.clientId`；`OQ-20` 的结论落在本表 |
 | `S-06` 同容器技能集一致 | 由 `CMP-scheduler` 按 `instanceId` 聚合同实例已下发未结算任务得出，本组件不存 digest |
-| 实例不可用（`OQ-21`） | 契约仍无上报载体；本组件 `blocked` 是调度器侧兜底，恢复由运维触发 |
+| 实例不可用（`OQ-21`） | 契约仍无上报载体；不再做调度器侧兜底（`blocked` 已删除），失败经节点错误直接暴露 |
 
 ### 4.4 节点停用与实例回收
 
@@ -170,8 +157,8 @@ enroll ──▶ active ──block──▶ blocked ──unblock──▶ acti
 |---|---|
 | 登记 | 首次登记成功；同 `instanceId` 重复登记幂等；同 ID 改 client 或改路径 → `BindingConflictError`；非绝对路径/空路径/含控制字符 → `ValidationError` |
 | 路径唯一 | 同一 client 下同路径重复登记 → `BindingConflictError`；不同 client 同路径字符串允许登记 |
-| 可派发 | `active` 可派发且绑定 client 匹配；`blocked`/`retired` 不可派发；未知实例返回 `null` / `false` |
-| 状态机 | `block` 幂等；`unblock` 恢复；`retire` 终态后 `unblock` 拒绝；`retire` 幂等 |
+| 可派发 | `active` 可派发且绑定 client 匹配；`retired` 不可派发；未知实例返回 `null` / `false` |
+| 状态机 | `retire` 幂等且为终态；回收后 `isDispatchable` 为 `false`、不再出现在 `listDispatchable` |
 | 边界 | 不读写文件系统；不导入 `scheduler`/`http-gateway`；只依赖 `platform`/`kernel` |
 
 ## 7 预算与运行
@@ -183,4 +170,4 @@ enroll ──▶ active ──block──▶ blocked ──unblock──▶ acti
 ## 8 待定
 
 - 实例与 client 的绑定是否需要「临时改派」接口（跨 client 迁移工作区）——当前只做 `retire` + 重新 `enroll`，不提供迁移；等真实运维需求出现再定。
-- `blocked` 是否自动恢复（client 重启后重新探活）——契约无实例不可用上报载体（`OQ-21`），当前保持人工 `unblock`。
+- ~~`blocked` 是否自动恢复~~：2026-11-12 已删除该状态，问题消失。

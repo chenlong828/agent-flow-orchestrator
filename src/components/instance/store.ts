@@ -1,13 +1,12 @@
 import { toIso } from "../../core/kernel/index.ts";
 import type { Db } from "../../core/platform/index.ts";
-import type { BlockReason, Instance, InstanceState } from "./types.ts";
+import type { Instance, InstanceState } from "./types.ts";
 
 export type InstanceRow = {
   id: string;
   client_id: string;
   workspace_path: string;
   state: InstanceState;
-  block_reason: BlockReason | null;
   enrolled_at: Date | string;
   updated_at: Date | string;
 };
@@ -19,7 +18,7 @@ export type EnrollInstanceRow = {
   now: Date;
 };
 
-const COLUMNS = "id, client_id, workspace_path, state, block_reason, enrolled_at, updated_at";
+const COLUMNS = "id, client_id, workspace_path, state, enrolled_at, updated_at";
 
 export function toInstance(row: InstanceRow): Instance {
   return {
@@ -27,7 +26,6 @@ export function toInstance(row: InstanceRow): Instance {
     clientId: row.client_id,
     workspacePath: row.workspace_path,
     state: row.state,
-    blockReason: row.block_reason,
     enrolledAt: toIso(row.enrolled_at),
     updatedAt: toIso(row.updated_at),
   };
@@ -39,12 +37,7 @@ export type InstanceStore = {
   listByClient(clientId: string): Promise<InstanceRow[]>;
   listDispatchable(clientId: string): Promise<InstanceRow[]>;
   insert(input: EnrollInstanceRow): Promise<InstanceRow | null>;
-  setState(
-    id: string,
-    state: InstanceState,
-    blockReason: BlockReason | null,
-    now: Date,
-  ): Promise<InstanceRow | null>;
+  setState(id: string, state: InstanceState, now: Date): Promise<InstanceRow | null>;
 };
 
 export function createInstanceStore(db: Db): InstanceStore {
@@ -71,17 +64,17 @@ export function createInstanceStore(db: Db): InstanceStore {
       ),
     insert: (input) =>
       db.one<InstanceRow>(
-        `insert into instance (id, client_id, workspace_path, state, block_reason, enrolled_at, updated_at)
-         values ($1, $2, $3, 'active', null, $4, $4)
+        `insert into instance (id, client_id, workspace_path, state, enrolled_at, updated_at)
+         values ($1, $2, $3, 'active', $4, $4)
          on conflict do nothing
          returning ${COLUMNS}`,
         [input.id, input.clientId, input.workspacePath, input.now],
       ),
-    setState: (id, state, blockReason, now) =>
+    setState: (id, state, now) =>
       db.one<InstanceRow>(
-        `update instance set state = $2, block_reason = $3, updated_at = $4
+        `update instance set state = $2, updated_at = $3
           where id = $1 returning ${COLUMNS}`,
-        [id, state, blockReason, now],
+        [id, state, now],
       ),
   };
   return store;

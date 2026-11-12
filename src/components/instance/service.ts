@@ -1,12 +1,7 @@
 import { BindingConflictError, NotFoundError, ValidationError, type Clock, type IdGenerator } from "../../core/kernel/index.ts";
 import type { Db } from "../../core/platform/index.ts";
 import { createInstanceStore, toInstance, type InstanceRow, type InstanceStore } from "./store.ts";
-import {
-  ensureBlockReason,
-  ensureClientId,
-  ensureInstanceId,
-  ensureWorkspacePath,
-} from "./validate.ts";
+import { ensureClientId, ensureInstanceId, ensureWorkspacePath } from "./validate.ts";
 import type { EnrollInstance, Instance, InstanceService } from "./types.ts";
 
 export type InstanceDeps = {
@@ -76,21 +71,10 @@ export function createInstanceService(deps: InstanceDeps): InstanceService {
       const row = await store.findById(ensureInstanceId(instanceId));
       return row !== null && row.state === "active" && row.client_id === clientId;
     },
-    block: async (instanceId, reason) => {
-      const row = await requireRow(store, ensureInstanceId(instanceId));
-      if (row.state === "retired" || row.state === "blocked") return;
-      await store.setState(row.id, "blocked", ensureBlockReason(reason), deps.clock.now());
-    },
-    unblock: async (instanceId) => {
-      const row = await requireRow(store, ensureInstanceId(instanceId));
-      if (row.state === "retired") throw new ValidationError("instanceId", "已回收的实例不能恢复");
-      if (row.state === "active") return;
-      await store.setState(row.id, "active", null, deps.clock.now());
-    },
     retire: async (instanceId) => {
       const row = await requireRow(store, ensureInstanceId(instanceId));
       if (row.state === "retired") return;
-      await store.setState(row.id, "retired", row.block_reason, deps.clock.now());
+      await store.setState(row.id, "retired", deps.clock.now());
     },
   };
 }

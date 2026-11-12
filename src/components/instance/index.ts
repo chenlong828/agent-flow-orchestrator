@@ -1,5 +1,4 @@
 export type {
-  BlockReason,
   EnrollInstance,
   Instance,
   InstanceService,

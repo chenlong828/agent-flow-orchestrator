@@ -75,7 +75,7 @@ externalRefs: []
 
 - `free=0`：返回空批，不下发、不预留。
 - `running[]` 出现调度器未派发或已结算的 `taskId`：忽略并且不放进 `tasks`，不报错（client 侧清理责任）。
-- 实例 `blocked` / `retired` / 未登记：该实例任务不派发，留在队列；不返回错误。
+- 实例 `retired` / 未登记：该实例任务不派发，留在队列；不返回错误。
 - `finished[]` 与 `running[]` 同时包含同一任务：以 `finished[]` 为准，不重发。
 - 请求体未知字段、`capacity.free` 非法：`400`，见 `SCN-0205`。
 

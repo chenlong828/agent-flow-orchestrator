@@ -214,7 +214,7 @@ type RunService = {
 | `resumePending` | 重启对账 | 无 | `{resumed}` | 无 | 启动一次；对每个 `running`/`waiting_confirm` run 调 `advance` |
 
 - `start` 的可运行性校验（按顺序）：同 `instance_id` 无活跃 run（否则 `RunConflictError`）→ 工作流存在且图非空 → 恰好一个 `start` 与一个 `end` → 每节点 ≤1 条 seq 入/出边 → `review`/`confirm` 的回退边目标为祖先 → 专家矩阵（`start`/`agent`/`split`/`review`/`fanout`/`end` 必须绑专家且启用，`confirm` 不得绑专家）→ **不含 `split`/`fanout`**（返回 `ValidationError`，`details.field=graph.nodes[<i>].type`，`reason=unsupported_node_type`）。
-- `start` 登记实例：按 `(clientId, workspacePath)` 查已有实例并**复用**（`CMP-instance` 的 `getByBinding`），不存在才 `enroll` 新实例。一个工作区一个实例、可承载多个 run——`CMP-instance` 的「同 client 同 `workspacePath` 唯一」不变量不变；并发 run 共享实例的 `active`/`blocked`，工作区失败时该实例所有 run 的任务一起结算失败（符合实例语义）。复用时若命中 `retired` → 拒绝启动（`ValidationError`，`reason=instance_retired`）；命中 `blocked` → 复用，任务在调度器排队等运维恢复。
+- `start` 登记实例：按 `(clientId, workspacePath)` 查已有实例并**复用**（`CMP-instance` 的 `getByBinding`），不存在才 `enroll` 新实例。一个工作区一个实例、可承载多个 run——`CMP-instance` 的「同 client 同 `workspacePath` 唯一」不变量不变；并发 run 共享实例的 `active` 状态；工作区失败时只结算该实例当下排队/在跑的任务（实例不再被摘除）。复用时若命中 `retired` → 拒绝启动（`ValidationError`，`reason=instance_retired`）；实例保持 `active`，同工作区下一次启动照常派发。
 - `handleTaskResult` 的归属判定：`run_node.task_id = result.taskId` 命中 → 编排结算；未命中 → 委托 `scheduler.acceptResult` 并直接返回（兼容手工注入的临时任务，`jd.ts`）。
 - `decide` 的幂等：`waiting_confirm` 下同决策重复提交返回当前详情；run 已推进后再提交 → `ValidationError`（`details.reason=invalid_state`）。
 - 错误经 `kernel` 统一类型；`http-gateway` 负责映射（见 [`CMP-http-gateway` §4.5](../http-gateway/spec.md)）。

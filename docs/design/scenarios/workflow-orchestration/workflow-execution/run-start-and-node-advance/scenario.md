@@ -85,7 +85,7 @@ externalRefs: []
 - `harnessId` 不存在 → `404`；存在但未绑定 `clientId` 或已停用 → `400 validation_error`。
 - 实例登记冲突（同 `instanceId` 不同绑定）→ `409`，不建 run。
 - 同一工作区已有 `running`/`waiting_confirm` 的 run → `409 run_conflict`，不建 run；等前一个 run 结束后再启动。
-- 入队后实例 `blocked` / 节点停用 → 任务留在 `queued`，run 保持 `running`，不报错（派发门禁在调度器，`S-04`/`§4.8`）。
+- 入队后实例 `retired` / 节点停用 → 任务留在 `queued`，run 保持 `running`，不报错（派发门禁在调度器，`S-04`/`§4.8`）。
 - 节点失败/超时 → `run.failed`，停在当前节点，不再推进（默认语义，见 `OQ-28`）。
 
 ## 4 不可变引用

@@ -398,7 +398,7 @@ describe("结果结算（S-08：失败不自动重派）", () => {
     expect((await poll(scheduler, silentClient, 1)).tasks).toEqual([]);
   });
 
-  test("TC-EXR-004 workspace 失败使实例 blocked 并结算同实例其余任务", async () => {
+  test("TC-EXR-004 workspace 失败只结算同实例其余任务，实例保持可派发（无 blocked）", async () => {
     const clientId = "node-workspace";
     await bindNode(clientId);
     const instanceId = await enroll(clientId);
@@ -423,9 +423,16 @@ describe("结果结算（S-08：失败不自动重派）", () => {
       error: { class: "workspace", code: "workspace_missing", message: "目录不可写" },
     });
 
-    expect((await ctx.instanceService.get(instanceId))?.state).toBe("blocked");
+    expect((await ctx.instanceService.get(instanceId))?.state).toBe("active");
     expect(await ctx.scheduler.inspect(second!)).toMatchObject({ state: "done", outcome: "failed" });
+    // 不再摘除实例：同工作区下一次显式启动能重新派发，失败会直接暴露在节点上。
     expect((await poll(ctx.scheduler, clientId, 1)).tasks).toEqual([]);
+    const retry = await ctx.scheduler.enqueue({
+      tasks: [
+        { instanceId, taskSpacePath: taskSpaceOf(instanceId), nodeId: "n3", prompt: "三", timeoutMs: 1000, skillIds: [skillId] },
+      ],
+    });
+    expect((await poll(ctx.scheduler, clientId, 1)).tasks.map((task) => task.taskId)).toEqual(retry.taskIds);
   });
 });
 

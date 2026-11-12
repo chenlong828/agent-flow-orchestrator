@@ -200,7 +200,7 @@ enqueue ──▶ queued ──dispatch──▶ dispatched ──settle──�
                 └──requeue（attempt+1）┘
 ```
 
-- `queued`：可派发。`notBefore` 未到（退避中）或实例不可派发（blocked/retired）时不派发。
+- `queued`：可派发。`notBefore` 未到（退避中）或实例不可派发（retired / 未登记）时不派发。
 - `dispatched`：已下发且未结算。满足 §4.3 的重派条件时回到 `queued`。
 - `done`：终态，不可再改变；`outcome` 与 `error` 在结算时一次写入。
 - 未确认重发（`S-03`）不改变状态与 `attempt`：仍是 `dispatched`，下一次 poll 把同一 `taskId` 再放进 `tasks`。
@@ -297,7 +297,7 @@ type SkillSet = { digest: string; packages: SkillPackageRef[] };
 2. 节点可用：`NodeDirectory.isDispatchable(clientId)`（`CMP-harness` 中已绑定该 `clientId` 且 `enabled`）。
 3. 任一不满足 → 不派发，任务留在 `queued`；不报错、不消耗 `attempt`。
 
-- **节点停用（`enabled=false`）**：不派发新任务；在跑任务继续跑完；不向 client 下发 `stop`（`stop` 只由 `requestStop` 触发）。与实例 `blocked` 的区别：`blocked` 是执行失败兜底，会把同实例任务结算为失败；停用是管理员意图，只停止新增派发。
+- **节点停用（`enabled=false`）**：不派发新任务；在跑任务继续跑完；不向 client 下发 `stop`（`stop` 只由 `requestStop` 触发）。实例侧只有 `retired` 会挡住派发；执行失败不再摘除实例（2026-11-12 删除 `blocked`）。
 - **凭据解析**：执行端 Bearer token 经 `ExecutorAuthenticator.resolveClientId` 解析（由 `CMP-harness` 在 `harness.client_token` 上实现），不读配置、不做启动期交集校验。
   - 未知 token（含已解绑、已轮换的旧 token）：`401 unauthorized`（client 停止并退出，契约 §4.1）。
   - token 有效但节点停用：鉴权通过，但**不派发**（空批、不消耗 `attempt`），记一条 warning；不返回 `401`，避免管理动作把 client 踢下线。

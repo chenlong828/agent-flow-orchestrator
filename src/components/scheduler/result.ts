@@ -38,8 +38,9 @@ export function createResultHandler(
     const now = deps.clock.now();
     await deps.db.transaction((tx) => store.settle(tx, { id: taskId, outcome, error, now }));
 
+    // 工作区类失败不再摘除实例：失败即终态、不自动重派，下一次 run 直接重跑并在节点上暴露同一错误。
+    // 同一实例的其余排队任务仍需结算，避免同批 fan-out 逐个失败。
     if (result.status === "failed" && error?.class === "workspace") {
-      await deps.instance.block(row.instance_id, "workspace_failure");
       await deps.db.transaction((tx) => store.settleQueuedByInstance(tx, row.instance_id, now));
     }
     notify(client);

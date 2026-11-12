@@ -1,5 +1,4 @@
 import { ValidationError } from "../../core/kernel/index.ts";
-import type { BlockReason } from "./types.ts";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -30,13 +29,6 @@ export function ensureWorkspacePath(value: unknown): string {
 export function ensureInstanceId(value: unknown): string {
   if (typeof value !== "string" || !UUID_PATTERN.test(value)) {
     throw new ValidationError("instanceId", "必须是 UUID");
-  }
-  return value;
-}
-
-export function ensureBlockReason(value: BlockReason): BlockReason {
-  if (value !== "workspace_failure" && value !== "operator") {
-    throw new ValidationError("reason", "必须是 workspace_failure 或 operator");
   }
   return value;
 }

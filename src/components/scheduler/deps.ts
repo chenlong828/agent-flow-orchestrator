@@ -6,6 +6,7 @@ export type SchedulerDeps = {
   db: Db;
   clock: Clock;
   ids: IdGenerator;
+  /** 入队前校验实例存在；不再用于「失败摘除实例」。 */
   instance: InstanceService;
   packages: SkillPackageSource;
   node: NodeDirectory;

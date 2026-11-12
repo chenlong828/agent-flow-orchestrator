@@ -1,5 +1,4 @@
-export type InstanceState = "active" | "blocked" | "retired";
-export type BlockReason = "workspace_failure" | "operator";
+export type InstanceState = "active" | "retired";
 
 /** 执行实例：一个工作区路径 + 一个归属 client。 */
 export type Instance = {
@@ -7,7 +6,6 @@ export type Instance = {
   clientId: string;
   workspacePath: string;
   state: InstanceState;
-  blockReason: BlockReason | null;
   enrolledAt: string;
   updatedAt: string;
 };
@@ -27,7 +25,5 @@ export type InstanceService = {
   getByBinding(clientId: string, workspacePath: string): Promise<Instance | null>;
   listDispatchable(clientId: string): Promise<Instance[]>;
   isDispatchable(instanceId: string, clientId: string): Promise<boolean>;
-  block(instanceId: string, reason: BlockReason): Promise<void>;
-  unblock(instanceId: string): Promise<void>;
   retire(instanceId: string): Promise<void>;
 };

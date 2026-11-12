@@ -37,7 +37,6 @@ describe("执行实例登记", () => {
       clientId: "node-a",
       workspacePath: "/work/instance-a",
       state: "active",
-      blockReason: null,
       enrolledAt: "2026-11-11T00:00:00.000Z",
     });
 
@@ -124,37 +123,25 @@ describe("执行实例状态机", () => {
     expect(await svc.get("0191f2f0-2222-7000-8000-0000000000ff")).toBeNull();
   });
 
-  test("block 幂等并记录原因；unblock 恢复；retire 终态拒绝恢复", async () => {
+  test("retire 幂等并进入终态；回收后不可派发", async () => {
     const svc = await service();
     const instance = await svc.enroll({
       instanceId: "0191f2f0-2222-7000-8000-000000000040",
       clientId: "node-a",
       workspacePath: "/work/lifecycle",
     });
-    await svc.block(instance.instanceId, "workspace_failure");
-    await svc.block(instance.instanceId, "operator");
-    expect(await svc.get(instance.instanceId)).toMatchObject({
-      state: "blocked",
-      blockReason: "workspace_failure",
-    });
-    expect(await svc.isDispatchable(instance.instanceId, "node-a")).toBe(false);
-    expect(await svc.listDispatchable("node-a")).toHaveLength(0);
-
-    await svc.unblock(instance.instanceId);
-    await svc.unblock(instance.instanceId);
-    expect(await svc.get(instance.instanceId)).toMatchObject({ state: "active", blockReason: null });
+    expect(await svc.isDispatchable(instance.instanceId, "node-a")).toBe(true);
 
     await svc.retire(instance.instanceId);
     await svc.retire(instance.instanceId);
     expect(await svc.get(instance.instanceId)).toMatchObject({ state: "retired" });
-    await expect(svc.unblock(instance.instanceId)).rejects.toBeInstanceOf(ValidationError);
+    expect(await svc.isDispatchable(instance.instanceId, "node-a")).toBe(false);
+    expect(await svc.listDispatchable("node-a")).toHaveLength(0);
   });
 
   test("未知实例的操作报 NotFound", async () => {
     const svc = await service();
     const missing = "0191f2f0-2222-7000-8000-00000000dead";
-    await expect(svc.block(missing, "operator")).rejects.toBeInstanceOf(NotFoundError);
-    await expect(svc.unblock(missing)).rejects.toBeInstanceOf(NotFoundError);
     await expect(svc.retire(missing)).rejects.toBeInstanceOf(NotFoundError);
   });
 });
