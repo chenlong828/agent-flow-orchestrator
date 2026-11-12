@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { closeTestDb, resetBusinessData } from "../../helpers/test-db.ts";
-import { createTestContext, type TestContext } from "../../helpers/app.ts";
+import { call, createTestContext, type TestContext } from "../../helpers/app.ts";
 import {
   completeNextTask,
   createRunFixture,
@@ -196,5 +196,35 @@ describe("SCN-0301 运行启动与节点推进", () => {
       graphMissingExpert(missingExpertFixture.expertId),
     );
     await expectRejected(missingExpertFixture, "/work/invalid-expert", "validation_error");
+  });
+
+  test("启动请求字段校验：缺失 harnessId、空/超长 intent、非布尔 autoConfirm 均 400", async () => {
+    const fixture = await createRunFixture(ctx, graphLinear);
+    const workspacePath = "/work/request-validation";
+    const base = {
+      harnessId: fixture.harnessId,
+      workspacePath,
+      intentMarkdown: "正常诉求",
+    };
+    const cases: { name: string; body: Record<string, unknown> }[] = [
+      { name: "缺 harnessId", body: { ...base, harnessId: undefined } },
+      { name: "harnessId 非 UUID", body: { ...base, harnessId: "not-a-uuid" } },
+      { name: "空 intent", body: { ...base, intentMarkdown: "   " } },
+      { name: "超长 intent", body: { ...base, intentMarkdown: "x".repeat(262145) } },
+      { name: "autoConfirm 非布尔", body: { ...base, autoConfirm: "true" } },
+    ];
+    for (const item of cases) {
+      const response = await call(
+        ctx.app,
+        "POST",
+        `/api/v1/workflows/${fixture.workflowId}/runs`,
+        { body: item.body },
+      );
+      expect(response.status, item.name).toBe(400);
+      expect(response.body.error.code, item.name).toBe("validation_error");
+    }
+    const runs = await listRuns(ctx, `?workflowId=${fixture.workflowId}`);
+    expect(runs.body.total).toBe(0);
+    expect(await ctx.instanceService.getByBinding(fixture.clientId, workspacePath)).toBeNull();
   });
 });

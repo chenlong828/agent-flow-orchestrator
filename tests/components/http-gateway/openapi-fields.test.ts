@@ -14,6 +14,8 @@ import {
   WORKFLOW_GRAPH_FIELDS,
   WORKFLOW_IMPORT_FIELDS,
   WORKFLOW_WRITE_FIELDS,
+  RUN_DECISION_FIELDS,
+  RUN_START_FIELDS,
 } from "../../../src/components/http-gateway/fields.ts";
 
 const specification = Bun.YAML.parse(
@@ -46,6 +48,8 @@ const CASES: [string, readonly string[]][] = [
   ["WorkflowCopy", WORKFLOW_COPY_FIELDS],
   ["WorkflowSaveDefinition", WORKFLOW_GRAPH_FIELDS],
   ["WorkflowDsl", WORKFLOW_IMPORT_FIELDS],
+  ["RunStartRequest", RUN_START_FIELDS],
+  ["DecisionRequest", RUN_DECISION_FIELDS],
 ];
 
 describe("HTTP 字段白名单与 OpenAPI 请求体一致", () => {

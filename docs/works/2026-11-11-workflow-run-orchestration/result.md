@@ -56,6 +56,7 @@ level: P1
 | 列表 `RunSummary` 泄漏 `workspacePath`/`taskSpacePath`/`autoConfirm`/`error` | 按 §4.1.1 收敛，详情仍返回 |
 | `workflow_run` 23 列触发门禁 | 迁移 `0005` 合并结果列、去掉冗余列 |
 | `quality-report` 只读建表语句，不应用 `alter table add/drop column` | 按迁移顺序跟踪列集合，`0005` 后表宽为 20 |
+| 启动运行缺字段、intent 空或超 256 KiB、`autoConfirm` 非布尔时返回 500/404 | 路由补字段类型校验，领域补 intent 非空与 262144 字节上限，统一 `400 validation_error` |
 | `run` 模块 755 行、圈复杂度 28、8 处非空断言 | 拆分模块、去掉断言、复杂度归零 |
 
 ## 5 未完成与遗留

@@ -39,7 +39,19 @@ async function resolveInstance(runtime: RunRuntime, clientId: string, workspaceP
   );
 }
 
+const MAX_INTENT_BYTES = 262144;
+
+function ensureIntent(intentMarkdown: string): void {
+  if (intentMarkdown.trim() === "") {
+    throw new ValidationError("intentMarkdown", "必须是非空字符串");
+  }
+  if (new TextEncoder().encode(intentMarkdown).byteLength > MAX_INTENT_BYTES) {
+    throw new ValidationError("intentMarkdown", `不能超过 ${MAX_INTENT_BYTES} 字节`);
+  }
+}
+
 async function start(input: StartRun, runtime: RunRuntime, deps: CommandsDeps): Promise<RunDetail> {
+  ensureIntent(input.intentMarkdown);
   const workflow = await runtime.deps.workflowRead.get(input.workflowId);
   const graph = workflow.graph;
   assertRunnableGraph(graph);

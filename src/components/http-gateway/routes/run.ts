@@ -27,15 +27,36 @@ export async function handleRun(ctx: RouteContext): Promise<Response> {
   throw new NotFoundError("路径", ctx.path);
 }
 
+function requiredString(body: Record<string, unknown>, field: string): string {
+  const value = body[field];
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new ValidationError(field, "必须是非空字符串");
+  }
+  return value;
+}
+
 export async function startRun(ctx: RouteContext, workflowId: string): Promise<Response> {
   const runService = requireRun(ctx);
   const body = await readJsonObject(ctx.request, RUN_START_FIELDS);
+  const harnessId = assertUuid(
+    typeof body.harnessId === "string" ? body.harnessId : undefined,
+    "harnessId",
+  );
+  const workspacePath = requiredString(body, "workspacePath");
+  const intentMarkdown = requiredString(body, "intentMarkdown");
+  let autoConfirm: boolean | undefined;
+  if (body.autoConfirm !== undefined) {
+    if (typeof body.autoConfirm !== "boolean") {
+      throw new ValidationError("autoConfirm", "必须是布尔值");
+    }
+    autoConfirm = body.autoConfirm;
+  }
   const detail = await runService.start({
     workflowId,
-    harnessId: String(body.harnessId ?? ""),
-    workspacePath: String(body.workspacePath ?? ""),
-    intentMarkdown: String(body.intentMarkdown ?? ""),
-    ...(body.autoConfirm === undefined ? {} : { autoConfirm: body.autoConfirm === true }),
+    harnessId,
+    workspacePath,
+    intentMarkdown,
+    ...(autoConfirm === undefined ? {} : { autoConfirm }),
     actor: actorFrom(ctx.request, ctx.deps.actor),
   });
   return json({ runId: detail.runId }, 201, { Location: `/api/v1/runs/${detail.runId}` });
