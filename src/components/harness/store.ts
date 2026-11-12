@@ -37,6 +37,8 @@ export type HarnessRootWrite = {
   concurrencyMax: number;
   queuePolicy: QueuePolicy;
   enabled: boolean;
+  /** 仅开发期自注册在插入时直接写入 `client_id`；管理面写入仍只经 `bindClient`。 */
+  clientId?: string | null;
   now: Date;
   actor: string | null;
 };
@@ -59,9 +61,9 @@ async function insertRoot(tx: Db, input: HarnessRootWrite): Promise<void> {
   await tx.query(
     `insert into harness
           (id, name, kind, address, access_mode, description, concurrency_max,
-           queue_policy, enabled, health, last_heartbeat_at, revision,
+           queue_policy, enabled, client_id, health, last_heartbeat_at, revision,
            created_at, updated_at, created_by, updated_by)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'unknown', null, 1, $10, $10, $11, $11)`,
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'unknown', null, 1, $11, $11, $12, $12)`,
     [
       input.id,
       input.name,
@@ -72,6 +74,7 @@ async function insertRoot(tx: Db, input: HarnessRootWrite): Promise<void> {
       input.concurrencyMax,
       input.queuePolicy,
       input.enabled,
+      input.clientId ?? null,
       input.now,
       input.actor,
     ],

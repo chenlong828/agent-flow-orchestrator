@@ -25,6 +25,10 @@ export type HttpDeps = {
   backend: ExecutorDeps["backend"];
   /** 测试可注入更短的执行面挂起周期；缺省 30000。 */
   executorPollHoldMs?: number;
+  /** 执行面鉴权模式；缺省 `on`。开发期由 config 传 `off`。 */
+  executorAuth?: ExecutorDeps["authMode"];
+  /** 开发期自注册：确保 clientId 对应的节点行存在。 */
+  executorEnroll?: (clientId: string, address?: string) => Promise<void>;
   harnessService: HarnessService;
   toolService: ToolService;
   skillDraftService: SkillDraftService;
@@ -46,7 +50,12 @@ export function createHttpApp(deps: HttpDeps): (request: Request) => Promise<Res
   const runtime: Runtime = {
     deps,
     routeDeps: toRouteDeps(deps),
-    executor: { backend: deps.backend, pollHoldMs: deps.executorPollHoldMs },
+    executor: {
+      backend: deps.backend,
+      pollHoldMs: deps.executorPollHoldMs,
+      authMode: deps.executorAuth,
+      ensureNode: deps.executorEnroll,
+    },
   };
   return async function handle(request: Request): Promise<Response> {
     return handleRequest(request, runtime);

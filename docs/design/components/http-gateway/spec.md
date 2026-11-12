@@ -209,6 +209,7 @@ updated: 2026-11-11
 - `EXE-01`–`EXE-05` 均已实现，按 [`executor-http-v3`](../../contracts/executor-http-v3.md) 运行；client 侧 v3 实现与联调另立工序（`T-RUN-09`）。
 - 五个端点都不计入产品业务端点计数，也不写入 `openapi.yaml` 的产品 `paths`；它们由 `CMP-http-gateway` 的 `executor` 路由实现：`poll` 调 `CMP-scheduler`，`result` 先经 `CMP-run`（有 run 归属时）再调调度器，`skill-packages` 调 `SkillPackageSource`，`session-log`/`archive` 调 `CMP-run`。
 - 鉴权：`Authorization: Bearer <token>`，token → `clientId` 由 `CMP-harness` 的 `ExecutorAuthenticator` 在 `harness.client_token` 上解析；**产品端点不受影响**，仍无鉴权。
+- **开发期身份旁路**（`EXECUTOR_AUTH=off`，2026-11-12）：允许 `X-Client-Id: <1–64 个非空白字符>` 直接声明 `clientId`，可选 `X-Client-Address: <1–200 字符>`。解析顺序：能命中的 Bearer 优先，其次身份头，都没有 → `401 unauthorized`。身份来自头且节点不存在时调 `CMP-harness.ensureNode` 自动登记（详见 [`harness/spec.md`](../harness/spec.md) §3.4）；自动登记失败按 §3.3 映射（形状非法 `400`，库不可用 `503`）。`EXECUTOR_AUTH=on` 时身份头被忽略，行为与本节原语义一致。
 - 版本闸门：契约现行版本为 `3`，`X-Executor-Protocol` 必须精确等于 `3`；缺失或不等 → `400 unsupported_protocol`，不进入调度；不保留 v2 兼容窗口。
 - 常量（代码常量，不通过配置协商）：`maxResultBytes=262144`、`maxPromptBytes=1048576`、`maxSkillPackageBytes=67108864`、`maxTasksPerPoll=10`、`pollHoldMs=30000`、`clientPollTimeoutMs=40000`、`clientSilentMs=120000`、`resultGraceMs=60000`；v3 新增 `maxSessionLogBytes=67108864`、`maxArchiveBytes=536870912`、`maxArchiveEntries=100000`、`maxArchiveUncompressedBytes=2147483648`（`API-42` 的 intent 上限仍是产品面 256 KiB，不是执行面常量）。
 - `P-01` 长轮询：网关按 `pollHoldMs` 调 `SchedulerService.poll`，返回后合并 `CMP-run.archiveRequestsFor(clientId)`；**不因归档指令缩短挂起**（首次下发的同一跳由编排侧唤醒一次）。请求体透传 `capacity`/`running`/`finished`/`archivedRuns`，响应透传 `tasks`/`stop`/`cancelInstances`/`nextPollAfterMs` + `archiveRequests`。
@@ -226,7 +227,7 @@ updated: 2026-11-11
 | 400 | `unsupported_protocol` | `X-Executor-Protocol` 缺失或不等于 `3` |
 | 400 | `validation_error` | 请求体未知字段、字段类型/范围非法、`status`/`error.class` 不在闭集 |
 | 400 | `invalid_archive` | `P-05` 的 gzip/tar 损坏、含绝对路径/`..`/越界链接 |
-| 401 | `unauthorized` | Bearer 缺失或 token 未映射到 `clientId` |
+| 401 | `unauthorized` | Bearer 缺失或 token 未映射到 `clientId`，且（`EXECUTOR_AUTH=off` 时）没有可用的 `X-Client-Id` |
 | 404 | `task_not_found` | `P-02`/`P-04` 的 `taskId` 不存在或不属于该 client 的实例 |
 | 404 | `run_not_found` | `P-05` 的 `runId` 不存在或不属于该 `clientId` |
 | 404 | `package_not_found` | `P-03` 的 `packageId` 不存在或已下架 |

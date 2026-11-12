@@ -78,6 +78,14 @@ export type HarnessService = {
   ): Promise<{ id: string; revision: number }>;
   /** 解绑执行节点：清空 clientId 与凭据；本就未绑定视为成功。 */
   unbindClient(id: string, revision: number, actor?: string): Promise<{ id: string; revision: number }>;
+  /**
+   * 开发期自注册：确保该 `clientId` 有可派发的节点行。
+   * 不存在则按默认值新建（`name=clientId`，名称冲突追加后缀）；已存在原样返回，不修改任何字段。
+   */
+  ensureNode(
+    clientId: string,
+    input?: { address?: string; actor?: string },
+  ): Promise<{ id: string; created: boolean }>;
 } & RevisionedLifecycle;
 
 export type HarnessRead = {

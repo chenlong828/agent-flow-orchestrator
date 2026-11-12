@@ -144,6 +144,7 @@ type HarnessQuery = {
 | `setEnabled` | 启停 | `id`、`revision`、`enabled` | `{ id, revision }` | `NotFoundError`、`RevisionConflictError` | 单行更新并递增 `revision`；停用不改变已下发未结算任务 |
 | `bindClient` | 登记/换绑节点并写入凭据 | `id`、`revision`、`HarnessClientBinding` | `{ id, revision }` | `NotFoundError`、`RevisionConflictError`、`ValidationError`（`clientId`/`token` 为空、含空白或超长）、`BindingConflictError`（`clientId` 或 token 已被其他 Harness 占用） | 单行更新并递增 `revision`；两个唯一索引兜底 |
 | `unbindClient` | 解绑节点并清空凭据 | `id`、`revision` | `{ id, revision }` | `NotFoundError`、`RevisionConflictError` | 幂等：本就未绑定视为成功，仍递增 `revision` |
+| `ensureNode` | 开发期自注册：确保该 `clientId` 有可派发节点行 | `clientId`、`{ address?, actor? }` | `{ id, created }` | `ValidationError`（`clientId` 形状非法）、`NameConflictError`（后缀用尽） | 先按 `client_id` 唯一索引查；不存在则在单事务内插入（`client_id` 随插入写入）；已存在不改任何字段 |
 | `delete` | 删除 Harness | `id`、`revision` | `void` | `NotFoundError`、`RevisionConflictError`、`ReferencedError` | 先 `ReferenceGuard`，再删除；同一事务 |
 | `list` | 列表查询 | `HarnessQuery` | `Page<HarnessSummary>` | `ValidationError` | 读 |
 | `get` | 详情查询 | `id` | `HarnessDetail` | `NotFoundError` | 读 |
@@ -151,6 +152,7 @@ type HarnessQuery = {
 | `ExecutorAuthenticator.resolveClientId` | 凭据解析 | `token` | `string \| null` | `DatabaseUnavailableError` | 读；`client_token` 唯一索引命中，未登记/已解绑返回 `null` |
 
 方法定义是本组件的权威来源；`http-gateway` 只把 DTO 映射到这些方法，不定义业务方法。
+
 
 ### 3.3 节点目录与在线状态口径
 
@@ -169,6 +171,16 @@ Harness 是执行节点目录：`client_id` 绑定 `CMP-instance` 里实例所�
 - 在线状态不参与派发：派发只看 `NodeDirectory.isDispatchable`（`enabled` + 已绑定）与 client 自报的 `capacity.free`（`executor-http-v3` §9 规定容量不做二次限制）。
 - 停用（`enabled=false`）语义：不派发新任务；在跑任务继续跑完；不向 client 下发 `stop`（`stop` 只由运维停止动作触发，见 `scheduler` §4.6）。
 
+### 3.4 开发期自注册（`ensureNode`）
+
+`EXECUTOR_AUTH=off` 时执行面按 `X-Client-Id` 放行（[`http-gateway` §5.5](../http-gateway/spec.md)），节点行由本方法补齐：
+
+- **默认值**：`name=clientId`（超过 80 字截断，与已有资产同名时追加 `-2`、`-3`… 最多 5 次）、`kind=container`、`accessMode=agent`、`address=上报值或 auto`、`concurrencyMax=4`、`queuePolicy=fifo`、`enabled=true`、`createdBy=auto-enroll`；`tags` 为空。
+- **幂等**：同一 `clientId` 只对应一行；已存在则原样返回 `{ id, created:false }`，不修改 `enabled`、`address` 与任何人工维护字段。停用节点不会被自动复活。
+- **并发**：两个请求同时登记同一 `clientId` 时，唯一索引兜底；插入冲突后回查并复用已有行，不报 `409`。
+- **不写凭据**：自动登记的节点 `client_token` 为 `null`；`EXECUTOR_AUTH=on` 前需要用 `API-41` 补登记凭据。
+- 本方法是开发期旁路的唯一写入口，管理面 `create` / `update` 仍不接受 `clientId`。
+
 ## 4 依赖与边界
 
 - 允许：`platform` 的 `Db`；`kernel` 的 `Clock`、`IdGenerator`、`ReferenceGuard` 端口、`NodeDirectory` 与 `ExecutorAuthenticator` 端口、错误类型。
@@ -185,6 +197,7 @@ Harness 是执行节点目录：`client_id` 绑定 `CMP-instance` 里实例所�
 - 节点目录：登记/解绑幂等；`clientId` 空串、空白、超长拒绝；同一 `clientId` 或同一 token 被第二个 Harness 使用 → `BindingConflictError`，凭据冲突不回显 token；解绑后 `isDispatchable` 为 `false`、旧 token 解析为 `null`。
 - 凭据读模型：详情返回 `clientToken`，列表不返回；`getByClientId` 不返回凭据。
 - 派生状态：四类状态各一例（从未 poll、`free>0`、`free=0` 且有在跑、超过 `clientSilentMs`）；调度器不可用时降级 `unknown`。
+- 开发期自注册（§3.4）：未知 `clientId` 建默认行且 `clientId` 直接落库、重复调用不新增行、已存在行（含停用）不被修改、同名资产追加后缀、`clientId` 形状非法拒绝。
 - 契约：对应 REST 端点的 3 正 1 反在 `http-gateway` 规格中列明。
 
 ## 6 预算与运行
@@ -199,3 +212,4 @@ Harness 是执行节点目录：`client_id` 绑定 `CMP-instance` 里实例所�
 - `client_id`、`client_token`、`bindClient`/`unbindClient`、`NodeDirectory` 与 `ExecutorAuthenticator` 已实现（2026-11-10，见 [`history/decisions/2026-11-10-harness-node-registry.md`](../../../history/decisions/2026-11-10-harness-node-registry.md) 与 [`2026-11-10-executor-client-token.md`](../../../history/decisions/2026-11-10-executor-client-token.md)）；直接在基线加列，未做数据迁移。
 - `health` / `lastHeartbeatAt` 的派生读（§3.3）已实现：由 `catalog` 组合 `CMP-scheduler` 的 `presence` 覆盖列值；本组件不写这两列。
 - `harness_tag` 不设业务数量上限，只做字段级长度与请求体校验。
+- `ensureNode`（§3.4）已实现（2026-11-12，[`2026-11-12-executor-auth-dev-bypass.md`](../../../history/decisions/2026-11-12-executor-auth-dev-bypass.md)）：`client_id` 随插入写入，绕开 `bindClient` 需要 token 的约束。

@@ -55,7 +55,14 @@ export type TestContext = {
   backend: ReturnType<typeof createExecutorBackend>;
 };
 
-export async function createTestContext(): Promise<TestContext> {
+export type TestContextOptions = {
+  /** 缺省 `on`：既有用例保持严格 Bearer 语义。 */
+  executorAuth?: "on" | "off";
+};
+
+export async function createTestContext(
+  options: TestContextOptions = {},
+): Promise<TestContext> {
   const db = await getTestDb();
   const harnessRead = createHarnessRead({ db });
   const toolRead = createToolRead({ db });
@@ -169,6 +176,10 @@ export async function createTestContext(): Promise<TestContext> {
     catalog,
     backend,
     executorPollHoldMs: 20,
+    executorAuth: options.executorAuth ?? "on",
+    executorEnroll: async (clientId, address) => {
+      await harnessService.ensureNode(clientId, { address });
+    },
     harnessService,
     toolService,
     skillDraftService,

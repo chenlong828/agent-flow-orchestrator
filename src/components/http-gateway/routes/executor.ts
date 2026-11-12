@@ -38,8 +38,12 @@ export async function handleExecutor(
   const requestId = request.headers.get("x-request-id") ?? undefined;
   try {
     assertProtocol(request);
-    const clientId = await authenticate(request, deps.backend);
-    const response = await route({ request, segments, deps }, clientId);
+    const identity = await authenticate(request, deps);
+    if (identity.source === "header" && deps.ensureNode !== undefined) {
+      const address = request.headers.get(CLIENT_ADDRESS_HEADER)?.trim();
+      await deps.ensureNode(identity.clientId, address === "" ? undefined : address);
+    }
+    const response = await route({ request, segments, deps }, identity.clientId);
     if (requestId !== undefined && requestId !== "") {
       response.headers.set("x-request-id", requestId);
     }
@@ -60,18 +64,31 @@ function assertProtocol(request: Request): void {
   }
 }
 
-async function authenticate(
-  request: Request,
-  backend: ExecutorDeps["backend"],
-): Promise<string> {
+const CLIENT_ID_HEADER = "x-client-id";
+const CLIENT_ADDRESS_HEADER = "x-client-address";
+
+type Identity = { clientId: string; source: "bearer" | "header" };
+
+/**
+ * 身份解析：能命中的 Bearer 优先（存量节点、测试与 `EXECUTOR_AUTH=on` 不受影响）；
+ * `authMode=off` 时回退到 `X-Client-Id`；两者都没有则 `401 unauthorized`。
+ */
+async function authenticate(request: Request, deps: ExecutorDeps): Promise<Identity> {
   const header = request.headers.get("authorization");
-  if (header === null) throw new UnauthorizedError();
-  const match = /^Bearer\s+(.+)$/i.exec(header.trim());
-  const token = match?.[1]?.trim();
-  if (token === undefined || token === "") throw new UnauthorizedError();
-  const clientId = await backend.resolveClientId(token);
-  if (clientId === null) throw new UnauthorizedError();
-  return clientId;
+  if (header !== null) {
+    const token = /^Bearer\s+(.+)$/i.exec(header.trim())?.[1]?.trim();
+    if (token !== undefined && token !== "") {
+      const clientId = await deps.backend.resolveClientId(token);
+      if (clientId !== null) return { clientId, source: "bearer" };
+    }
+  }
+  if ((deps.authMode ?? "on") === "off") {
+    const declared = request.headers.get(CLIENT_ID_HEADER)?.trim();
+    if (declared !== undefined && declared !== "") {
+      return { clientId: declared, source: "header" };
+    }
+  }
+  throw new UnauthorizedError();
 }
 
 type Matcher = (ctx: ExecutorContext, clientId: string) => Promise<Response> | null;

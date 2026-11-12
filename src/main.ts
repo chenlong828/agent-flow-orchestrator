@@ -37,6 +37,11 @@ import { createCatalog } from "./components/catalog/index.ts";
 import { createApiDocs, createHttpApp } from "./components/http-gateway/index.ts";
 
 const config = await loadConfig();
+if (config.executorAuth === "off") {
+  console.warn(
+    "执行面鉴权已关闭（EXECUTOR_AUTH=off）：允许 X-Client-Id 自注册，仅限开发期；暴露到非 loopback 前必须设 EXECUTOR_AUTH=on",
+  );
+}
 
 await ensureDatabase(config.databaseUrl);
 const db = createDb(config.databaseUrl);
@@ -155,6 +160,13 @@ const app = createHttpApp({
     authenticator: executorAuthenticator,
     run: runService,
   }),
+  executorAuth: config.executorAuth,
+  executorEnroll: async (clientId, address) => {
+    const node = await harnessService.ensureNode(clientId, { address });
+    if (node.created) {
+      console.log(`执行面自动登记节点：clientId=${clientId}（X-Client-Id，EXECUTOR_AUTH=off）`);
+    }
+  },
   runService,
   harnessService,
   toolService,

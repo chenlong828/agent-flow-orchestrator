@@ -153,6 +153,8 @@ async function createHarness(
   ctx: HarnessServiceContext,
   input: CreateHarness,
   requestActor?: string,
+  /** 仅开发期自注册在插入时带上 clientId；管理面 create 不传。 */
+  clientId?: string,
 ): Promise<{ id: string; revision: number }> {
   const normalized = normalizeWrite(input);
   const enabled = normalizeEnabled(input.enabled) ?? true;
@@ -161,7 +163,14 @@ async function createHarness(
   const actorValue = requestActor ?? ctx.actor;
   try {
     await ctx.db.transaction(async (tx) => {
-      await ctx.store.insertRoot(tx, { ...normalized, enabled, id, now, actor: actorValue });
+      await ctx.store.insertRoot(tx, {
+        ...normalized,
+        enabled,
+        id,
+        clientId: clientId ?? null,
+        now,
+        actor: actorValue,
+      });
       await ctx.store.replaceTags(tx, id, normalized.tags);
     });
   } catch (error) {
@@ -323,6 +332,57 @@ async function unbindHarnessClient(
   );
 }
 
+const AUTO_ENROLL_ACTOR = "auto-enroll";
+const AUTO_ENROLL_ADDRESS = "auto";
+const AUTO_ENROLL_DESCRIPTION = "执行面自动登记（开发期身份旁路）";
+const AUTO_ENROLL_CONCURRENCY = 4;
+const AUTO_ENROLL_NAME_ATTEMPTS = 5;
+
+/** 自动登记用的名称：`clientId` 超长截断；冲突时追加 `-2`、`-3`…（`name` 唯一索引，上限 80 字）。 */
+function autoEnrollName(base: string, attempt: number): string {
+  if (attempt === 1) return base.slice(0, 80);
+  const suffix = `-${attempt}`;
+  return `${base.slice(0, 80 - suffix.length)}${suffix}`;
+}
+
+async function ensureHarnessNode(
+  ctx: HarnessServiceContext,
+  clientId: string,
+  input: { address?: string; actor?: string } | undefined,
+): Promise<{ id: string; created: boolean }> {
+  const value = ensureClientId(clientId);
+  const existing = await ctx.store.findByClientId(ctx.db, value);
+  if (existing !== null) return { id: existing.id, created: false };
+
+  const address = input?.address ?? AUTO_ENROLL_ADDRESS;
+  const actor = input?.actor ?? AUTO_ENROLL_ACTOR;
+  for (let attempt = 1; attempt <= AUTO_ENROLL_NAME_ATTEMPTS; attempt += 1) {
+    try {
+      const created = await createHarness(
+        ctx,
+        {
+          name: autoEnrollName(value, attempt),
+          kind: "container",
+          address,
+          accessMode: "agent",
+          concurrencyMax: AUTO_ENROLL_CONCURRENCY,
+          queuePolicy: "fifo",
+          description: AUTO_ENROLL_DESCRIPTION,
+        },
+        actor,
+        value,
+      );
+      return { id: created.id, created: true };
+    } catch (error) {
+      if (!(error instanceof NameConflictError)) throw error;
+      // 并发登记：另一个请求刚写入同一 clientId，直接复用它。
+      const raced = await ctx.store.findByClientId(ctx.db, value);
+      if (raced !== null) return { id: raced.id, created: false };
+    }
+  }
+  throw new NameConflictError(autoEnrollName(value, 1));
+}
+
 async function deleteHarness(
   ctx: HarnessServiceContext,
   id: string,
@@ -370,6 +430,7 @@ export function createHarnessService(deps: HarnessDeps): HarnessService {
       bindHarnessClient(ctx, id, revision, binding, requestActor),
     unbindClient: (id, revision, requestActor) =>
       unbindHarnessClient(ctx, id, revision, requestActor),
+    ensureNode: (clientId, input) => ensureHarnessNode(ctx, clientId, input),
     delete: (id, revision) => deleteHarness(ctx, id, revision),
   };
 }

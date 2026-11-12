@@ -27,6 +27,8 @@ export type Config = {
   skillDraftTtlHours: number;
   taskMaxAttempts: number;
   taskRetryDelayMs: number;
+  /** 执行面鉴权：`off` 时允许 `X-Client-Id` 自注册（开发期默认）。 */
+  executorAuth: "on" | "off";
   archiveRoot: string;
   runDefaultTimeoutMs: number;
   runMaxNodeVisits: number;
@@ -325,10 +327,13 @@ function resolveEnvConfig(
   env: Record<string, string | undefined>,
   file: FileConfig,
 ): Omit<Config, "databaseUrl"> {
+  const executor = resolveExecutorConfig(env, file.executor, fail);
   return {
     ...resolveServerConfig(env, file),
     ...resolveAppConfig(env, file),
-    ...resolveExecutorConfig(env, file.executor, fail),
+    executorAuth: executor.auth,
+    taskMaxAttempts: executor.taskMaxAttempts,
+    taskRetryDelayMs: executor.taskRetryDelayMs,
     ...resolveRunConfig(env, file.run, fail),
     ...resolveArchiveConfig(env, file.archive, fail),
   };

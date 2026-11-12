@@ -73,10 +73,11 @@ export function loadConfig(options?: LoadConfigOptions): Promise<Config>;
   < process.env（包含 Bun 从 .env 加载的值）
 ```
 
-- 环境变量键：`HOST`、`PORT`、`DATABASE_URL`、`DEV_ACTOR`、`LOG_LEVEL`、`SKILL_STORAGE_ROOT`、`SKILL_DRAFT_TTL_HOURS`、`TASK_MAX_ATTEMPTS`、`TASK_RETRY_DELAY_MS`、`ARCHIVE_ROOT`、`RUN_DEFAULT_TIMEOUT_MS`、`RUN_MAX_NODE_VISITS`。
+- 环境变量键：`HOST`、`PORT`、`DATABASE_URL`、`DEV_ACTOR`、`LOG_LEVEL`、`SKILL_STORAGE_ROOT`、`SKILL_DRAFT_TTL_HOURS`、`EXECUTOR_AUTH`、`TASK_MAX_ATTEMPTS`、`TASK_RETRY_DELAY_MS`、`ARCHIVE_ROOT`、`RUN_DEFAULT_TIMEOUT_MS`、`RUN_MAX_NODE_VISITS`。
 - 空字符串视为未设置，沿用现有行为。
 - `SKILL_STORAGE_ROOT` 为空时按未设置处理，回退 `.local/skills`；`SKILL_DRAFT_TTL_HOURS` 必须是正整数小时，非法值报 `config_validation_error`。
 - 执行面凭据**不通过配置提供，永久保存在 `harness.client_token`**（数据库）：token → `clientId` 由 `CMP-harness` 解析（经 `kernel.ExecutorAuthenticator`），登记与轮换走 `API-41`；配置里不出现任何 token，也不读 `.env` 中的凭据键。
+- `EXECUTOR_AUTH` 只接受 `on` / `off`，默认 **`off`**（开发期）：`off` 时执行面允许 `X-Client-Id` 自注册，启动日志打一条告警；**生产部署必须设 `on`**，属上线阻塞项（[`2026-11-12-executor-auth-dev-bypass.md`](../../../history/decisions/2026-11-12-executor-auth-dev-bypass.md)）。非 `on`/`off` 的值报 `config_validation_error`，字段为 `EXECUTOR_AUTH`。
 - `TASK_MAX_ATTEMPTS` 必须是 1–10 的整数，默认 3，只约束「未回报重派」（`executor-http-v3` `S-02`）；`TASK_RETRY_DELAY_MS` 必须是 0–600000 的整数，默认 5000。失败或超时的结果不自动重派（[`scheduler`](../scheduler/spec.md) §4.5，2026-11-11 裁决），这两个参数不影响失败结果。
 - `executor-http-v3` §3 的常量（`pollHoldMs=30000`、`maxTasksPerPoll=10`、`clientSilentMs=120000`、`resultGraceMs=60000`、`maxResultBytes`、`maxPromptBytes`、`maxSkillPackageBytes`、`clientPollTimeoutMs`）不通过配置协商，代码常量固定；本组件不读取。
 - 已存在的 shell 环境变量优先于 `.env`；这是 Bun 的加载语义。

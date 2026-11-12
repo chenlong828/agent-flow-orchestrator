@@ -101,4 +101,11 @@ export type ExecutorDeps = {
   backend: ExecutorBackend;
   /** 测试可注入更短的挂起周期；缺省用契约常量。 */
   pollHoldMs?: number;
+  /**
+   * 执行面鉴权模式：缺省 `on`（严格 Bearer）。
+   * `off` 为开发期旁路，允许 `X-Client-Id` 声明身份；生产部署必须设 `on`。
+   */
+  authMode?: "on" | "off";
+  /** 开发期自注册：`authMode=off` 且身份来自 `X-Client-Id` 时调用，确保节点行存在。 */
+  ensureNode?(clientId: string, address?: string): Promise<void>;
 };

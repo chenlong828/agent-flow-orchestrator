@@ -429,3 +429,79 @@ describe("Harness 执行节点登记", () => {
     expect(await authenticate.resolveClientId("tok-a")).toBeNull();
   });
 });
+
+describe("Harness 开发期自注册（ensureNode）", () => {
+  test("未知 clientId 建默认节点行；重复调用幂等、不新增行", async () => {
+    const first = await service.ensureNode("dev-node-01");
+    expect(first.created).toBe(true);
+
+    const detail = await read.get(first.id);
+    expect(detail).toMatchObject({
+      name: "dev-node-01",
+      kind: "container",
+      address: "auto",
+      accessMode: "agent",
+      concurrencyMax: 4,
+      queuePolicy: "fifo",
+      enabled: true,
+      clientId: "dev-node-01",
+      clientToken: null,
+    });
+
+    const again = await service.ensureNode("dev-node-01");
+    expect(again).toEqual({ id: first.id, created: false });
+    const page = await read.list({ page: normalizePageQuery() });
+    expect(page.total).toBe(1);
+  });
+
+  test("上报地址写入首次登记；已存在行不被修改（含停用状态）", async () => {
+    const created = await service.ensureNode("dev-node-02", {
+      address: "10.0.4.13:7801",
+    });
+    expect((await read.get(created.id)).address).toBe("10.0.4.13:7801");
+
+    await service.setEnabled(created.id, 1, false);
+    const second = await service.ensureNode("dev-node-02", {
+      address: "10.0.9.9:9000",
+    });
+    expect(second).toEqual({ id: created.id, created: false });
+    const detail = await read.get(created.id);
+    expect(detail.address).toBe("10.0.4.13:7801");
+    expect(detail.enabled).toBe(false);
+    expect(detail.revision).toBe(2);
+  });
+
+  test("与已有资产同名时追加后缀，不覆盖、不报错", async () => {
+    const manual = await service.create(createInput("dev-node-03"));
+    const enrolled = await service.ensureNode("dev-node-03");
+    expect(enrolled.created).toBe(true);
+    expect(enrolled.id).not.toBe(manual.id);
+
+    const enrolledDetail = await read.get(enrolled.id);
+    expect(enrolledDetail.name).toBe("dev-node-03-2");
+    expect(enrolledDetail.clientId).toBe("dev-node-03");
+    expect((await read.get(manual.id)).clientId).toBeNull();
+  });
+
+  test("clientId 形状非法时拒绝，不建行", async () => {
+    for (const value of ["", "has space", "x".repeat(65)]) {
+      const error = await service.ensureNode(value).catch((e) => e);
+      expect(error).toBeInstanceOf(ValidationError);
+      expect(error.details).toEqual({ field: "clientId", reason: "必须是 1–64 个非空白字符" });
+    }
+    const page = await read.list({ page: normalizePageQuery() });
+    expect(page.total).toBe(0);
+  });
+
+  test("自动登记的节点可被派发；停用后不可派发", async () => {
+    const db = await getTestDb();
+    const directory = createHarnessNodeDirectory(read);
+    const created = await service.ensureNode("dev-node-04");
+    expect(await directory.isDispatchable("dev-node-04")).toBe(true);
+
+    await service.setEnabled(created.id, 1, false);
+    expect(await directory.isDispatchable("dev-node-04")).toBe(false);
+    expect(await directory.listClientIds()).toEqual([]);
+    void db;
+  });
+});

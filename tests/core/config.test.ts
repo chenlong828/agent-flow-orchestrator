@@ -47,6 +47,7 @@ describe("CMP-config 默认值与文件覆盖", () => {
       logLevel: "info",
       skillStorageRoot: ".local/skills",
       skillDraftTtlHours: 24,
+      executorAuth: "off",
       taskMaxAttempts: 3,
       taskRetryDelayMs: 5000,
       archiveRoot: ".local/archive",
@@ -79,6 +80,7 @@ describe("CMP-config 默认值与文件覆盖", () => {
       logLevel: "warn",
       skillStorageRoot: ".local/skills",
       skillDraftTtlHours: 24,
+      executorAuth: "off",
       taskMaxAttempts: 3,
       taskRetryDelayMs: 5000,
       archiveRoot: ".local/archive",
@@ -112,6 +114,7 @@ describe("CMP-config 默认值与文件覆盖", () => {
       logLevel: "debug",
       skillStorageRoot: "/srv/skills",
       skillDraftTtlHours: 48,
+      executorAuth: "off",
       taskMaxAttempts: 3,
       taskRetryDelayMs: 5000,
       archiveRoot: ".local/archive",
@@ -138,6 +141,7 @@ describe("CMP-config 默认值与文件覆盖", () => {
       logLevel: "info",
       skillStorageRoot: ".local/skills",
       skillDraftTtlHours: 24,
+      executorAuth: "off",
       taskMaxAttempts: 3,
       taskRetryDelayMs: 5000,
       archiveRoot: ".local/archive",
@@ -356,5 +360,24 @@ describe("CMP-config 运行编排参数", () => {
     expect(error).toBeInstanceOf(ConfigError);
     expect(error.code).toBe("config_validation_error");
     expect(error.field).toBe("run.unknown");
+  });
+});
+
+describe("CMP-config 执行面鉴权开关", () => {
+  test("缺省关闭；EXECUTOR_AUTH=on 打开，非法值被拒绝", async () => {
+    const configDir = await tempConfigDir();
+    expect((await loadConfig(options(configDir))).executorAuth).toBe("off");
+
+    expect(
+      (await loadConfig(options(configDir, { EXECUTOR_AUTH: "on" }))).executorAuth,
+    ).toBe("on");
+    for (const value of ["  ", "strict", "ON"]) {
+      const error = await loadConfig(
+        options(configDir, { EXECUTOR_AUTH: value }),
+      ).catch((caught) => caught);
+      expect(error).toBeInstanceOf(ConfigError);
+      expect(error.code).toBe("config_validation_error");
+      expect(error.field).toBe("EXECUTOR_AUTH");
+    }
   });
 });
