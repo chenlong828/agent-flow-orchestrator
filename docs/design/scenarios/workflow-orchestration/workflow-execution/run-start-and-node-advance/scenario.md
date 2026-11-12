@@ -82,7 +82,7 @@ externalRefs: []
 失败路径：
 
 - 校验失败（图非法、专家缺失/停用、含 `split`/`fanout`）→ `400`，**不建 run、不登记 instance**。
-- `harnessId` 不存在或未绑定 `clientId` → `404`。
+- `harnessId` 不存在 → `404`；存在但未绑定 `clientId` 或已停用 → `400 validation_error`。
 - 实例登记冲突（同 `instanceId` 不同绑定）→ `409`，不建 run。
 - 同一工作区已有 `running`/`waiting_confirm` 的 run → `409 run_conflict`，不建 run；等前一个 run 结束后再启动。
 - 入队后实例 `blocked` / 节点停用 → 任务留在 `queued`，run 保持 `running`，不报错（派发门禁在调度器，`S-04`/`§4.8`）。

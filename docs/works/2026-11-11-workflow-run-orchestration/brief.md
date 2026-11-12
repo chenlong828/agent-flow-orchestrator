@@ -52,7 +52,7 @@ level: P1
 | `T-RUN-06` | change | http-gateway | 产品面 6 端点 + 执行面 `P-04`/`P-05` + `poll` 字段映射 + 组合根接线 | 完成（2026-11-12） | openapi 已补 `API-42`–`API-47`（54 个业务端点、55 个 operation、38 个 path）；nodeId 校验改为图内稳定 ID；日志响应补 `X-Checksum-Sha256`；`quality:gate` 0 违规 |
 | `T-RUN-07` | change | workflow | DSL 7 类节点、删除 `fanin` 配对、`fanout` 前驱必须是 `split` | 完成（2026-11-12） | workflow 23 例、openapi/DSL schema 同步 |
 | `T-RUN-08` | verify | global | `SCN-0301`–`SCN-0304` 测试落地并转 `verified` | 完成（2026-11-12） | 4 个场景各 3 正 1 反（`TC-RUN-001`–`016`），`tests/components/http-gateway/run-*.test.ts` 全绿 |
-| `T-RUN-09` | verify | global | 与 `agent-flow-client` v3 联调：启动→end、review 回退、confirm 决策、cancel、日志与归档 | 待开始（阻塞：client 仍是 v2，前置未满足） | 联调记录写入 `result.md`；需用户决定 client 侧改造归属 |
+| `T-RUN-09` | verify | global | 与 `agent-flow-client` v3 联调：启动→end、review 回退、confirm 决策、cancel、日志与归档 | 完成（2026-11-12） | 真实 client（`95d759a`）四条链路全过；记录见 [`result.md`](result.md) §3 |
 | `T-RUN-10` | design | global | 按 client 评审修订契约 v3 与交接件（`B-01`–`B-04`、`D-01`–`D-10`） | 完成（2026-11-12） | 契约 §11.4 修订记录；交接件更新；客户端待按修订版重新确认 |
 
 装载清单（开工前必读）：
