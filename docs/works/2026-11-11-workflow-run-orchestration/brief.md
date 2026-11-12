@@ -49,7 +49,7 @@ level: P1
 | `T-RUN-03` | design | global | 组件规格 `CMP-run`、契约 v3 定稿、`CMP-workflow`/`CMP-http-gateway`/`CMP-config`/`CMP-kernel`/`CMP-instance`/`CMP-scheduler`/`architecture` 规格增量 | 完成（2026-11-11，待第二次人工评审确认） | 规格冻结后进入 `T-RUN-04` |
 | `T-RUN-04` | change | kernel / platform / config | 迁移 `0002`：`workflow_run`/`run_node`/`run_artifact` 与活跃 run 唯一索引；`[run]` / `[archive]` 配置 | 完成（2026-11-11） | 迁移可重复执行；`bun run check` 339 pass |
 | `T-RUN-05` | change | run | `CMP-run` 服务：start / advance / verdict / rollback / confirm / cancel / archive | 实现完成，待收口（2026-11-12） | `tests/components/run` 10 例、`bun run check` 349 pass；`quality:gate` 11 项 WARN 待处理（文件拆分/复杂度/孤儿接线/表列数） |
-| `T-RUN-06` | change | http-gateway | 产品面 6 端点 + 执行面 `P-04`/`P-05` + `poll` 字段映射 + 组合根接线（同时解决 run 模块孤儿与质量门禁） | 待开始 | 契约测试按 3 正 1 反通过；`quality:gate` 0 违规 |
+| `T-RUN-06` | change | http-gateway | 产品面 6 端点 + 执行面 `P-04`/`P-05` + `poll` 字段映射 + 组合根接线 | 实现完成，待收口（2026-11-12） | 3100 已起、协议 3、run 启动/查询/取消冒烟通过；openapi 与 `quality:gate` 待收口 |
 | `T-RUN-07` | change | workflow | DSL 7 类节点、删除 `fanin` 配对、`fanout` 前驱必须是 `split` | 完成（2026-11-12） | workflow 23 例、openapi/DSL schema 同步 |
 | `T-RUN-08` | verify | global | `SCN-0301`–`SCN-0304` 测试落地并转 `verified` | 待开始 | 四个场景全绿 |
 | `T-RUN-09` | verify | global | 与 `agent-flow-client` v3 联调：启动→end、review 回退、confirm 决策、cancel、日志与归档 | 待开始（前置：client 按修订版 v3 确认并实现） | 联调记录写入 `result.md` |
@@ -61,7 +61,8 @@ level: P1
 - `T-RUN-03`：`design-proposal.md`、[`executor-http-v3.md`](../../design/contracts/executor-http-v3.md)、[`scheduler/spec.md`](../../design/components/scheduler/spec.md)、[`workflow/spec.md`](../../design/components/workflow/spec.md)、[`http-gateway/spec.md`](../../design/components/http-gateway/spec.md)。规格冻结产物：[`run/spec.md`](../../design/components/run/spec.md)、[`executor-http-v3.md`](../../design/contracts/executor-http-v3.md)、[`architecture.md`](../../design/architecture.md)。
 - `T-RUN-04`：迁移 `0001_baseline.sql`、[`config/spec.md`](../../design/components/config/spec.md)、[`platform/spec.md`](../../design/components/platform/spec.md)。
 - 实现记录（2026-11-12）：`CMP-run` 落 `src/components/run/`（`types`/`deps`/`store`/`service`/`prompt`/`verdict`/`archive`/`graph-checks`/`validate`）；DSL 落 `graph.ts`/`graph-analysis.ts`/`dsl.schema.json`/`openapi.yaml`；`instance.getByBinding` 与 kernel 新错误码/常量已落。
-- 质量门禁遗留（T-RUN-05）：`service.ts` 747 行 / `createRunService` 663 行 / 圈复杂度 24、8 处非空断言、`run/types.ts` 深导入 scheduler、10 个孤儿文件（未接组合根）、`workflow_run` 23 列；在 `T-RUN-06` 接线前先拆分 `run` 模块与收敛表列。
+- T-RUN-06 记录（2026-11-12）：新增 `task_space_path`（迁移 `0003_task_space.sql`、scheduler `TaskDraft`/`TaskEnvelope`），执行面协议升 3；`P-04`/`P-05` 与 `archiveRequests`/`archivedRuns` 已接线；产品面 `POST /workflows/{id}/runs`、`GET /runs`、`GET /runs/{id}`、`POST /runs/{id}/cancel`、决策与日志下载已实现；`3100` 已重启并验证 `/healthz`、`/openapi.yaml`、run 启动/取消。
+- 质量门禁遗留（T-RUN-05/06）：`service.ts` 747 行 / `createRunService` 663 行 / 圈复杂度 24、8 处非空断言、`run/types.ts` 深导入 scheduler、10 个孤儿文件（未接组合根）、`workflow_run` 23 列；在 `T-RUN-06` 接线前先拆分 `run` 模块与收敛表列。
 - `T-RUN-05`：`T-RUN-03` 冻结的规格、`src/components/scheduler/service.ts`、`src/components/instance/service.ts`。
 - `T-RUN-06`：`T-RUN-03` 冻结的契约、`src/components/http-gateway/routes/executor.ts`、`src/components/http-gateway/routes/workflow.ts`。
 - `T-RUN-07`：`src/components/workflow/graph.ts`、`graph-analysis.ts`、`dsl.ts`、`dsl.schema.json`。

@@ -42,6 +42,7 @@ updated: 2026-11-11
 - 同一 `taskId` 同一时刻最多一条 `dispatched` 事实；结果只接受一次（`S-08`）。
 - `cancelRequestedAt` 是取消请求的标记，不是第四个状态：置位后任务仍按 `dispatched → done` 收敛，由 `poll` 的 `cancelInstances` 与 client 的 `cancelled` 结果兑现。
 - 任务归属的 `clientId` 来自实例绑定，任务表不单独存「可改派给谁」的字段；跨 client 改派不是本组件的隐式行为（见 §4.7）。
+- v3 起 `task` 增加 `task_space_path`：由上游编排在入队时冻结，重派不变（`S-05`）；空串表示旧任务无 task-space。
 - 技能集 digest 由本组件在入队时计算并冻结；规范见 §4.4。
 
 ## 3 公共契约
@@ -58,6 +59,7 @@ type TaskDraft = {
   prompt: string;          // ≤ maxPromptBytes
   timeoutMs: number;       // > 0
   skillIds: string[];      // 由上游给出；解析为不可变 skillSet
+  taskSpacePath?: string;  // v3：run 的 task-space 绝对路径；空串表示无 task-space
 };
 
 type EnqueueInput = { tasks: TaskDraft[]; actor?: string };
@@ -88,6 +90,7 @@ type TaskEnvelope = {
   attempt: number;
   prompt: string;
   workspacePath: string;
+  taskSpacePath: string;
   timeoutMs: number;
   skillSet: SkillSet;
 };
