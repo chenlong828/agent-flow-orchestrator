@@ -60,6 +60,19 @@
         "height": { "type": "number" }
       }
     },
+    "nodeLayout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number" },
+        "height": { "type": "number" },
+        "inSide": { "enum": ["top", "right", "bottom", "left"] },
+        "outSide": { "enum": ["top", "right", "bottom", "left"] }
+      }
+    },
     "viewportLayout": {
       "type": "object",
       "additionalProperties": false,
@@ -105,7 +118,7 @@
           "description": "专家 UUID 或 null；节点类型矩阵与专家存在性由服务端校验。",
           "anyOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }]
         },
-        "layout": { "$ref": "#/$defs/layout" }
+        "layout": { "$ref": "#/$defs/nodeLayout" }
       }
     },
     "edge": {
