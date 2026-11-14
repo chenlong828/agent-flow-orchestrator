@@ -14,6 +14,11 @@ export type RunNodeState =
 export type ArchiveState = "none" | "pending" | "stored" | "failed";
 export type RunArtifactKind = "session_log" | "archive";
 
+/** 回退进入原因指针：只记「哪一行的驳回」，理由正文仍以被驳回行的 verdict 为准。 */
+export type EnterReason =
+  | { kind: "review_fail"; from: string; fromVisit: number }
+  | { kind: "confirm_reject"; from: string; fromVisit: number };
+
 export type StartRun = {
   workflowId: string;
   harnessId: string;
@@ -30,6 +35,7 @@ export type RunNodeView = {
   state: RunNodeState;
   taskId: string | null;
   verdict: Record<string, unknown> | null;
+  enterReason: EnterReason | null;
   message: string;
   error: { code: string; message: string } | null;
   dispatchedAt: string | null;
@@ -149,6 +155,7 @@ export type RunNodeRow = {
   state: RunNodeState;
   task_id: string | null;
   verdict: Record<string, unknown> | string | null;
+  enter_reason: EnterReason | string | null;
   message: string | null;
   error: { code: string; message: string } | string | null;
   dispatched_at: Date | string | null;

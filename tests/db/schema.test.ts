@@ -60,6 +60,7 @@ describe("数据库结构", () => {
       "0006_skill_slug.sql",
       "0007_drop_instance_blocked.sql",
       "0008_skill_category_flow.sql",
+      "0009_run_node_enter_reason.sql",
     ]);
 
     const categories = await db.query<{ code: string; position: number }>(

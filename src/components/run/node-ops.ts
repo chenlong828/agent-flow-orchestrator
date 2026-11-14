@@ -2,13 +2,14 @@ import { NotFoundError } from "../../core/kernel/index.ts";
 import type { WorkflowNode } from "../workflow/index.ts";
 import type { RunCore } from "./core.ts";
 import type { ErrorView } from "./internal.ts";
-import type { RunNodeRow, RunRow } from "./types.ts";
+import type { EnterReason, RunNodeRow, RunRow } from "./types.ts";
 
 export type NodeOps = {
   createNode(
     run: RunRow,
     node: WorkflowNode,
     state: "queued" | "waiting_confirm",
+    enterReason?: EnterReason | null,
   ): Promise<RunNodeRow | null>;
   settleNode(
     run: RunRow,
@@ -31,6 +32,7 @@ export function createNodeOps(core: RunCore): NodeOps {
     run: RunRow,
     node: WorkflowNode,
     state: "queued" | "waiting_confirm",
+    enterReason?: EnterReason | null,
   ): Promise<RunNodeRow | null> {
     const visit = (await store.maxVisit(deps.db, run.id, node.id)) + 1;
     if (visit > deps.maxNodeVisits) {
@@ -50,6 +52,7 @@ export function createNodeOps(core: RunCore): NodeOps {
         nodeType: node.type,
         expertId: node.expertId,
         state,
+        ...(enterReason === undefined || enterReason === null ? {} : { enterReason }),
         now,
       });
       await store.setCurrentNode(tx, run.id, node.id, now);

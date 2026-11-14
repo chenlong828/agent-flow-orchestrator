@@ -2,6 +2,7 @@ import { NotFoundError, ValidationError } from "../../core/kernel/index.ts";
 import type { WorkflowNode } from "../workflow/index.ts";
 import type { RunCore } from "./core.ts";
 import { startNode } from "./graph-checks.ts";
+import { resolveEntry } from "./entry.ts";
 import { composeNodePrompt } from "./prompt.ts";
 import type { RunNodeRow, RunRow } from "./types.ts";
 
@@ -22,13 +23,20 @@ export function createDispatchOps(core: RunCore): DispatchOps {
       throw new ValidationError(`graph.nodes.${node.id}.expertId`, "执行节点必须绑定专家");
     }
     const expert = await deps.expertRead.get(node.expertId);
-    const workflow = await deps.workflowRead.get(run.workflow_id);
     const start = startNode(graphFor(run));
+    const entry = await resolveEntry(store, deps.db, graphFor(run), run, row);
     const prompt = composeNodePrompt({
-      workflowName: workflow.name,
       node,
-      expertName: expert.name,
+      expert: {
+        name: expert.name,
+        role: expert.role,
+        persona: expert.persona,
+        duty: expert.duty,
+        verifyOrder: expert.verifyOrder,
+        notes: expert.notes,
+      },
       taskSpacePath: run.task_space_path,
+      ...(entry === undefined ? {} : { entry }),
       ...(start?.id === node.id ? { intentMarkdown: run.intent_markdown } : {}),
     });
     const enqueued = await deps.scheduler.enqueue({

@@ -58,6 +58,7 @@ function graphConfirm(expertId: string): WorkflowGraph {
     edges: [
       { id: "e1", from: "n1", to: "n2", kind: "seq" },
       { id: "e2", from: "n2", to: "n3", kind: "seq" },
+      { id: "e3", from: "n2", to: "n1", kind: "rollback" },
     ],
   };
 }
@@ -237,7 +238,7 @@ describe("CMP-run 启动与推进", () => {
       actor: null,
     });
     expect(run.state).toBe("running");
-    expect(run.taskSpacePath).toBe(`/work/linear/.agent-flow/task/${run.runId}`);
+    expect(run.taskSpacePath).toMatch(/^\/work\/linear\/task-spaces\/\d{8}-\d{6}$/);
     expect(h.scheduler.enqueued[0]!.tasks[0]!.taskSpacePath).toBe(run.taskSpacePath);
     expect(run.nodes).toHaveLength(1);
     expect(run.nodes[0]!.nodeId).toBe("n1");
@@ -328,6 +329,20 @@ describe("CMP-run 判定与回退", () => {
     expect(agents[1]?.visit).toBe(2);
     expect(agents[1]?.state).toBe("dispatched");
     expect(detail.state).toBe("running");
+
+    // 进入原因是机制字段：目标节点与回退路径上的节点都指向被驳回行；
+    // prompt 由它渲染出理由，理由正文仍只在被驳回行的 verdict 里。
+    expect(agents[1]?.enterReason).toEqual({ kind: "review_fail", from: "n3", fromVisit: 1 });
+    expect(reviews.find((n) => n.visit === 2)?.enterReason).toEqual({
+      kind: "review_fail",
+      from: "n3",
+      fromVisit: 1,
+    });
+    expect(agents[0]?.enterReason).toBeNull();
+    const retry = h.scheduler.enqueued.at(-1)!.tasks[0]!;
+    expect(retry.prompt).toContain("[本次进入] 节点「审核」判定 fail，本节点被回退重跑。");
+    expect(retry.prompt).toContain("驳回理由：再改");
+    expect(retry.prompt).not.toContain("第 1 轮");
   });
 
   test("verdict 非法时节点与 run 失败", async () => {
@@ -371,6 +386,31 @@ describe("CMP-run 人工确认与取消", () => {
     expect(detail.state).toBe("running");
     expect(detail.nodes.find((n) => n.nodeId === "n2")?.state).toBe("succeeded");
     expect(detail.nodes.find((n) => n.nodeId === "n3")?.state).toBe("dispatched");
+  });
+
+  test("人工驳回后重跑：进入原因指向确认行，prompt 渲染驳回意见", async () => {
+    const h = await makeHarness(graphConfirm);
+    const run = await h.runService.start({
+      workflowId: h.workflowId,
+      harnessId: h.harnessId,
+      workspacePath: "/work/confirm-reject",
+      intentMarkdown: "x",
+      actor: null,
+    });
+    await driveSucceeded(h, run.runId, 1);
+    const detail = await h.runService.decide({
+      runId: run.runId,
+      nodeId: "n2",
+      decision: "reject",
+      comment: "方案与预算冲突，改完再提交",
+      actor: "tester",
+    });
+    expect(detail.state).toBe("running");
+    const retry = detail.nodes.find((n) => n.nodeId === "n1" && n.visit === 2);
+    expect(retry?.enterReason).toEqual({ kind: "confirm_reject", from: "n2", fromVisit: 1 });
+    const task = h.scheduler.enqueued.at(-1)!.tasks[0]!;
+    expect(task.prompt).toContain("[本次进入] 人工在「确认」节点驳回，本节点被回退重跑。");
+    expect(task.prompt).toContain("驳回意见：方案与预算冲突，改完再提交");
   });
 
   test("取消把 run 置为 cancelled 并取消实例任务", async () => {

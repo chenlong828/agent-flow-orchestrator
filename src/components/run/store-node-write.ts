@@ -27,9 +27,20 @@ export function createNodeWrites() {
     async insertNode(tx: Db, row: NewNodeRow): Promise<void> {
       await tx.query(
         `insert into run_node
-           (run_id, node_id, visit, node_type, expert_id, state, created_at, updated_at)
-         values ($1, $2, $3, $4, $5, $6, $7, $7)`,
-        [row.runId, row.nodeId, row.visit, row.nodeType, row.expertId, row.state, row.now],
+           (run_id, node_id, visit, node_type, expert_id, state, enter_reason, created_at, updated_at)
+         values ($1, $2, $3, $4, $5, $6, $7::text::jsonb, $8, $8)`,
+        [
+          row.runId,
+          row.nodeId,
+          row.visit,
+          row.nodeType,
+          row.expertId,
+          row.state,
+          row.enterReason === undefined || row.enterReason === null
+            ? null
+            : JSON.stringify(row.enterReason),
+          row.now,
+        ],
       );
     },
 

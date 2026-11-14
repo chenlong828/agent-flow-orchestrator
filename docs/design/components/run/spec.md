@@ -47,13 +47,13 @@ updated: 2026-11-12
 | 表 | 关键字段 | 说明 |
 |---|---|---|
 | `workflow_run` | `id`、`workflow_id`、`workflow_revision`、`graph_snapshot`、`intent_markdown`、`harness_id`、`client_id`、`instance_id`、`workspace_path`、`task_space_path`、`auto_confirm`、`state`、`outcome`、`current_node_id`、`result`（`finalMessage`/`error`）、`archive_state`、`finished_at`、`created_at`/`updated_at`/`created_by` | 运行聚合根；`graph_snapshot` 是启动时冻结的 `WorkflowGraph`；运行创建即开始，`startedAt` 对外取 `created_at`（`0005` 迁移收敛表宽） |
-| `run_node` | `run_id`、`node_id`、`visit`、`node_type`、`expert_id`、`state`、`task_id`、`verdict`、`message`、`error`、`dispatched_at`、`finished_at` | 追加写为主：同一节点每次重访新增一行，旧行保留；`attempt` 归调度器，不在本表留第二真相 |
+| `run_node` | `run_id`、`node_id`、`visit`、`node_type`、`expert_id`、`state`、`task_id`、`verdict`、`message`、`error`、`enter_reason`、`dispatched_at`、`finished_at` | 追加写为主：同一节点每次重访新增一行，旧行保留；`attempt` 归调度器，不在本表留第二真相 |
 | `run_artifact` | `run_id`、`node_id`（归档为 null）、`visit`、`attempt`（归档为 null）、`kind`（`session_log` / `archive`）、`store_key`、`size_bytes`、`sha256`、`created_at` | 制品元数据；一次尝试一份日志，字节在 `FileStore`，本组件不持有字节 |
 
 不变量：
 
 - `workflow_run.id` 为 UUIDv7，全生命周期唯一；`graph_snapshot` 写入后不再改变。
-- `task_space_path` 由服务端拼接：`<workspace_path>/.agent-flow/task/<runId>`，**不接收调用方提供的路径分量**。
+- `task_space_path` 由服务端在启动时生成：`<workspace_path>/task-spaces/<YYYYMMDD-HHmmss>`（本地时间，冲突追加 `-2`），**不接收调用方提供的路径分量**。工作区本身的形态（普通目录 / git 超项目 + submodule）由用户决定，编排只把它当不透明绝对路径，不做 git 校验。
 - 同一个 run 同一时刻最多一个 `run_node` 处于 `queued` / `dispatched` / `waiting_confirm`（串行推进）。
 - 同一 `(run_id, node_id, visit)` 唯一；`visit` 从 1 开始，回退重访 +1。
 - `workflow_run.state` 闭集 `created` / `running` / `waiting_confirm` / `done`；`outcome` 只在 `done` 时存在，取 `succeeded` / `failed` / `cancelled`。
@@ -259,16 +259,26 @@ dispatched ──失败/超时/verdict 非法──▶ failed ──▶ run.fail
 按固定顺序拼接，全部为纯文本（`prompt` 对 client 仍 opaque）：
 
 ```
-[运行上下文]
-工作流：<workflow.name>
-当前节点：<node.name>（<node.type>）
-本次运行的 task-space：<taskSpacePath>（所有产物写入此目录；启动诉求在 intent.md）
-[启动诉求] 仅 start 节点：把诉求原文写入 <taskSpacePath>/intent.md，再开始执行
-[启动诉求原文]（仅 start 节点，受 maxPromptBytes 约束）
-[节点说明] <node.description 或 node.name>；绑定专家：<expert.name>
-[输出要求] 产物落 task-space 并说明文件名。
-[review 专用] 结束前在最后一段 ```json 代码块给出 {"verdict":"pass"|"fail","reason":"…"}。
+[agent-flow工作流任务]
+本次任务执行相关记录的 task-space：<taskSpacePath>
+读取 <task-space>/intent.md 作为本系列任务运行的目标与约束，方便后续其他任务了解情况。
+[输出要求] 无特别要求，跟随Skill执行。
+[本次进入] 节点「<被驳回节点名>」判定 fail，本节点被回退重跑。
+驳回理由：<被驳回行的 verdict.reason，截断 300 字符>
+
+[专家]
+名称：<expert.name>
+角色：<expert.role>
+性格：<expert.persona 按序用「、」连接>
+职责：<expert.duty>
+验证顺序：<expert.verifyOrder>
+注意事项：<expert.notes>
 ```
+
+- start 节点把中间那句换成「把下面的诉求原文写入 `<taskSpacePath>/intent.md`，再开始执行」，并追加 `[启动诉求原文]`（受 `maxPromptBytes` 约束）。
+- 不写工作流名、节点名、工作目录与目录规范：工作目录由 DSH 的运行上下文提供，产物归属与判定标准由技能承载。
+- 专家块空字段整行省略；技能清单与使用顺序不进 prompt（清单由 DSH 技能目录注入，顺序只作人工查看）。
+- `[本次进入]` 块只在回退重跑时出现：`run_node.enter_reason` 只存指针 `{kind, from, fromVisit}`，理由正文按指针回查被驳回行的 `verdict`，不复制第二份；confirm 驳回渲染成「人工在「<节点>」节点驳回」+「驳回意见」。
 
 - 不注入上游节点的消息正文；跨节点上下文靠 task-space 文件。
 - `confirm` 不组装 prompt、不入队。
@@ -280,7 +290,7 @@ dispatched ──失败/超时/verdict 非法──▶ failed ──▶ run.fail
 1. `review` 结果结算：从 `message` 中取**最后一段** ```json 代码块解析；`verdict` 必须是 `"pass"` 或 `"fail"` 字符串，否则 `run_node(failed, verdict_invalid)`、`run.failed`。
 2. `pass` → `succeeded` → 推进 seq。
 3. `fail` → `rejected`：在冻结图中找该节点唯一 `rollback` 出边；无 → `run.failed(missing_rollback_edge)`。目标必须是当前节点的祖先（按 seq 入边回溯），否则 `run.failed(invalid_rollback_target)`。
-4. 回退：`current_node_id = 目标节点`，目标节点下次执行时 `visit = 该节点历史最大 visit + 1`；目标到 `review` 之间的节点依次重跑，各自 `visit+1`。
+4. 回退：`current_node_id = 目标节点`，目标节点下次执行时 `visit = 该节点历史最大 visit + 1`；目标到 `review` 之间的节点依次重跑，各自 `visit+1`，新行写入同一个 `enter_reason` 指针（指向被驳回行），派发时渲染成 prompt 的 `[本次进入]` 块。
 5. 轮次上限：任一节点本次 `visit > run.max_node_visits`（默认 5）→ `run.failed(visit_limit_exceeded)`，不再入队。
 6. `confirm` 决策：`pass` → `succeeded` → 推进；`reject` → `rejected` → 按第 3–5 条回退。
 

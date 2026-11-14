@@ -1,4 +1,4 @@
-import type { RunArtifactKind, RunNodeState, RunRow, RunState } from "./types.ts";
+import type { EnterReason, RunArtifactKind, RunNodeState, RunRow, RunState } from "./types.ts";
 
 export const RUN_COLUMNS = `
   id, workflow_id, workflow_revision, graph_snapshot, intent_markdown, harness_id,
@@ -9,7 +9,7 @@ export const RUN_COLUMNS = `
 
 export const NODE_COLUMNS = `
   run_id, node_id, visit, node_type, expert_id, state, task_id, verdict,
-  message, error, dispatched_at, finished_at`;
+  message, error, enter_reason, dispatched_at, finished_at`;
 
 export type NewRunRow = {
   id: string;
@@ -34,8 +34,12 @@ export type NewNodeRow = {
   nodeType: string;
   expertId: string | null;
   state: RunNodeState;
+  /** 回退进入原因指针；首轮为 null。 */
+  enterReason?: EnterReason | null;
   now: Date;
 };
+
+
 
 export type NewArtifactRow = {
   id: string;

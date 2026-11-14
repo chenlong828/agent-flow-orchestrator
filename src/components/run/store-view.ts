@@ -33,6 +33,7 @@ export function toNodeView(row: RunNodeRow): RunNodeView {
     state: row.state,
     taskId: row.task_id,
     verdict: parseJson(row.verdict),
+    enterReason: parseJson(row.enter_reason),
     message: row.message ?? "",
     error: parseJson(row.error),
     dispatchedAt: toIsoOrNull(row.dispatched_at),

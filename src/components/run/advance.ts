@@ -6,7 +6,7 @@ import {
   seqOut,
   startNode,
 } from "./graph-checks.ts";
-import type { RunNodeRow, RunRow } from "./types.ts";
+import type { EnterReason, RunNodeRow, RunRow } from "./types.ts";
 import type { RunRuntime } from "./runtime.ts";
 
 type Step = { type: "stop" } | { type: "next"; currentId: string };
@@ -57,6 +57,7 @@ async function stepRejected(
   run: RunRow,
   graph: WorkflowGraph,
   node: WorkflowNode,
+  row: RunNodeRow,
 ): Promise<Step> {
   const target = rollbackTarget(graph, node.id);
   if (target === null) {
@@ -74,8 +75,13 @@ async function stepRejected(
     }, null);
     return { type: "stop" };
   }
+  // 回退进入原因只记指针：理由正文仍在被驳回行的 verdict 里。
+  const enterReason: EnterReason =
+    node.type === "confirm"
+      ? { kind: "confirm_reject", from: node.id, fromVisit: row.visit }
+      : { kind: "review_fail", from: node.id, fromVisit: row.visit };
   for (const revisit of path) {
-    const created = await runtime.createNode(run, revisit, "queued");
+    const created = await runtime.createNode(run, revisit, "queued", enterReason);
     if (created === null) return { type: "stop" };
   }
   await markCurrent(runtime, run, target);
@@ -133,7 +139,7 @@ async function stepNode(
     case "failed":
       return { type: "stop" };
     case "rejected":
-      return stepRejected(runtime, run, graph, node);
+      return stepRejected(runtime, run, graph, node, row);
     case "succeeded":
       return stepSucceeded(runtime, run, graph, node, row);
     default:
