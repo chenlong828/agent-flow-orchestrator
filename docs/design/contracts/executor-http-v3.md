@@ -170,7 +170,7 @@ v3 在此之上加两件事：**执行前有 task-space**（工作区内按 run 
       "attempt": 1,
       "prompt": "……任务信息 + 输出契约，opaque 文本……",
       "workspacePath": "/abs/instance-a",
-      "taskSpacePath": "/abs/instance-a/.agent-flow/task/01J9Z8A1B2",
+      "taskSpacePath": "/abs/instance-a/task-spaces/20261113-101922",
       "timeoutMs": 1800000,
       "skillSet": { "digest": "sha256:<hex>", "packages": [] }
     }
@@ -182,7 +182,7 @@ v3 在此之上加两件事：**执行前有 task-space**（工作区内按 run 
       "runId": "01J9Z8A1B2",
       "instanceId": "0193f0aa-6c31-7c4e-9a4b-0d1e2f3a4b5c",
       "workspacePath": "/abs/instance-a",
-      "taskSpacePath": "/abs/instance-a/.agent-flow/task/01J9Z8A1B2"
+      "taskSpacePath": "/abs/instance-a/task-spaces/20261113-101922"
     }
   ],
   "nextPollAfterMs": 0
@@ -531,7 +531,7 @@ type ArchiveAck = {
 - **并发**：同一 `instanceId` 上允许多个任务同时执行，前提是 `S-06` 的同 digest 与 `C-03` 的安装临界区。
 - **产品侧约束**（不属于本契约的传输语义，但影响任务分布）：同一工作区同时只推进一个运行的节点任务；例外是 `fanout` 内部展开的多个任务，它们同属一个 run、共用同一专家与技能集。
 - **终止上界**：`timeoutMs` 是契约要求；`idle_timeout` 是可选优化（`C-06`），默认关闭，避免误杀长工具调用。
-- **清理**：本契约**没有清理指令**。工作区与 task-space 默认保留（分析产物是重跑的基础；归档依赖该目录）；实例不再需要时由运维按 `instanceId` 回收。`keep` / `clean-skills` / `clean-client` 等本地清理策略**不覆盖** `.agent-flow/task`。
+- **清理**：本契约**没有清理指令**。工作区与 task-space 默认保留（分析产物是重跑的基础；归档依赖该目录）；实例不再需要时由运维按 `instanceId` 回收。`keep` / `clean-skills` / `clean-client` 等本地清理策略**不覆盖** `task-spaces/`。
 
 ## 10 联调与验收
 
@@ -608,7 +608,7 @@ type ArchiveAck = {
 | `D-06` | 新增 `session_log_too_large`、`archive_too_large` 两个结果/归档错误码 |
 | `D-07` | 升级时丢弃 v2 遗留的 `settled` 结果（client 启动迁移逻辑；契约侧无需字段） |
 | `D-08` | §11.2/§11.3 按正文修正（`S-02`、`S-07`、`C-06`、`C-08`） |
-| `D-09` | 清理策略不覆盖 `.agent-flow/task`（§9） |
+| `D-09` | 清理策略不覆盖 `task-spaces/`（§9） |
 | `D-10` | 归档确认后仍保留本地 task-space（`C-12`） |
 | `H-01` | 响应与 `details` 的 `bytes` 明确为压缩后大小 |
 | `H-02` | `P-04` 的 `404 task_not_found` → client 丢弃上传与结果，停止重试 |

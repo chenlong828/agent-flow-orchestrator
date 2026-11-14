@@ -59,11 +59,11 @@ run 进入终态（`succeeded` / `failed` / `cancelled`）后，调度器通过 
 
 1. run 进入终态时置 `archive_state = pending`；该 run 的节点日志副本（`runs/<runId>/nodes/*.jsonl.gz`）已在存储中。
 2. 该 client 下一次 `P-01`：响应增 `archiveRequests: [{runId, instanceId, taskSpacePath}]`；电平语义，直到 client 在 `archivedRuns` 中确认。
-3. client 打包 `<workspace>/.agent-flow/task/<runId>/` 为 tar.gz → `POST /runs/{runId}/archive`（`application/gzip`）。
+3. client 打包 `<taskSpacePath>/`（`<workspace>/task-spaces/<YYYYMMDD-HHmmss>`）为 tar.gz → `POST /runs/{runId}/archive`（`application/gzip`）。
 4. 服务端校验：run 存在且属于该 token 的 `clientId`；大小 ≤ `maxArchiveBytes`（512 MiB）；gzip/tar 可解且不含路径穿越；计算 sha256。
 5. 落盘：`<archive.root>/history/<instanceId>/<runId>/task-space.tar.gz`，并把该 run 各节点日志副本复制到同目录 `logs/<nodeId>-<visit>-a<attempt>.jsonl.gz`；写 `run_artifact` 与 `archive_state = stored`。
 6. client 下一跳 poll 带 `archivedRuns: [runId]`：服务端停止为该 run 下发归档指令；重复上报幂等。
-7. 本地 `<workspace>/.agent-flow/task/<runId>/` 保留不删除；回收由运维按 `instanceId` 处理（与「工作区默认保留」一致）。
+7. 本地 `<taskSpacePath>/` 保留不删除；回收由运维按 `instanceId` 处理（与「工作区默认保留」一致）。
 
 失败路径：
 

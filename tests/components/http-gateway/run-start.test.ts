@@ -115,7 +115,9 @@ describe("SCN-0301 运行启动与节点推进", () => {
     expect(detail.body.state).toBe("running");
     expect(detail.body.currentNodeId).toBe("n1");
     expect(detail.body.workspacePath).toBe(workspacePath);
-    expect(detail.body.taskSpacePath).toBe(`${workspacePath}/.agent-flow/task/${runId}`);
+    expect(detail.body.taskSpacePath).toMatch(
+      new RegExp(`^${workspacePath}/task-spaces/\\d{8}-\\d{6}$`),
+    );
     expect(detail.body.nodes).toHaveLength(1);
     expect(detail.body.nodes[0]).toMatchObject({
       nodeId: "n1",
@@ -132,9 +134,9 @@ describe("SCN-0301 运行启动与节点推进", () => {
     expect(task.instanceId).toBe(detail.body.instanceId);
     expect(task.nodeId).toBe("n1");
     expect(task.attempt).toBe(1);
-    expect(task.taskSpacePath).toBe(`${workspacePath}/.agent-flow/task/${runId}`);
+    expect(task.taskSpacePath).toBe(detail.body.taskSpacePath);
     expect(task.prompt).toContain("把需求实现成代码");
-    expect(task.prompt).toContain(`${workspacePath}/.agent-flow/task/${runId}`);
+    expect(task.prompt).toContain(detail.body.taskSpacePath);
   });
 
   test("TC-RUN-002 首节点成功结算后自动派发 seq 后继，run 保持 running", async () => {

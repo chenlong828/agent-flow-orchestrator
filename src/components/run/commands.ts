@@ -50,6 +50,23 @@ function ensureIntent(intentMarkdown: string): void {
   }
 }
 
+/** 同一秒内重复启动时追加 `-2`、`-3`；路径一旦写入 run 即冻结。 */
+async function resolveTaskSpacePath(
+  runtime: RunRuntime,
+  workspacePath: string,
+  now: Date,
+): Promise<string> {
+  for (let suffix = 1; suffix <= 100; suffix += 1) {
+    const candidate = taskSpaceFor(workspacePath, now, suffix === 1 ? undefined : suffix);
+    const taken = await runtime.deps.db.one<{ found: number }>(
+      "select 1 as found from workflow_run where task_space_path = $1 limit 1",
+      [candidate],
+    );
+    if (taken === null) return candidate;
+  }
+  throw new ValidationError("workspacePath", "同一秒内启动次数过多，请稍后重试");
+}
+
 async function start(input: StartRun, runtime: RunRuntime, deps: CommandsDeps): Promise<RunDetail> {
   ensureIntent(input.intentMarkdown);
   const workflow = await runtime.deps.workflowRead.get(input.workflowId);
@@ -68,6 +85,7 @@ async function start(input: StartRun, runtime: RunRuntime, deps: CommandsDeps): 
   const startNodeValue = startNode(graph);
   if (startNodeValue === null) throw new ValidationError("graph.nodes", "缺少开始节点");
   const now = runtime.deps.clock.now();
+  const taskSpacePath = await resolveTaskSpacePath(runtime, workspacePath, now);
   await runtime.deps.db.transaction(async (tx) => {
     await runtime.store.insertRun(tx, {
       id: runId,
@@ -79,7 +97,7 @@ async function start(input: StartRun, runtime: RunRuntime, deps: CommandsDeps): 
       clientId,
       instanceId: instance.instanceId,
       workspacePath,
-      taskSpacePath: taskSpaceFor(workspacePath, runId),
+      taskSpacePath,
       autoConfirm: input.autoConfirm ?? false,
       now,
       actor: input.actor ?? null,

@@ -74,7 +74,7 @@ externalRefs: []
 2. `CMP-run.start` 校验可运行性：工作流存在；图恰好一个 `start` 与一个 `end`；每个节点 ≤1 条 seq 入边/出边；`review`/`confirm` 的回退边目标为祖先；节点专家存在且启用；**不含 `split`/`fanout`**（第二期支持）。
 3. 解析 `harnessId → clientId`；`instance.enroll({instanceId, clientId, workspacePath})`（重复登记同绑定幂等）；冻结 `revision`、`graphSnapshot`、启动诉求原文；创建 `run(created)` 与首节点 `run_node(pending)`。
 4. `advance`：取 `start` 节点 → 按 §4.1 组装 prompt（含 `taskSpacePath`；首节点额外含启动诉求原文）→ 按专家解析 `skillIds` → `scheduler.enqueue({instanceId, nodeId, prompt, timeoutMs, skillIds})` → `run_node(dispatched)`、`run(running)`。
-5. client 取任务后 `mkdir -p <workspace>/.agent-flow/task/<runId>`，写 `intent.md`，建 session 执行；结束后先上传 session-log，再上报结果（`SCN-0302`）。
+5. client 取任务后 `mkdir -p <taskSpacePath>`（`<workspace>/task-spaces/<YYYYMMDD-HHmmss>`），写 `intent.md`，建 session 执行；结束后先上传 session-log，再上报结果（`SCN-0302`）。
 6. `CMP-run.handleTaskResult`：用 `taskId` 找到 `run_node` → 校验日志存在 → `scheduler.acceptResult` → `run_node(succeeded)` → 取该节点唯一 seq 出边 → 入队下一节点；循环直到 `end`。
 7. `end` 节点成功后：`run.done(succeeded)`，保存最终消息与产物清单；进入归档流程（`SCN-0304`）。
 8. 服务重启：扫描 `running` 的 run，`dispatched` 的节点用 `scheduler.inspect(taskId)` 对账，已结算则补结算再推进；未结算保持等待（`S-02` 会重派）。

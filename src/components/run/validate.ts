@@ -21,6 +21,19 @@ export function ensureAttempt(value: unknown): number {
   return attempt;
 }
 
-export function taskSpaceFor(workspacePath: string, runId: string): string {
-  return `${workspacePath.replace(/\/+$/, "")}/.agent-flow/task/${runId}`;
+function pad(value: number, width = 2): string {
+  return String(value).padStart(width, "0");
+}
+
+/** 目录名取运行启动时刻的本地时间：`YYYYMMDD-HHmmss`，人可读且稳定。 */
+function taskSpaceName(startedAt: Date): string {
+  const date = [startedAt.getFullYear(), pad(startedAt.getMonth() + 1), pad(startedAt.getDate())].join("");
+  const time = [pad(startedAt.getHours()), pad(startedAt.getMinutes()), pad(startedAt.getSeconds())].join("");
+  return `${date}-${time}`;
+}
+
+/** task-space 名由服务端生成，调用方不提供路径分量；冲突时由调用方追加序号。 */
+export function taskSpaceFor(workspacePath: string, startedAt: Date, suffix?: number): string {
+  const base = `${workspacePath.replace(/\/+$/, "")}/task-spaces/${taskSpaceName(startedAt)}`;
+  return suffix === undefined ? base : `${base}-${suffix}`;
 }
