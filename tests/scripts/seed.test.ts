@@ -36,13 +36,13 @@ afterAll(async () => {
 });
 
 describe("演示种子", () => {
-  test("首轮写入 7 个 Skill / 8 个专家 / 2 条流程与 13 条技能装配边，不预置 Harness 与工具", async () => {
+  test("首轮写入 11 个 Skill / 10 个专家 / 2 条流程与 21 条技能装配边，不预置 Harness 与工具", async () => {
     const result = await seedAll(db, store);
     expect(result).toEqual({
-      skills: 7,
-      experts: 8,
+      skills: 11,
+      experts: 10,
       workflows: 2,
-      expertSkills: 13,
+      expertSkills: 21,
     });
     const counts = await db.one<{
       harnesses: number;
@@ -65,14 +65,14 @@ describe("演示种子", () => {
     expect(counts).toEqual({
       harnesses: 0,
       tools: 0,
-      skills: 7,
-      experts: 8,
+      skills: 11,
+      experts: 10,
       workflows: 2,
       toolEdges: 0,
       missingPackages: 0,
     });
 
-    expect(await store.list("packages/")).toHaveLength(7);
+    expect(await store.list("packages/")).toHaveLength(11);
     const arch = await db.one<{ package_key: string }>(
       "select package_key from skill where slug = 'arch-design-spec'",
     );
@@ -107,18 +107,46 @@ describe("演示种子", () => {
         (select count(*)::int from workflow) as workflows,
         (select count(*)::int from expert_skill) as "skillEdges"`,
     );
-    expect(counts).toEqual({ skills: 7, experts: 8, workflows: 2, skillEdges: 13 });
-    expect(await store.list("packages/")).toHaveLength(7);
+    expect(counts).toEqual({ skills: 11, experts: 10, workflows: 2, skillEdges: 21 });
+    expect(await store.list("packages/")).toHaveLength(11);
 
     const requirements = await db.one<{ version: string; tags: number }>(
       `select s.version,
         (select count(*)::int from skill_tag t where t.skill_id = s.id) as tags
-       from skill s where s.name = '需求到任务'`,
+       from skill s where s.name = '需求到场景'`,
     );
-    expect(requirements).toEqual({ version: "v1.1", tags: 3 });
+    expect(requirements).toEqual({ version: "v2.0", tags: 3 });
   });
 
-  test("分类覆盖、装配引用完整，且研发流程含 8 个节点与两条回退边", async () => {
+  test("已存在的流程不被种子覆盖，保留界面上的改名与改图", async () => {
+    await seedAll(db, store);
+    const row = await db.one<{ id: string }>("select id from workflow where name = 'TRUN-DEV-01'");
+    await db.query("update workflow set name = '我的研发流程', updated_by = 'ui' where id = $1", [row!.id]);
+    await db.query("update workflow_definition set updated_by = 'ui' where workflow_id = $1", [row!.id]);
+
+    await seedAll(db, store);
+
+    const after = await db.one<{
+      name: string;
+      updatedBy: string;
+      definitionUpdatedBy: string;
+      refs: number;
+    }>(
+      `select w.name, w.updated_by as "updatedBy", d.updated_by as "definitionUpdatedBy",
+        (select count(*)::int from workflow_expert_ref r where r.workflow_id = w.id) as refs
+       from workflow w join workflow_definition d on d.workflow_id = w.id
+       where w.id = $1`,
+      [row!.id],
+    );
+    expect(after).toEqual({
+      name: "我的研发流程",
+      updatedBy: "ui",
+      definitionUpdatedBy: "ui",
+      refs: 10,
+    });
+  });
+
+  test("分类覆盖、装配引用完整，且研发流程含 10 个节点与三条回退边", async () => {
     await seedAll(db, store);
     const categories = await db.query<{ category_code: string; count: number }>(
       "select category_code, count(*)::int from skill group by category_code order by category_code",
@@ -126,8 +154,9 @@ describe("演示种子", () => {
     expect(categories).toEqual([
       { category_code: "coding", count: 1 },
       { category_code: "docs", count: 1 },
-      { category_code: "process", count: 4 },
-      { category_code: "review", count: 1 },
+      { category_code: "process", count: 5 },
+      { category_code: "review", count: 2 },
+      { category_code: "testing", count: 2 },
     ]);
 
     const danglingSkill = await db.query(
@@ -147,16 +176,16 @@ describe("演示种子", () => {
        where w.name = 'TRUN-DEV-01'`,
     );
     expect(row).not.toBeNull();
-    expect(row!.graph.nodes).toHaveLength(8);
+    expect(row!.graph.nodes).toHaveLength(10);
     expect(row!.graph.nodes.every((node) => node.expertId !== null)).toBe(true);
-    expect(row!.graph.edges.filter((edge) => edge.kind === "rollback")).toHaveLength(2);
+    expect(row!.graph.edges.filter((edge) => edge.kind === "rollback")).toHaveLength(3);
 
     const refs = await db.query(
       `select 1 from workflow_expert_ref r
        join workflow w on w.id = r.workflow_id
        where w.name = 'TRUN-DEV-01'`,
     );
-    expect(refs).toHaveLength(8);
+    expect(refs).toHaveLength(10);
 
     const impl = await db.one<{
       graph: {

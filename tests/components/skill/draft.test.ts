@@ -349,7 +349,7 @@ describe("Skill 保存、启停与 GC", () => {
     const referenced: ReferenceGuard = {
       check: async () => [{ type: "expert", id: "e1", name: "专家" }],
     };
-    const row = await db.one<{ id: string }>("select id from skill where name = '需求到任务'");
+    const row = await db.one<{ id: string }>("select id from skill where name = '需求到场景'");
     const error = await service(systemClock, 24, referenced)
       .delete(row!.id, 1)
       .catch((caught) => caught);

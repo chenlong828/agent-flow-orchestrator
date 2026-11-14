@@ -49,12 +49,16 @@ type WorkflowSeed = {
  */
 const SKILLS: SkillSeed[] = [
   { slug: "workflow-init", name: "工作流初始化", category: "process", tags: ["初始化", "诉求落盘"], enabled: true, updatedM: 30 },
-  { slug: "req-scenario-spec", name: "需求到任务", category: "process", tags: ["需求", "场景", "任务拆分"], enabled: true, updatedM: 60 },
+  { slug: "req-scenario-spec", name: "需求到场景", category: "process", tags: ["需求", "场景", "验收"], enabled: true, updatedM: 60 },
   { slug: "design-before-coding", name: "先设计后编码", category: "process", tags: ["设计", "组件"], enabled: true, updatedM: 90 },
   { slug: "arch-design-spec", name: "架构设计规格", category: "process", tags: ["架构", "契约", "定级"], enabled: true, updatedM: 120 },
   { slug: "dev-execution-spec", name: "开发执行纪律", category: "coding", tags: ["执行", "验收", "提交"], enabled: true, updatedM: 150 },
   { slug: "doc-layout-spec", name: "文档布局", category: "docs", tags: ["文档", "目录"], enabled: true, updatedM: 180 },
+  { slug: "task-split", name: "任务拆分", category: "process", tags: ["拆分", "任务表", "依赖"], enabled: true, updatedM: 195 },
+  { slug: "scenario-verify", name: "场景验证", category: "testing", tags: ["场景", "3+1", "验收"], enabled: true, updatedM: 200 },
+  { slug: "implementation-accept", name: "实现鉴定", category: "review", tags: ["鉴定", "准出", "证据"], enabled: true, updatedM: 205 },
   { slug: "review-verdict", name: "审核判定", category: "review", tags: ["审核", "verdict"], enabled: true, updatedM: 210 },
+  { slug: "swift-ui-probe", name: "Swift 界面调试助手", category: "testing", tags: ["焦点", "按键", "scenePhase", "界面探针"], enabled: true, updatedM: 330 },
 ];
 
 const EXPERTS: ExpertSeed[] = [
@@ -74,9 +78,9 @@ const EXPERTS: ExpertSeed[] = [
     role: "把一句话诉求澄清成可实施的需求卡、场景与任务表",
     persona: ["严谨", "刨根问底"],
     skills: ["req-scenario-spec", "doc-layout-spec"],
-    duty: "读 intent.md，产出需求卡、场景与任务拆分，明确范围与非目标后交给设计",
-    skillOrder: "需求到任务 → 文档布局",
-    verifyOrder: "每条需求有验收场景 → 任务能落到组件 → 文档就位",
+    duty: "读 intent.md，产出需求卡与场景卡，明确范围与非目标后交给设计",
+    skillOrder: "需求到场景 → 文档布局",
+    verifyOrder: "每条需求有验收场景 → 场景四元素齐 → 文档就位",
     notes: "追问到可实施粒度；不为「以后可能需要」扩大范围",
     refs: [], enabled: true,
   },
@@ -96,21 +100,32 @@ const EXPERTS: ExpertSeed[] = [
     role: "以否决视角审查方案的结构、契约与改动级别",
     persona: ["独立", "否决视角"],
     skills: ["arch-design-spec", "review-verdict"],
-    duty: "按架构规格核验方案的切分、依赖、契约与 P 级，给出 pass/fail 与可执行理由",
+    duty: "按架构规格核验方案的切分、依赖、契约与 P 级，给出 pass/fail 与可执行理由；把评审报告与 verdict 依据写进 task-space 的 review.md",
     skillOrder: "架构设计规格 → 审核判定",
-    verifyOrder: "模块地图与依赖矩阵齐全 → 契约不泄漏实现 → 定级与确认门一致",
-    notes: "证据不足视为 fail；评审上下文与被评审隔离；结束前必须在最终消息最后一段输出 {\"verdict\":\"pass\"或\"fail\",\"reason\":\"回退理由\"}，缺失或格式不符按判定无效处理",
+    verifyOrder: "模块地图与依赖矩阵齐全 → 契约不泄漏实现 → 定级与确认门一致 → review.md 与 verdict 一致",
+    notes: "证据不足视为 fail；评审上下文与被评审隔离；只判定，不改仓库状态位；结束前必须在最终消息末尾输出裸 JSON：{\"verdict\":\"pass\"或\"fail\",\"reason\":\"回退理由\"}（不加代码围栏，其后不再出现别的 JSON），缺失或格式不符按判定无效处理",
+    refs: [], enabled: true,
+  },
+  {
+    id: "task-splitter", name: "任务拆分专家", color: "#0891b2",
+    role: "把已评审的设计转成可独立交付的开发任务",
+    persona: ["结构化", "依赖敏感"],
+    skills: ["task-split", "doc-layout-spec"],
+    duty: "输入：需求卡、场景卡、组件规格与评审结论；输出：任务表（ID/类型/组件/依赖/出口）与并行关系，写入项目 doc/plan/roadmap.md",
+    skillOrder: "任务拆分 → 文档布局",
+    verifyOrder: "每个任务能指到组件规格 → 依赖无环 → 出口可检查 → 已落表 roadmap",
+    notes: "不写实现细节、不改代码；设计不足回退设计，不硬拆；一个任务对应一次可提交的改动",
     refs: [], enabled: true,
   },
   {
     id: "implementer", name: "开发实现专家", color: "#16a34a",
     role: "按已定方案完成代码、测试与提交",
     persona: ["规范控", "小步"],
-    skills: ["dev-execution-spec", "doc-layout-spec"],
-    duty: "在 workspace 内按方案实现并自测，提交绑定任务与场景；发现方案冲突先停下来更新方案",
+    skills: ["dev-execution-spec", "doc-layout-spec", "swift-ui-probe"],
+    duty: "在 workspace 内按方案实现并自测，提交绑定任务与场景；把改动、commit、测试命令与结果写进 task-space 的 dev.md，验收证据（命令输出、Outbox 行、MIME 头、AX 字段值等，脱敏后）写进 evidence/；发现方案冲突先停下来更新方案",
     skillOrder: "开发执行纪律 → 文档布局",
-    verifyOrder: "测试先红后绿 → git status 干净 → commit 一件事",
-    notes: "不顺手重构；不夹带无关改动",
+    verifyOrder: "逐条核对任务出口 → 测试先红后绿 → git status 干净 → commit 一件事 → dev.md 记录 commit、测试结果与建议状态",
+    notes: "不顺手重构；不夹带无关改动；只写 dev.md 与 evidence/，不改 result.md；不得把场景标 verified、需求标 delivered（只在 dev.md 写「建议翻转」，由收尾在评审通过后执行）",
     refs: [], enabled: true,
   },
   {
@@ -118,21 +133,32 @@ const EXPERTS: ExpertSeed[] = [
     role: "以独立、否决视角对实现产物做准出评审",
     persona: ["细致", "多疑"],
     skills: ["review-verdict"],
-    duty: "对照方案与规范审视代码与产物，给出 pass/fail 与可执行意见",
+    duty: "对照方案与规范审视代码与产物，给出 pass/fail 与可执行意见；把评审报告、verdict 依据与「状态翻转清单」（哪些场景可转 verified、哪个需求可转 delivered、哪个任务可标完成）写进 task-space 的 review.md",
     skillOrder: "审核判定",
-    verifyOrder: "每个结论有证据位置 → 结论与证据一致",
-    notes: "不读执行过程独白，只看产物与方案；结束前必须在最终消息最后一段输出 {\"verdict\":\"pass\"或\"fail\",\"reason\":\"回退理由\"}，缺失或格式不符按判定无效处理",
+    verifyOrder: "每个结论有证据位置 → 验收证据在 task-space 内可复核（缺证据按 fail）→ review.md 与 verdict 一致",
+    notes: "不读执行过程独白，只看产物与方案；只判定，不改仓库状态位，状态翻转由收尾在评审通过后执行；结束前必须在最终消息末尾输出裸 JSON：{\"verdict\":\"pass\"或\"fail\",\"reason\":\"回退理由\"}（不加代码围栏，其后不再出现别的 JSON），缺失或格式不符按判定无效处理",
+    refs: [], enabled: true,
+  },
+  {
+    id: "accept-reviewer", name: "实现鉴定专家", color: "#a21caf",
+    role: "判定本次实现是否真正走完",
+    persona: ["怀疑", "证据导向"],
+    skills: ["implementation-accept", "review-verdict", "doc-layout-spec"],
+    duty: "输入：场景卡 3 正 1 反、test.md 与 evidence/、实现提交；输出：pass/fail 结论；fail 时写明回退到哪个实现节点、改什么、怎么复现",
+    skillOrder: "实现鉴定 → 审核判定 → 文档布局",
+    verifyOrder: "每条例子有结果 → 证据可复核 → 依赖场景无回归 → 提交卫生 → 结论与证据一致",
+    notes: "不替开发改代码；不默认放行；fail 必须给回退目标与复现步骤；只判定不改状态",
     refs: [], enabled: true,
   },
   {
     id: "test-verifier", name: "测试验证专家", color: "#0d9488",
     role: "把验收场景落成可执行用例并给出证据",
     persona: ["挑剔", "数据敏感"],
-    skills: ["dev-execution-spec"],
-    duty: "基于验收场景设计用例并执行，输出可复现的测试结论；能力型技能待补充",
-    skillOrder: "",
-    verifyOrder: "用例覆盖验收场景 → 失败可复现",
-    notes: "不用生产数据直连；失败必须给复现步骤",
+    skills: ["scenario-verify", "doc-layout-spec", "swift-ui-probe"],
+    duty: "输入：场景卡 3 正 1 反例子与可执行 ID、实现提交；输出：逐例验证结果 test.md + evidence/；例子缺测试时补 Tests/（不改产品代码）",
+    skillOrder: "场景验证 → 文档布局",
+    verifyOrder: "3+1 逐条有结果 → 依赖场景回归 → 证据可在 task-space 复核",
+    notes: "不改产品代码、不翻转状态；环境不可用标阻塞，不伪造；失败必须给复现步骤",
     refs: [], enabled: true,
   },
   {
@@ -140,10 +166,10 @@ const EXPERTS: ExpertSeed[] = [
     role: "汇总本次运行产物，给出可追溯的最终结论",
     persona: ["克制"],
     skills: ["doc-layout-spec"],
-    duty: "只读取本次 task-space 里的记录（intent 与各节点留下的产物），汇总成 result.md：完成了什么、证据在哪、还剩什么；在最终消息给出结论",
+    duty: "读取 task-space 记录（intent 与各节点产物）汇总成 result.md；评审 pass 时按 review.md 的状态翻转清单修改项目文档状态位（场景 verified、需求 delivered、roadmap 任务标完成）并提交一次收口 commit；评审 fail 时只汇总、不改状态",
     skillOrder: "文档布局",
-    verifyOrder: "结论只引用 task-space 内文件 → 未完成项标注去向",
-    notes: "不做二次验证：不跑测试、不跑构建、不改项目仓库；不把没写在 task-space 里的东西写成结论；不新增范围、不掩盖失败",
+    verifyOrder: "只翻转 review pass 明确列出的项 → 收口 commit 只含状态位与证据行 → git status 干净",
+    notes: "不改代码与设计正文；不做二次验证：不跑测试、不跑构建；fail 时不翻转任何状态；只读 dev.md、review.md 与 intent.md，不覆盖它们；不把没写在 task-space 里的东西写成结论；不新增范围、不掩盖失败",
     refs: [], enabled: true,
   },
 ];
@@ -167,7 +193,7 @@ function flowNode(
   };
 }
 
-/** 8 节点研发流程：需求 → 方案 → 方案评审 → 实现 → 代码评审 → 测试 → 收尾。 */
+/** 10 节点研发流程：启动 → 需求 → 方案 → 方案评审 → 任务拆分 → 实现 → 代码评审 → 测试 → 实现鉴定 → 收尾。 */
 function devFlowGraph(): WorkflowGraph {
   const node = flowNode;
   return {
@@ -177,21 +203,26 @@ function devFlowGraph(): WorkflowGraph {
       node("n2", "需求", "agent", "req-analyst", 160, 0),
       node("n3", "方案", "agent", "solution-designer", 320, 0),
       node("n4", "方案评审", "review", "arch-reviewer", 480, 0),
+      node("n9", "任务拆分", "agent", "task-splitter", 560, 0),
       node("n5", "实现", "agent", "implementer", 640, 0),
       node("n6", "代码评审", "review", "code-reviewer", 800, 0),
       node("n7", "测试", "agent", "test-verifier", 960, 0),
+      node("n10", "实现鉴定", "review", "accept-reviewer", 1040, 0),
       node("n8", "收尾", "end", "summarizer", 1120, 0),
     ],
     edges: [
       { id: "e1", from: "n1", to: "n2", kind: "seq" },
       { id: "e2", from: "n2", to: "n3", kind: "seq" },
       { id: "e3", from: "n3", to: "n4", kind: "seq" },
-      { id: "e4", from: "n4", to: "n5", kind: "seq" },
+      { id: "e4", from: "n4", to: "n9", kind: "seq" },
+      { id: "e10", from: "n9", to: "n5", kind: "seq" },
       { id: "e5", from: "n5", to: "n6", kind: "seq" },
       { id: "e6", from: "n6", to: "n7", kind: "seq" },
-      { id: "e7", from: "n7", to: "n8", kind: "seq" },
+      { id: "e7", from: "n7", to: "n10", kind: "seq" },
+      { id: "e11", from: "n10", to: "n8", kind: "seq" },
       { id: "e8", from: "n4", to: "n3", kind: "rollback" },
       { id: "e9", from: "n6", to: "n5", kind: "rollback" },
+      { id: "e12", from: "n10", to: "n5", kind: "rollback" },
     ],
   };
 }
@@ -222,7 +253,7 @@ const WORKFLOWS: WorkflowSeed[] = [
     id: "dev-flow-01",
     name: "TRUN-DEV-01",
     type: "研发",
-    description: "af-dev-flow 雏形：需求 → 方案 → 方案评审 → 实现 → 代码评审 → 测试 → 收尾；方案评审回退到方案，代码评审回退到实现",
+    description: "af-dev-flow 雏形：需求 → 方案 → 方案评审 → 任务拆分 → 实现 → 代码评审 → 测试 → 实现鉴定 → 收尾；方案评审回退到方案，代码评审与实现鉴定回退到实现",
     graph: devFlowGraph(),
   },
   {
@@ -386,25 +417,26 @@ export async function seedAll(db: Db, store: FileStore): Promise<SeedResult> {
       }
     }
 
+    // 流程只在库中不存在时创建：用户会在界面上改名、改图，种子不得覆盖已有流程，
+    // 否则每次更新专家/技能后重跑种子都会把流程重置回种子里的样子。
     for (const workflow of WORKFLOWS) {
       const id = uuidFrom("workflow", workflow.id);
+      const existing = await tx.one<{ id: string }>("select id from workflow where id = $1", [id]);
+      if (existing !== null) {
+        console.log(`跳过已存在的流程：${workflow.name}（保留界面上的改名与改图）`);
+        continue;
+      }
       await tx.query(
         `insert into workflow
           (id, name, type, description, revision, created_at, updated_at, created_by, updated_by)
-         values ($1, $2, $3, $4, 1, $5, $5, 'seed', 'seed')
-         on conflict (id) do update set
-           name = excluded.name, type = excluded.type, description = excluded.description,
-           updated_at = excluded.updated_at, updated_by = 'seed'`,
+         values ($1, $2, $3, $4, 1, $5, $5, 'seed', 'seed')`,
         [id, workflow.name, workflow.type, workflow.description, new Date(now)],
       );
       await tx.query(
         `insert into workflow_definition (workflow_id, graph, updated_at, updated_by)
-         values ($1, $2::text::jsonb, $3, 'seed')
-         on conflict (workflow_id) do update set
-           graph = excluded.graph, updated_at = excluded.updated_at, updated_by = 'seed'`,
+         values ($1, $2::text::jsonb, $3, 'seed')`,
         [id, JSON.stringify(workflow.graph), new Date(now)],
       );
-      await tx.query("delete from workflow_expert_ref where workflow_id = $1", [id]);
       for (const node of workflow.graph.nodes) {
         if (node.expertId === null) continue;
         await tx.query(

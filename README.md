@@ -17,7 +17,7 @@ AgentFlow 研发智能体工作流编排服务的编排侧工程：目标是把�
 - 47 个业务端点（B1 37 + B3 10）+ `/healthz`，契约见 [`http-gateway/spec.md`](docs/design/components/http-gateway/spec.md)；运行时 `/openapi.yaml` 与 Swagger UI `/docs` 由 HTTP 组件直接提供。
 - Skill 包形态：内容是一个 zip（根 `SKILL.md`，可选 `scripts/`、`references/`），数据库只存 brief 与包指针；创建/更新走草稿保存，15 个 Skill 端点，`GET /skills/{id}/document` 输出全文。见 [`result.md`](docs/history/works/2026-10-28-skill-package/result.md)。
 - 开发者 API 文档：`/docs`（Swagger UI）与 `/openapi.yaml`，Swagger UI 资源已 vendor 到仓库，可离线使用。
-- 演示种子：7 Skill / 8 专家 / 1 条研发流程（`TRUN-DEV-01`），专家技能装配边 11 条；技能内容在 `scripts/seed-skills/`。不预置 Harness 与工具，Harness 由 client 首次 poll 自注册。
+- 演示种子：11 Skill / 10 专家 / 2 条研发流程（`TRUN-DEV-01`、`TRUN-DEV-02`），专家技能装配边 21 条；技能内容在 `scripts/seed-skills/`。不预置 Harness 与工具，Harness 由 client 首次 poll 自注册。
 - 实现结果与验证记录：[`result.md`](docs/history/works/2026-10-24-db-backend-infra/result.md)。
 
 B2 Key/工作区、B4 实例/看板、ACP 执行模型未实现；B3 工作流已实现（2026-10-29）。后续运行形态按实际需求另立工序，见 [`docs/plan/roadmap.md`](docs/plan/roadmap.md)。早期开放问题已关闭；当前只有 6 项 hold，见 [`docs/plan/open-questions.md`](docs/plan/open-questions.md)。
