@@ -326,6 +326,8 @@ describe("SCN-0003 Skill 检索与供给", () => {
       "retrieval",
       "review",
       "testing",
+      "process",
+      "docs",
     ]);
   });
 

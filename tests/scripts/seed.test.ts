@@ -36,21 +36,21 @@ afterAll(async () => {
 });
 
 describe("演示种子", () => {
-  test("首轮写入 5/10/12/8 与 23/23 条装配边，并为每个 Skill 写合法包", async () => {
+  test("首轮写入 7 个 Skill / 8 个专家 / 2 条流程与 13 条技能装配边，不预置 Harness 与工具", async () => {
     const result = await seedAll(db, store);
     expect(result).toEqual({
-      harnesses: 5,
-      tools: 10,
-      skills: 12,
+      skills: 7,
       experts: 8,
-      expertSkills: 23,
-      expertTools: 23,
+      workflows: 2,
+      expertSkills: 13,
     });
     const counts = await db.one<{
       harnesses: number;
       tools: number;
       skills: number;
       experts: number;
+      workflows: number;
+      toolEdges: number;
       missingPackages: number;
     }>(
       `select
@@ -58,68 +58,128 @@ describe("演示种子", () => {
         (select count(*)::int from tool) as tools,
         (select count(*)::int from skill) as skills,
         (select count(*)::int from expert) as experts,
+        (select count(*)::int from workflow) as workflows,
+        (select count(*)::int from expert_tool) as "toolEdges",
         (select count(*)::int from skill where package_key is null or package_key = '') as "missingPackages"`,
     );
     expect(counts).toEqual({
-      harnesses: 5,
-      tools: 10,
-      skills: 12,
+      harnesses: 0,
+      tools: 0,
+      skills: 7,
       experts: 8,
+      workflows: 2,
+      toolEdges: 0,
       missingPackages: 0,
     });
 
-    expect(await store.list("packages/")).toHaveLength(12);
-    const cres = await db.one<{ package_key: string }>(
-      "select package_key from skill where name = 'CRES 技能'",
+    expect(await store.list("packages/")).toHaveLength(7);
+    const arch = await db.one<{ package_key: string }>(
+      "select package_key from skill where slug = 'arch-design-spec'",
     );
-    expect(cres).not.toBeNull();
+    expect(arch).not.toBeNull();
     const entries = readSkillPackage(
-      await new Response(await store.get(`packages/${cres!.package_key}`)).bytes(),
+      await new Response(await store.get(`packages/${arch!.package_key}`)).bytes(),
     );
-    expect(entries[0]!.path).toBe("SKILL.md");
-    expect(parseSkillMarkdown(new TextDecoder().decode(entries[0]!.data))).toMatchObject({
-      name: "cres",
-      version: "v1.4",
+    expect(entries.map((entry) => entry.path)).toEqual([
+      "SKILL.md",
+      "references/arch-design-workflow.md",
+    ]);
+    const skillMd = new TextDecoder().decode(entries[0]!.data);
+    expect(parseSkillMarkdown(skillMd)).toMatchObject({
+      name: "arch-design-spec",
+      version: "v1.1",
     });
+    expect(new TextEncoder().encode(skillMd).byteLength).toBeLessThanOrEqual(16 * 1024);
   });
 
-  test("重复执行幂等，不产生重复行与重复装配边，版本保持 UI 值", async () => {
+  test("重复执行幂等，不产生重复行与重复装配边，版本保持种子值", async () => {
     await seedAll(db, store);
     await seedAll(db, store);
-    const counts = await db.one<{ harnesses: number; skills: number; skillEdges: number }>(
+    const counts = await db.one<{
+      skills: number;
+      experts: number;
+      workflows: number;
+      skillEdges: number;
+    }>(
       `select
-        (select count(*)::int from harness) as harnesses,
         (select count(*)::int from skill) as skills,
+        (select count(*)::int from expert) as experts,
+        (select count(*)::int from workflow) as workflows,
         (select count(*)::int from expert_skill) as "skillEdges"`,
     );
-    expect(counts).toEqual({ harnesses: 5, skills: 12, skillEdges: 23 });
-    expect(await store.list("packages/")).toHaveLength(12);
+    expect(counts).toEqual({ skills: 7, experts: 8, workflows: 2, skillEdges: 13 });
+    expect(await store.list("packages/")).toHaveLength(7);
 
-    const cres = await db.one<{ version: string; tags: number }>(
+    const requirements = await db.one<{ version: string; tags: number }>(
       `select s.version,
         (select count(*)::int from skill_tag t where t.skill_id = s.id) as tags
-       from skill s where s.name = 'CRES 技能'`,
+       from skill s where s.name = '需求到任务'`,
     );
-    expect(cres).toEqual({ version: "v1.4", tags: 2 });
+    expect(requirements).toEqual({ version: "v1.1", tags: 3 });
   });
 
-  test("种子数据满足引用完整性与分类覆盖", async () => {
+  test("分类覆盖、装配引用完整，且研发流程含 8 个节点与两条回退边", async () => {
     await seedAll(db, store);
     const categories = await db.query<{ category_code: string; count: number }>(
       "select category_code, count(*)::int from skill group by category_code order by category_code",
     );
     expect(categories).toEqual([
-      { category_code: "coding", count: 2 },
-      { category_code: "retrieval", count: 4 },
-      { category_code: "review", count: 3 },
-      { category_code: "testing", count: 3 },
+      { category_code: "coding", count: 1 },
+      { category_code: "docs", count: 1 },
+      { category_code: "process", count: 4 },
+      { category_code: "review", count: 1 },
     ]);
 
-    const dangling = await db.query(
+    const danglingSkill = await db.query(
       `select 1 from expert_skill es
        left join skill s on s.id = es.skill_id
        where s.id is null`,
     );
-    expect(dangling.length).toBe(0);
+    expect(danglingSkill.length).toBe(0);
+    const unboundTools = await db.query("select 1 from expert_tool");
+    expect(unboundTools.length).toBe(0);
+
+    const row = await db.one<{
+      graph: { nodes: { id: string; expertId: string | null }[]; edges: { kind: string }[] };
+    }>(
+      `select d.graph from workflow_definition d
+       join workflow w on w.id = d.workflow_id
+       where w.name = 'TRUN-DEV-01'`,
+    );
+    expect(row).not.toBeNull();
+    expect(row!.graph.nodes).toHaveLength(8);
+    expect(row!.graph.nodes.every((node) => node.expertId !== null)).toBe(true);
+    expect(row!.graph.edges.filter((edge) => edge.kind === "rollback")).toHaveLength(2);
+
+    const refs = await db.query(
+      `select 1 from workflow_expert_ref r
+       join workflow w on w.id = r.workflow_id
+       where w.name = 'TRUN-DEV-01'`,
+    );
+    expect(refs).toHaveLength(8);
+
+    const impl = await db.one<{
+      graph: {
+        nodes: { id: string; type: string; expertId: string | null }[];
+        edges: { from: string; to: string; kind: string }[];
+      };
+    }>(
+      `select d.graph from workflow_definition d
+       join workflow w on w.id = d.workflow_id
+       where w.name = 'TRUN-DEV-02'`,
+    );
+    expect(impl).not.toBeNull();
+    expect(impl!.graph.nodes.map((node) => node.type)).toEqual([
+      "start",
+      "confirm",
+      "agent",
+      "review",
+      "end",
+    ]);
+    const gate = impl!.graph.nodes.find((node) => node.type === "confirm");
+    expect(gate?.expertId).toBeNull();
+    expect(
+      impl!.graph.edges.filter((edge) => edge.kind === "rollback").map((edge) => `${edge.from}->${edge.to}`),
+    ).toEqual(["n4->n3"]);
   });
 });

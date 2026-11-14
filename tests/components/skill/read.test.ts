@@ -43,7 +43,7 @@ describe("Skill 读路径", () => {
     for (const file of packages) await store.delete(file.key);
 
     const page = await reader.list({ page: { limit: 5, offset: 0 } });
-    expect(page.total).toBe(12);
+    expect(page.total).toBe(7);
     expect(page.items).toHaveLength(5);
     expect(page.items[0]).toMatchObject({
       id: expect.any(String),
@@ -54,50 +54,50 @@ describe("Skill 读路径", () => {
     });
 
     const filtered = await reader.list({
-      q: "CRES",
-      categoryCode: "coding",
-      tag: "规范",
+      q: "架构",
+      categoryCode: "process",
+      tag: "契约",
       enabled: true,
       page: { limit: 50, offset: 0 },
     });
-    expect(filtered.items.map((item) => item.name)).toEqual(["CRES 技能"]);
+    expect(filtered.items.map((item) => item.name)).toEqual(["架构设计规格"]);
   });
 
   test("详情从包读取正文与文件清单，SKILL.md 首项且只读", async () => {
     const reader = createSkillRead(db, store);
     const row = await db.one<{ id: string; package_key: string }>(
-      "select id, package_key from skill where name = 'CRES 技能'",
+      "select id, package_key from skill where name = '架构设计规格'",
     );
     expect(row).not.toBeNull();
 
     const detail = await reader.get(row!.id);
-    expect(detail.body).toContain("## 适用场景");
+    expect(detail.body).toContain("## 三、工作流");
     expect(detail.body).not.toContain("name:");
     expect(detail.files[0]).toMatchObject({ path: "SKILL.md", readOnly: true });
     expect(detail.files.map((file) => file.path)).toEqual([
       "SKILL.md",
-      "references/usage.md",
+      "references/arch-design-workflow.md",
     ]);
 
     const document = await reader.getDocument(row!.id);
-    expect(parseSkillMarkdown(document.markdown).name).toBe("cres");
+    expect(parseSkillMarkdown(document.markdown).name).toBe("arch-design-spec");
     expect(document.revision).toBe(detail.revision);
     expect(document.markdown.endsWith("\n")).toBe(true);
 
     const pkg = await reader.getPackage(row!.id);
-    expect(pkg.fileName).toBe("cres-v1.4.zip");
+    expect(pkg.fileName).toBe("arch-design-spec-v1.1.zip");
     expect(readSkillPackage(pkg.data)[0]!.path).toBe("SKILL.md");
   });
 
   test("包缺失时详情与下载报 package_unavailable，summary/list 仍可用", async () => {
     const reader = createSkillRead(db, store);
     const row = await db.one<{ id: string; package_key: string }>(
-      "select id, package_key from skill where name = 'CRES 技能'",
+      "select id, package_key from skill where name = '架构设计规格'",
     );
     await store.delete(`packages/${row!.package_key}`);
 
-    expect((await reader.getSummary(row!.id)).name).toBe("CRES 技能");
-    expect((await reader.list({ page: { limit: 50, offset: 0 } })).total).toBe(12);
+    expect((await reader.getSummary(row!.id)).name).toBe("架构设计规格");
+    expect((await reader.list({ page: { limit: 50, offset: 0 } })).total).toBe(7);
     for (const operation of [
       () => reader.get(row!.id),
       () => reader.getDocument(row!.id),
@@ -120,19 +120,21 @@ describe("Skill 读路径", () => {
       { code: "retrieval", label: "检索", position: 1 },
       { code: "review", label: "审视", position: 2 },
       { code: "testing", label: "测试", position: 3 },
+      { code: "process", label: "流程", position: 4 },
+      { code: "docs", label: "文档", position: 5 },
     ]);
   });
 
   test("系统标识读取：按 id 返回 slug，未知 id 与空输入不产生条目", async () => {
     const reader = createSkillSlugReader({ db });
     const row = await db.one<{ id: string; slug: string }>(
-      "select id, slug from skill where name = 'CRES 技能'",
+      "select id, slug from skill where name = '架构设计规格'",
     );
     expect(row).not.toBeNull();
     expect(await reader.slugsFor([])).toEqual({});
-    expect(await reader.slugsFor([row!.id])).toEqual({ [row!.id]: "cres" });
+    expect(await reader.slugsFor([row!.id])).toEqual({ [row!.id]: "arch-design-spec" });
     expect(
       await reader.slugsFor([row!.id, "0191f2f0-bbbb-7000-8000-000000000000"]),
-    ).toEqual({ [row!.id]: "cres" });
+    ).toEqual({ [row!.id]: "arch-design-spec" });
   });
 });

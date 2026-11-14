@@ -40,7 +40,7 @@ beforeEach(async () => {
   store = createFileStore(join(directory, "skills"));
   await seedAll(db, store);
   const row = await db.one<{ id: string }>(
-    "select id from skill where name = 'CRES 技能'",
+    "select id from skill where name = '架构设计规格'",
   );
   skillId = row!.id;
 });
@@ -94,10 +94,10 @@ describe("Skill 草稿生命周期", () => {
 
     expect(draft.skillId).toBe(skillId);
     expect(draft.baseRevision).toBe(1);
-    expect(draft.baseVersion).toBe("v1.4");
+    expect(draft.baseVersion).toBe("v1.1");
     expect(draft.files.map((file) => file.path)).toEqual([
       "SKILL.md",
-      "references/usage.md",
+      "references/arch-design-workflow.md",
     ]);
     expect(draft.files[0]!.readOnly).toBe(true);
     expect(draft.files[1]!.readOnly).toBe(false);
@@ -110,7 +110,7 @@ describe("Skill 草稿生命周期", () => {
     expect(uploaded.file).toMatchObject({ path: "scripts/run.sh", size: 7 });
     expect(uploaded.files.map((file) => file.path)).toEqual([
       "SKILL.md",
-      "references/usage.md",
+      "references/arch-design-workflow.md",
       "scripts/run.sh",
     ]);
 
@@ -128,14 +128,14 @@ describe("Skill 草稿生命周期", () => {
     );
     expect(renamed.files.map((file) => file.path)).toEqual([
       "SKILL.md",
+      "references/arch-design-workflow.md",
       "references/run.sh",
-      "references/usage.md",
     ]);
 
     await drafts.deleteDraftFile(draft.id, "references/run.sh");
     expect((await drafts.getDraft(draft.id)).files.map((file) => file.path)).toEqual([
       "SKILL.md",
-      "references/usage.md",
+      "references/arch-design-workflow.md",
     ]);
   });
 
@@ -145,7 +145,7 @@ describe("Skill 草稿生命周期", () => {
 
     await drafts.uploadDraftFile(draft.id, "references/a.md", new Uint8Array([1]));
     const conflict = await drafts
-      .renameDraftFile(draft.id, "references/a.md", "references/usage.md")
+      .renameDraftFile(draft.id, "references/a.md", "references/arch-design-workflow.md")
       .catch((caught) => caught);
     expect(conflict).toBeInstanceOf(FileConflictError);
 
@@ -199,7 +199,7 @@ describe("Skill 保存、启停与 GC", () => {
 
     const saved = await drafts.saveDraft(draft.id, null, {
       name: "新建 Skill",
-      categoryCode: "coding",
+      categoryCode: "process",
       description: "新建草稿保存",
       tags: ["新", "新", "保存"],
       body: "## 适用场景\n\n内容",
@@ -235,20 +235,20 @@ describe("Skill 保存、启停与 GC", () => {
       [skillId],
     );
     const saved = await drafts.saveDraft(draft.id, 1, {
-      name: "CRES 技能",
-      categoryCode: "coding",
+      name: "架构设计规格",
+      categoryCode: "process",
       description: "更新描述",
-      tags: ["CRES"],
+      tags: ["架构"],
       body: "## 更新",
     });
-    expect(saved).toMatchObject({ revision: 2, version: "v1.5", created: false });
+    expect(saved).toMatchObject({ revision: 2, version: "v1.2", created: false });
     expect(await store.head(`packages/${before!.package_key}`)).toBeNull();
 
     await db.query("update skill set version = 'v1.9' where id = $1", [skillId]);
     const draft2 = await drafts.createDraft(skillId);
     const saved2 = await drafts.saveDraft(draft2.id, 2, {
-      name: "CRES 技能",
-      categoryCode: "coding",
+      name: "架构设计规格",
+      categoryCode: "process",
       description: "再更新",
       tags: [],
       body: "## 再更新",
@@ -261,8 +261,8 @@ describe("Skill 保存、启停与 GC", () => {
     const updateDraft = await drafts.createDraft(skillId);
     const missing = await drafts
       .saveDraft(updateDraft.id, null, {
-        name: "CRES 技能",
-        categoryCode: "coding",
+        name: "架构设计规格",
+        categoryCode: "process",
         description: "缺 If-Match",
         body: "",
       })
@@ -274,7 +274,7 @@ describe("Skill 保存、启停与 GC", () => {
     const extra = await drafts
       .saveDraft(newDraft.id, 1, {
         name: "新建 Skill 带 If-Match",
-        categoryCode: "coding",
+        categoryCode: "process",
         description: "多带 If-Match",
         body: "",
       })
@@ -289,8 +289,8 @@ describe("Skill 保存、启停与 GC", () => {
     const conflictDraft = await drafts.createDraft(null);
     const nameError = await drafts
       .saveDraft(conflictDraft.id, null, {
-        name: "CRES 技能",
-        categoryCode: "coding",
+        name: "架构设计规格",
+        categoryCode: "process",
         description: "冲突",
         body: "",
       })
@@ -301,8 +301,8 @@ describe("Skill 保存、启停与 GC", () => {
     const updateDraft = await drafts.createDraft(skillId);
     const revisionError = await drafts
       .saveDraft(updateDraft.id, 99, {
-        name: "CRES 技能",
-        categoryCode: "coding",
+        name: "架构设计规格",
+        categoryCode: "process",
         description: "冲突",
         body: "",
       })
@@ -313,7 +313,7 @@ describe("Skill 保存、启停与 GC", () => {
     const largeError = await drafts
       .saveDraft(oversized.id, null, {
         name: "超限",
-        categoryCode: "coding",
+        categoryCode: "process",
         description: "超限",
         body: "x".repeat(17_000),
       })
@@ -349,7 +349,7 @@ describe("Skill 保存、启停与 GC", () => {
     const referenced: ReferenceGuard = {
       check: async () => [{ type: "expert", id: "e1", name: "专家" }],
     };
-    const row = await db.one<{ id: string }>("select id from skill where name = 'LDP 技能'");
+    const row = await db.one<{ id: string }>("select id from skill where name = '需求到任务'");
     const error = await service(systemClock, 24, referenced)
       .delete(row!.id, 1)
       .catch((caught) => caught);

@@ -115,6 +115,8 @@ describe("B1 全链路旅程（仅通过 HTTP）", () => {
       "retrieval",
       "review",
       "testing",
+      "process",
+      "docs",
     ]);
 
     const skillDraft = await call(ctx.app, "POST", "/api/v1/skill-drafts", { body: {} });

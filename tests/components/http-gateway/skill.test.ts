@@ -69,7 +69,7 @@ afterAll(async () => {
 });
 
 describe("Skill HTTP 契约", () => {
-  test("GET /skill-categories 返回 4 条参考数据", async () => {
+  test("GET /skill-categories 返回 6 条参考数据", async () => {
     const response = await call(ctx.app, "GET", "/api/v1/skill-categories");
     expect(response.status).toBe(200);
     expect(response.body.items.map((item: any) => item.code)).toEqual([
@@ -77,6 +77,8 @@ describe("Skill HTTP 契约", () => {
       "retrieval",
       "review",
       "testing",
+      "process",
+      "docs",
     ]);
   });
 
