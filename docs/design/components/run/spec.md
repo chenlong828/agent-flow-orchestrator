@@ -287,7 +287,7 @@ dispatched ──失败/超时/verdict 非法──▶ failed ──▶ run.fail
 
 ### 4.5 判定与回退
 
-1. `review` 结果结算：从 `message` 中取**最后一段** ```json 代码块解析；`verdict` 必须是 `"pass"` 或 `"fail"` 字符串，否则 `run_node(failed, verdict_invalid)`、`run.failed`。
+1. `review` 结果结算：取 `message` 末尾窗口内**最后一个**可解析的 verdict JSON 对象（裸 JSON，不要求独占一行、不要求代码围栏）；`verdict` 必须是 `"pass"` 或 `"fail"` 字符串，否则 `run_node(failed, verdict_invalid)`、`run.failed`。
 2. `pass` → `succeeded` → 推进 seq。
 3. `fail` → `rejected`：在冻结图中找该节点唯一 `rollback` 出边；无 → `run.failed(missing_rollback_edge)`。目标必须是当前节点的祖先（按 seq 入边回溯），否则 `run.failed(invalid_rollback_target)`。
 4. 回退：`current_node_id = 目标节点`，目标节点下次执行时 `visit = 该节点历史最大 visit + 1`；目标到 `review` 之间的节点依次重跑，各自 `visit+1`，新行写入同一个 `enter_reason` 指针（指向被驳回行），派发时渲染成 prompt 的 `[本次进入]` 块。

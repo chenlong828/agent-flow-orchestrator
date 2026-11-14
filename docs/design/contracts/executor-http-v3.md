@@ -274,7 +274,7 @@ v3 在此之上加两件事：**执行前有 task-space**（工作区内按 run 
    - `session_log_too_large`：会话日志压缩后超过 `maxSessionLogBytes`，client 已上传 0 行空日志后按 `failed` 上报；
    - `archive_too_large`：归档超过 `maxArchiveBytes`（记录在 run 的 `archive_state`，不进结果体）。
    调度器据 `code` 区分「任务太大」与「疑似卡死」。
-5. `message` 只要有输出就填（按 `maxResultBytes` 截断，含截断标记不超过上限），空串只表示确实没有输出。**`review` 节点的 verdict JSON 就在 `message` 的最后一段代码块里**，由服务端解析；client 不解析、不改写。
+5. `message` 只要有输出就填（按 `maxResultBytes` 截断，含截断标记不超过上限），空串只表示确实没有输出。**`review` 节点的 verdict JSON 在 `message` 末尾**（裸 JSON，不加代码围栏，独占最后一行或紧跟最后一句均可），由服务端解析；client 不解析、不改写。
 6. 结果只含控制信息：状态、最终消息、停止原因、用量、session、错误类别；不含产物、会话全文、日志、凭据。
 7. 重复上报不要求 `attempt` 一致；以 `taskId` 判定。
 8. 已结算任务的重复上报仍按第 1 条返回 `accepted=false`；`session_log_missing` 只用于「尚未结算且缺日志」。

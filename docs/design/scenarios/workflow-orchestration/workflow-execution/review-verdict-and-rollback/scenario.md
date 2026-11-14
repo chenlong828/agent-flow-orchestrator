@@ -65,7 +65,7 @@ externalRefs: []
 4. client 上报结果 → `CMP-run.handleTaskResult`：找 `run_node` → **日志不存在 → `409 session_log_missing`，不调 `acceptResult`、不结算**；存在 → `scheduler.acceptResult`。
 5. 结算 `succeeded`：
    - 普通节点：`run_node(succeeded)`，推进 seq 后继。
-   - `review`：解析最终消息中最后一段 ```json 代码块为 `{verdict: "pass"|"fail", reason?}`；`pass` → `succeeded` + 推进；`fail` → `run_node(rejected)`，取该节点唯一 `rollback` 边的 `to` 作为回退目标。
+   - `review`：取最终消息末尾最后一个 verdict JSON 对象 `{verdict: "pass"|"fail", reason?}`（裸 JSON，不要求独占一行）；`pass` → `succeeded` + 推进；`fail` → `run_node(rejected)`，取该节点唯一 `rollback` 边的 `to` 作为回退目标。
 6. 回退：目标节点起重新执行，`run_node` 写 `visit+1` 新行；目标到 review 之间的节点依次重跑；旧行保留为历史。
 7. 轮次上限：任一节点 `visit+1 > run.max_node_visits`（默认 5）→ `run.failed(visit_limit_exceeded)`，不再入队。
 
