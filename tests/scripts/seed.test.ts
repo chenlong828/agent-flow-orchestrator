@@ -36,13 +36,13 @@ afterAll(async () => {
 });
 
 describe("演示种子", () => {
-  test("首轮写入 11 个 Skill / 10 个专家 / 2 条流程与 21 条技能装配边，不预置 Harness 与工具", async () => {
+  test("首轮写入 15 个 Skill / 13 个专家 / 3 条流程与 52 条技能装配边，不预置 Harness 与工具", async () => {
     const result = await seedAll(db, store);
     expect(result).toEqual({
-      skills: 11,
-      experts: 10,
-      workflows: 2,
-      expertSkills: 21,
+      skills: 15,
+      experts: 13,
+      workflows: 3,
+      expertSkills: 52,
     });
     const counts = await db.one<{
       harnesses: number;
@@ -65,14 +65,14 @@ describe("演示种子", () => {
     expect(counts).toEqual({
       harnesses: 0,
       tools: 0,
-      skills: 11,
-      experts: 10,
-      workflows: 2,
+      skills: 15,
+      experts: 13,
+      workflows: 3,
       toolEdges: 0,
       missingPackages: 0,
     });
 
-    expect(await store.list("packages/")).toHaveLength(11);
+    expect(await store.list("packages/")).toHaveLength(15);
     const arch = await db.one<{ package_key: string }>(
       "select package_key from skill where slug = 'arch-design-spec'",
     );
@@ -87,7 +87,7 @@ describe("演示种子", () => {
     const skillMd = new TextDecoder().decode(entries[0]!.data);
     expect(parseSkillMarkdown(skillMd)).toMatchObject({
       name: "arch-design-spec",
-      version: "v1.1",
+      version: "v1.3",
     });
     expect(new TextEncoder().encode(skillMd).byteLength).toBeLessThanOrEqual(16 * 1024);
   });
@@ -107,15 +107,15 @@ describe("演示种子", () => {
         (select count(*)::int from workflow) as workflows,
         (select count(*)::int from expert_skill) as "skillEdges"`,
     );
-    expect(counts).toEqual({ skills: 11, experts: 10, workflows: 2, skillEdges: 21 });
-    expect(await store.list("packages/")).toHaveLength(11);
+    expect(counts).toEqual({ skills: 15, experts: 13, workflows: 3, skillEdges: 52 });
+    expect(await store.list("packages/")).toHaveLength(15);
 
     const requirements = await db.one<{ version: string; tags: number }>(
       `select s.version,
         (select count(*)::int from skill_tag t where t.skill_id = s.id) as tags
        from skill s where s.name = '需求到场景'`,
     );
-    expect(requirements).toEqual({ version: "v2.0", tags: 3 });
+    expect(requirements).toEqual({ version: "v2.4", tags: 3 });
   });
 
   test("已存在的流程不被种子覆盖，保留界面上的改名与改图", async () => {
@@ -154,8 +154,8 @@ describe("演示种子", () => {
     expect(categories).toEqual([
       { category_code: "coding", count: 1 },
       { category_code: "docs", count: 1 },
-      { category_code: "process", count: 5 },
-      { category_code: "review", count: 2 },
+      { category_code: "process", count: 8 },
+      { category_code: "review", count: 3 },
       { category_code: "testing", count: 2 },
     ]);
 

@@ -43,7 +43,7 @@ describe("Skill 读路径", () => {
     for (const file of packages) await store.delete(file.key);
 
     const page = await reader.list({ page: { limit: 5, offset: 0 } });
-    expect(page.total).toBe(11);
+    expect(page.total).toBe(15);
     expect(page.items).toHaveLength(5);
     expect(page.items[0]).toMatchObject({
       id: expect.any(String),
@@ -85,7 +85,7 @@ describe("Skill 读路径", () => {
     expect(document.markdown.endsWith("\n")).toBe(true);
 
     const pkg = await reader.getPackage(row!.id);
-    expect(pkg.fileName).toBe("arch-design-spec-v1.1.zip");
+    expect(pkg.fileName).toBe("arch-design-spec-v1.3.zip");
     expect(readSkillPackage(pkg.data)[0]!.path).toBe("SKILL.md");
   });
 
@@ -97,7 +97,7 @@ describe("Skill 读路径", () => {
     await store.delete(`packages/${row!.package_key}`);
 
     expect((await reader.getSummary(row!.id)).name).toBe("架构设计规格");
-    expect((await reader.list({ page: { limit: 50, offset: 0 } })).total).toBe(11);
+    expect((await reader.list({ page: { limit: 50, offset: 0 } })).total).toBe(15);
     for (const operation of [
       () => reader.get(row!.id),
       () => reader.getDocument(row!.id),

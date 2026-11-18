@@ -1,7 +1,7 @@
 ---
 name: "doc-layout-spec"
 description: "要新建或改动文档树内的任何文件（总体需求、项目规格、场景、本次任务的 brief/result、归档件）之前，用它定位归属与状态；也为新项目接入工作区、核对既有文档树、决定归档去向时用。需求怎么拆归 req-scenario-spec，任务怎么拆归 task-split，文档内容怎么写不归它管。"
-version: "v3.6"
+version: "v3.7"
 ---
 
 # 文档布局：工作区、项目、任务三层
@@ -101,7 +101,7 @@ task-spaces/20261113-101922/
 - 一个任务最多三类提交，各自一件事：**实现 commit**（开发）、**测试 commit**（测试节点补测试时）、**收口 commit**（收尾）。没有补测试就没有测试 commit。
 - 收口 commit 之后工作树必须干净；收尾不改代码、不改设计正文、不复跑验证。
 
-- `brief.md` 必须列出**本次涉及哪些项目**（如 `uumail`、`i2xclient`），后续文档按此归属到对应项目 `doc/`。
+- `brief.md` 必须列出**本次涉及哪些项目**（项目名按 workspace 实际目录填，如 `<项目 A>`、`<项目 B>`），后续文档按此归属到对应项目 `doc/`。
 - 跨项目或项目内真相**边做边写**进对应 `doc/`，不搞「最后统一迁移」：下一次工作只读 `doc/`，留在 task-space 等于丢失；运行可能超时或取消，等收尾再搬会一起丢。
 - `task-space` 里的同名文件只是过程记录，最终版以 `doc/` 为准；不要在两处维护同一份现行内容。
 - 运行结束 → 编排打包归档（tar.gz 在编排侧），本地目录保留只读。
@@ -144,7 +144,7 @@ task-spaces/20261113-101922/
 ---
 layer: design
 module: drawer          # 所属领域/模块；global 表示跨模块
-scope: project:uumail   # workspace | project:<name>
+scope: project:<name>   # workspace | project:<name>
 status: current
 updated: 2026-11-14
 ---

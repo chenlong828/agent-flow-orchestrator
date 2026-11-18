@@ -1,7 +1,7 @@
 ---
 name: "review-verdict"
 description: "审核判定：核验 task-space 产物并输出 verdict JSON（pass/fail）；结束前必须输出，否则本次判定无效。触发：review 节点、审核、准出、判定"
-version: "v1.2"
+version: "v1.7"
 ---
 
 # 用途
@@ -25,6 +25,8 @@ version: "v1.2"
 - `pass`：产物满足目标，证据齐全，没有未决的阻塞项。
 - `fail`：存在缺失、与目标不符、证据不足，或留有必须修复的缺陷。
 - `reason` 写「回哪个阶段、改什么」，不写情绪化评价。
+- `fail` 必须引用任务出口或场景卡的具体条目（`T-xxxx` / `T-SCN-xxxx` / 文件行）；卡外新增的证据要求只能记建议。
+- 证据层级按任务出口与场景卡标注核对，不越级要求；证据分级见 `af-flow-rule` §1；确认与默认确认见 `auto-confirm`。
 
 ## 常见踩坑
 
@@ -32,3 +34,4 @@ version: "v1.2"
 - 把 JSON 放在正文中间、后面还跟了新的 JSON 示例：取最后一个 verdict 对象，容易判错对象。
 - JSON 里 `verdict` 用了 `passed`/`ok`/`true` 之类的值，解析失败。
 - 为了推进流程默认给 pass，却没有证据。
+- 用「证据不够」判 fail，却指不出任务出口/场景卡的哪一条，或要求卡外的更高层级证据。

@@ -1,0 +1,26 @@
+{
+  "categories": {
+    "correctness": "off",
+    "suspicious": "off",
+    "pedantic": "off",
+    "perf": "off",
+    "style": "off",
+    "restriction": "off",
+    "nursery": "off"
+  },
+  "rules": {
+    "max-lines": ["warn", { "max": 600 }],
+    "max-lines-per-function": ["warn", { "max": 80 }],
+    "max-params": ["warn", 5],
+    "max-depth": ["warn", 4],
+    "complexity": ["warn", 15],
+    "max-statements": ["warn", 30],
+    "max-classes-per-file": ["warn", 1],
+    "max-nested-callbacks": ["warn", 3],
+    "typescript/no-explicit-any": "warn",
+    "typescript/no-non-null-assertion": "warn",
+    "typescript/ban-ts-comment": "warn",
+    "import/max-dependencies": ["warn", { "max": 20 }],
+    "import/no-cycle": "warn"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "js-backend",
+  "displayName": "JS/TS 后端",
+  "slug": "js-backend-code-review",
+  "version": "v0.1",
+  "stacks": ["javascript", "typescript", "node", "bun"],
+  "appliesTo": {
+    "requires": ["package.json"],
+    "any": ["package.json", "**/*.ts", "**/*.js", "**/*.mjs"],
+    "not": ["**/*.vue"]
+  },
+  "entry": "scripts/review.mjs",
+  "commands": {
+    "doctor": ["doctor", "--json"],
+    "precheck": ["precheck", "--json"],
+    "report": ["report", "--json"],
+    "gate": ["gate", "--json"],
+    "calibrate": ["calibrate", "--json"]
+  },
+  "stateDir": ".workspace/checks/js-backend",
+  "reportSchema": "check-report@1"
+}

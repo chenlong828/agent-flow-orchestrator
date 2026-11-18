@@ -226,6 +226,6 @@ P1 的人参与分两次：第一次带候选模块图、契约草案、关键�
 ## 六、与其他 skill 的协作
 
 - 先走 **design-before-coding** 的业务复述、现状盘点、模式选择与场景走查；本 skill 在其上补架构规格。若只做架构评审，可跳过模式选择，但业务能力盘点与现状依赖图不能省。同一修改只画一张地图：本 skill 的分层模块地图就是组件地图的架构细化，不两图并行维护。
-- 编码执行、验收与提交纪律遵循 **dev-execution-spec**；本 skill 定下的改动级别与人工确认门是它动工前的前置核对——P1 未确认不编码，P2 未确认不合并。
+- 编码执行、验收与提交纪律遵循 **dev-execution-spec**；本 skill 定下的改动级别与人工确认点是它动工前的前置核对——P1 未确认不编码，P2 未确认不合并。
 - 架构规格、模块卡、依赖矩阵、契约卡属于现行真相，按 **doc-layout-spec** 落到 `doc/design/architecture.md` 或 `doc/design/components/<id>/spec.md`；评审过程、候选方案、被否决理由落到本次工作的 `task-spaces/<本次运行>/`；定稿决策落到 `doc/history/decisions/`；踩过的坑落到 `doc/history/pitfalls.md`。
 - 冲突时：文档放哪里听 doc-layout-spec；通用设计流程听 design-before-coding；架构内容判据听本 skill；动手到交付的执行纪律听 dev-execution-spec。

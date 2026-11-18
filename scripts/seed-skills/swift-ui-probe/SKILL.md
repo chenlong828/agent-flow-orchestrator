@@ -1,68 +1,123 @@
 ---
 name: "swift-ui-probe"
-description: "Swift 界面探针：在 macOS 图形会话里验证单测覆盖不到的 AppKit/SwiftUI 行为——键盘焦点归属、.onDeleteCommand 是否只在指定控件命中、scenePhase 与 NSApplication 前台通知、按键是否被目标控件接收；产出可复核的 evidence 文本。触发：焦点、按键、Delete、scenePhase、前台状态、界面行为验证"
-version: "v1.0"
+description: "Swift/macOS 界面探针：对指定 App 的活动窗口截图（可按区域），配合 harness 的 read_image 迭代观察任意组件区域（工具栏/列表/正文/侧栏/弹窗），用于 GUI 渲染、布局、文案的视觉验证。触发：界面验收、视觉回归、截图取证、看真实 macOS 窗口；Web 程序不适用"
+version: "v1.2"
 ---
 
 # 用途
 
-界面行为验证：单元测试跑在无窗口环境里，验不了「键盘事件落到哪个控件」「只有列表响应 Delete」「应用失活/回焦时前台状态怎么变」。本技能用两个**可编译、可复跑**的小探针补这块证据。
+macOS GUI 程序最终交付的是**屏幕上的样子**。本技能提供一条最小命令：定位指定 App 的活动窗口 → 截图（可只截一块区域）→ PNG 落盘，模型用 harness 的 `read_image` 直接读图判断。
 
-产物是**证据文本**，不是新的产品代码；探针源码与日志一起落 task-space 的 `evidence/`。
+观察单位是**界面的任意组件区域**（工具栏、列表、正文、侧栏、弹窗、菜单、状态栏……），不限于某一种控件。典型的迭代方式：先截整窗 → 读图定位组件 → 按坐标截区域 → 再读图看细节。
+
+它是 L3 视觉证据的**标准工具**，不是每次任务临时写探针。
 
 ## 何时用
 
-- 需要证明「某快捷键/按键只在目标控件生效，其它焦点上下文不响应」；
-- 需要确认 `scenePhase`、`NSApplication.willResignActiveNotification` / `didBecomeActiveNotification` 的真实触发顺序与取值；
-- 需要记录 `firstResponder` 类型，证明按键确实落在目标控件上，而不是“没聚焦所以没命中”；
-- 验收要求「真机/真实窗口」证据，而单测只能证明模型层逻辑。
+- 需要判断界面渲染是否正确：布局、文案、颜色、白底/深色、破版、对齐；
+- 验收要求「真实窗口/真实 App」的视觉证据；
+- 视觉回归：同一区域改动前后各截一张对比。
 
 ## 何时不用
 
-- 纯逻辑、数据转换、契约映射 → 用单元测试；
-- 真实网关读写、协议抓包 → **不在本技能范围**（这类探针会改真实邮箱，需单独授权与独立脚本）；
-- 需要加载被测 app 的全部真实视图做端到端点击 → 现阶段用一次性的 AX 驱动，不要套本模板。
+- 纯逻辑、数据转换、契约映射 → 单元测试（L1）；
+- 需要证明「点击后发生了什么」「键盘落在哪个控件」 → 交互驱动探针或 UI 测试；
+- Web 程序（浏览器渲染）→ 用无头浏览器导出截图，不在本技能范围；
+- 本技能只面向 macOS 本机开发环境，不做远程/无显示器场景。
 
-## 两个探针
+## 通用观察流程：整窗 → 读图 → 定位 → 区域 → 再读图
 
-| 模式 | 源文件 | 验证什么 | 输出 |
-|---|---|---|---|
-| `focus` | `scripts/focus-delete-probe.swift` | 5 个焦点上下文（list / search / body / compose / settings）各发一次 Delete（keyCode 51），只有列表应触发 `.onDeleteCommand` | `ui-focus-<context>.txt` |
-| `scene` | `scripts/scene-phase-probe.swift` | 真实 `WindowGroup` 窗口在 activate → deactivate → reactivate 过程中的 `scenePhase` 与 `NSApplication` 通知 | `scene-phase.txt` |
-
-## 步骤
-
-1. **确定目标上下文**：要验哪个控件收键盘、哪个不收；对应 `list/search/body/compose/settings`。
-2. **改模板**（只在必要时）：窗口标题用 `--title`；若目标 app 的控件结构与模板不同，按 `references/writing-a-probe.md` 调整焦点目标与日志字段。
-3. **编译并运行**：
+1. **截整窗**，拿到窗口尺寸与整体布局：
 
    ```bash
-   bash <skill>/scripts/run-probe.sh --mode focus --context list  --out <task-space>/evidence
-   bash <skill>/scripts/run-probe.sh --mode focus --context search --out <task-space>/evidence
-   bash <skill>/scripts/run-probe.sh --mode scene --out <task-space>/evidence
+   "$B/window-shot" --app uumail --out <task-space>/evidence/window.png
+   # image=3024x1768 scale=2.00（窗口 1512x884 pt）
    ```
 
-   脚本会把 `swiftc` 的模块缓存放进输出目录（避免写 `~/Library` 被沙箱拒绝），编译产物也放该目录。
-4. **读结果**：每个上下文必须有 `RESULT ... firstResponder=<类型>`；列表的 `deleteCommands` 应为 1，其余为 0。
-5. **落结论**：在 `dev.md`（或 `evidence/` 下的说明文件）写「上下文 → 是否命中 → firstResponder 类型 → 结论」；结论要与实现/设计改动对应。
+2. **读图定位**（harness 的 `read_image`）：在预览图上找到目标组件的像素范围。注意预览可能被等比缩小，**以图里报的预览尺寸为基准**换算。
+
+3. **换算到窗口坐标**（工具参数 `--region` 用窗口 pt）：
+
+   ```
+   region_x = 预览x / 预览宽 * 窗口宽(pt)
+   region_w = 预览w / 预览宽 * 窗口宽(pt)
+   region_y、region_h 同理用高度换算
+   ```
+
+   例：预览 1512x884、窗口 1512x884 pt、目标在预览里是 (700,80)-(1500,580) →
+   `--region 700,80,800,500`。
+
+4. **截区域并再读图**：区域越小，预览里单位像素越大，小字越清楚。文字看不清就再收紧一次范围。
+
+5. **落结论**：把区域截图与结论写进 `test.md` / `review.md`，引用文件名与窗口信息行。
+
+这条循环对**任何组件**都成立：工具栏、列表行、阅读区头部、正文画布、对话框按钮、菜单项。定位靠读图，不靠猜坐标。
+
+## 命令
+
+编译一次（产物放临时目录，不写技能目录）：
+
+```bash
+SK=<skill 目录>
+B=${TMPDIR:-/tmp}/app-shot
+mkdir -p "$B"
+CLANG_MODULE_CACHE_PATH="$B/mc" swiftc -O "$SK/scripts/window-shot.swift" -o "$B/window-shot"
+```
+
+列出当前窗口（确认 App 的 owner 名与标题）：
+
+```bash
+"$B/window-shot" --list
+# id=389735 pid=6402 owner=uumail title=收件箱 bounds=0,33 1512x884
+```
+
+截活动窗口：
+
+```bash
+"$B/window-shot" --app uumail --out <task-space>/evidence/inbox.png
+```
+
+只截一块区域（坐标是**窗口坐标，单位 pt**，原点在窗口左上角）：
+
+```bash
+"$B/window-shot" --app uumail --region 700,80,800,500 --out <task-space>/evidence/reading-pane.png
+```
+
+参数：
+
+| 参数 | 说明 |
+|---|---|
+| `--list` | 列出所有 on-screen 窗口（id / pid / owner / title / bounds） |
+| `--app <owner>` | 按窗口 owner 名匹配（大小写不敏感），取最前面的那个窗口 |
+| `--pid <pid>` | 按进程匹配（App 有多窗口时更精确） |
+| `--region x,y,w,h` | 裁剪区域，窗口坐标 pt；超出窗口会被拒绝 |
+| `--out <file.png>` | 输出路径，目录不存在会自动创建 |
+
+退出码：`0` 成功；`2` 参数错误；`3` 无屏幕录制权限；`4` 找不到窗口；`5` 截图或区域失败；`6` 写文件失败。
+
+## 输出
+
+stdout 两行：
+
+```
+id=389735 pid=6402 owner=uumail title=收件箱 bounds=0,33 1512x884
+image=3024x1768 scale=2.00 out=<task-space>/evidence/inbox.png
+```
+
+- `scale` 是 Retina 倍率（通常 2.00）；`image` 尺寸 = `bounds` × `scale`；
+- 区域截图时 `image` 尺寸 = `region` × `scale`。
 
 ## 判据
 
-- `firstResponder` 必须打印具体类型（如 `SwiftUIOutlineListView`、`NSTextView`、`PlatformTextView`）；`nil` 说明没有真正聚焦，结论不成立。
-- 只有目标控件允许 `deleteCommands=1`；其它上下文出现 1 即视为行为越界。
-- `scene` 结论必须同时记录 `NSApp.isActive` 与通知；只记 `scenePhase` 不足以说明前台状态。
-- 探针输出与源码必须一起落 `evidence/`，只留结论文字不可复核。
+- 退出码 0，PNG 文件存在且非空；
+- `image` 与 `bounds`/`region` 的倍率关系成立（防止截错窗口或缩放错误）；
+- 图里能读到目标界面（标题栏、目标区域）；读不出说明窗口没到目标状态，先让 App 进入目标状态再截；
+- 截图落 `task-space/evidence/`，在 `test.md` / `review.md` 里引用文件名。
 
 ## 坑
 
-- **会抢焦点**：探针需要激活窗口才能收键盘事件；一次只跑一个模式，单次约 2–6 秒后自动退出。无人值守时段跑会打断用户操作。
-- **需要图形会话**：SSH / 无窗口环境下 `NSApplication.activate` 不生效，`firstResponder` 可能为 `nil`。
-- **`scenePhase` 在 macOS 上不随失活变化**：实测 `@Environment(\.scenePhase)` 始终是 `.active`；需要前台状态时监听 `NSApplication` 通知（这本身就是常见设计修正）。
-- **编译缓存**：直接用 `swiftc` 会尝试写 `~/Library`；用 `run-probe.sh`，它把 `CLANG_MODULE_CACHE_PATH` 与 `-module-cache-path` 指到输出目录。
-- **不要打印真实数据**：窗口标题、日志里不要出现真实邮箱、账号、凭据。
-
-## 边界
-
-- 仅 macOS + SwiftUI/AppKit；Linux/Windows 不适用。
-- 探针是“等价结构”而非加载真实 app；结论要回到目标 app 的实际控件结构上复核。
-- 不包含网关写命令、AX 全树 dump（后者另行扩展）。
+- **需要屏幕录制权限**：系统设置 → 隐私与安全性 → 屏幕录制，给宿主进程（终端/DSH）授权；否则退出码 3。
+- **窗口必须在屏**：最小化、被系统保护、或无窗口时找不到；先激活 App 并打开目标窗口。
+- **多窗口**：`--app` 取最前面的那个；需要固定窗口时用 `--list` 找 id 再用 `--pid`。
+- **隐私**：真实邮件、账号、正文会进图。落 evidence 前裁剪到目标区域，或先换成假数据/测试账号；不要把真实凭据、身份证件、完整邮箱地址留在图里。
+- **时序**：截图是瞬时状态；切换邮件/主题后要等界面更新完成再截，必要时先截一张确认再截目标张。

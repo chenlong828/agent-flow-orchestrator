@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "updated": "2026-11-18",
+  "paths": {
+    "source": ["src"],
+    "tests": ["tests"],
+    "migrations": ["db/migrations"],
+    "entries": ["src/main.ts"],
+    "ignore": []
+  },
+  "components": {
+    "roots": ["src/components"],
+    "deepImportRoots": ["src/components"],
+    "publicFiles": ["index.ts", "contract.ts"],
+    "fanoutExempt": [],
+    "deepImportExempt": []
+  },
+  "routes": { "roots": [], "methodSelector": "request.method" },
+  "allow": {
+    "console": [],
+    "env": [],
+    "runtimeApis": { "Bun.file": ["src/allowed.ts"] }
+  },
+  "contracts": { "command": null },
+  "rules": {
+    "Q-01": { "threshold": 5 },
+    "Q-02": { "threshold": 3 },
+    "Q-03": { "threshold": 2 },
+    "Q-18": { "threshold": 2 },
+    "Q-19": { "threshold": 0.5 },
+    "Q-26": { "threshold": 2 },
+    "Q-27": { "threshold": 1 }
+  },
+  "precheckRules": [
+    "Q-01",
+    "Q-02",
+    "Q-03",
+    "Q-04",
+    "Q-05",
+    "Q-06",
+    "Q-07",
+    "Q-08",
+    "Q-11",
+    "Q-13",
+    "Q-14",
+    "Q-15",
+    "Q-16",
+    "Q-20",
+    "Q-21",
+    "Q-22",
+    "Q-23",
+    "Q-25",
+    "Q-26",
+    "Q-27",
+    "Q-28",
+    "Q-29"
+  ]
+}

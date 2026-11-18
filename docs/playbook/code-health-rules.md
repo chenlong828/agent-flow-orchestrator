@@ -151,3 +151,7 @@ bun run quality:gate
 - 既有 OpenAPI 字段测试：契约一致性。
 
 工具本身的限制也写进规则：`typescript-eslint` 当前不支持 TypeScript 7.0，所以不用 ESLint；`dependency-cruiser` 同样要求 TS <7，依赖图改由 `ts-morph` 计算。工具不可用时先换工具，不降级规则。
+
+## 8. 与检查技能的关系
+
+2026-11-18 起，本文的规则、阈值与反馈闭环已抽取为可复用技能包 `js-backend-code-review`（`scripts/seed-skills/js-backend-code-review/`），工作区发现与调度由 `workspace-scan` 承担。本文继续作为**本项目的 profile 依据**：阈值来历、存量演变与项目特有豁免写在这里；通用规则目录、判断清单、命令与输出契约以技能包的 `references/` 为准。现有 `quality:report` 保持不变，待 parity 对照稳定后另立工序切换。

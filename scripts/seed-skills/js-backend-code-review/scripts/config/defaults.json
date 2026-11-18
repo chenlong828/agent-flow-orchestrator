@@ -1,0 +1,406 @@
+{
+  "schemaVersion": 1,
+  "rulesVersion": "v0.1",
+  "defaults": {
+    "paths": {
+      "source": [
+        "src"
+      ],
+      "tests": [
+        "tests"
+      ],
+      "migrations": [
+        "db/migrations"
+      ],
+      "entries": [
+        "src/main.ts"
+      ]
+    },
+    "components": {
+      "roots": [
+        "src/components"
+      ],
+      "publicFiles": [
+        "index.ts",
+        "contract.ts"
+      ],
+      "fanoutExempt": [
+        "src/main.ts"
+      ],
+      "deepImportExempt": [],
+      "deepImportRoots": [
+        "src/components"
+      ]
+    },
+    "routes": {
+      "roots": [
+        "src/components/http-gateway/routes"
+      ],
+      "methodSelector": "request.method"
+    },
+    "allow": {
+      "console": [],
+      "env": [],
+      "runtimeApis": {}
+    },
+    "tests": {
+      "weakPatterns": [
+        "\\btoBeDefined\\(",
+        "\\btoBeTruthy\\("
+      ],
+      "skipPatterns": [
+        "\\b(?:test|describe|it)\\.skip\\("
+      ]
+    },
+    "commit": {
+      "taskPattern": "T-[A-Z0-9-]+",
+      "fixPrefix": "fix",
+      "churnTaskThreshold": 3
+    },
+    "jscpd": {
+      "format": "typescript",
+      "minLines": 8,
+      "minTokens": 70
+    },
+    "contracts": {
+      "command": null
+    },
+    "precheckRules": [
+      "Q-01",
+      "Q-02",
+      "Q-03",
+      "Q-04",
+      "Q-05",
+      "Q-06",
+      "Q-07",
+      "Q-08",
+      "Q-11",
+      "Q-13",
+      "Q-14",
+      "Q-15",
+      "Q-16",
+      "Q-20",
+      "Q-21",
+      "Q-22",
+      "Q-23",
+      "Q-25",
+      "Q-26",
+      "Q-27",
+      "Q-28",
+      "Q-29"
+    ]
+  },
+  "rules": {
+    "Q-01": {
+      "name": "文件行数",
+      "group": "尺寸与复杂度",
+      "level": "HARD",
+      "threshold": 600,
+      "warn": 500,
+      "unit": "行",
+      "tool": "ts-morph",
+      "cost": "fast",
+      "scope": "file"
+    },
+    "Q-02": {
+      "name": "函数行数",
+      "group": "尺寸与复杂度",
+      "level": "HARD",
+      "threshold": 80,
+      "unit": "行",
+      "tool": "oxlint",
+      "cost": "fast",
+      "scope": "file"
+    },
+    "Q-03": {
+      "name": "函数参数",
+      "group": "尺寸与复杂度",
+      "level": "HARD",
+      "threshold": 5,
+      "unit": "个",
+      "tool": "oxlint",
+      "cost": "fast",
+      "scope": "file"
+    },
+    "Q-04": {
+      "name": "圈复杂度",
+      "group": "尺寸与复杂度",
+      "level": "HARD",
+      "threshold": 15,
+      "unit": "",
+      "tool": "oxlint",
+      "cost": "fast",
+      "scope": "file"
+    },
+    "Q-05": {
+      "name": "嵌套深度",
+      "group": "尺寸与复杂度",
+      "level": "WARN",
+      "threshold": 4,
+      "unit": "层",
+      "tool": "oxlint",
+      "cost": "fast",
+      "scope": "file"
+    },
+    "Q-06": {
+      "name": "循环依赖",
+      "group": "依赖与死代码",
+      "level": "HARD",
+      "threshold": 0,
+      "unit": "组",
+      "tool": "ts-morph",
+      "cost": "fast",
+      "scope": "repo"
+    },
+    "Q-07": {
+      "name": "跨组件深导入",
+      "group": "依赖与死代码",
+      "level": "HARD",
+      "threshold": 0,
+      "unit": "处",
+      "tool": "ts-morph",
+      "cost": "fast",
+      "scope": "file"
+    },
+    "Q-08": {
+      "name": "孤儿文件",
+      "group": "依赖与死代码",
+      "level": "HARD",
+      "threshold": 0,
+      "unit": "个",
+      "tool": "ts-morph",
+      "cost": "fast",
+      "scope": "repo"
+    },
+    "Q-09": {
+      "name": "孤儿运行时导出",
+      "group": "依赖与死代码",
+      "level": "RATCHET",
+      "threshold": 0,
+      "unit": "个",
+      "tool": "knip",
+      "cost": "slow",
+      "scope": "repo"
+    },
+    "Q-10": {
+      "name": "孤儿类型",
+      "group": "依赖与死代码",
+      "level": "INFO",
+      "threshold": 0,
+      "unit": "个",
+      "tool": "knip",
+      "cost": "slow",
+      "scope": "repo"
+    },
+    "Q-11": {
+      "name": "组件扇出",
+      "group": "依赖与死代码",
+      "level": "WARN",
+      "threshold": 8,
+      "unit": "个",
+      "tool": "ts-morph",
+      "cost": "fast",
+      "scope": "file"
+    },
+    "Q-12": {
+      "name": "克隆块",
+      "group": "复制与类型逃逸",
+      "level": "HARD",
+      "threshold": 0,
+      "unit": "块",
+      "tool": "jscpd",
+      "cost": "slow",
+      "scope": "repo"
+    },
+    "Q-13": {
+      "name": "非空断言",
+      "group": "复制与类型逃逸",
+      "level": "RATCHET",
+      "threshold": 0,
+      "unit": "处",
+      "tool": "oxlint",
+      "cost": "fast",
+      "scope": "file"
+    },
+    "Q-14": {
+      "name": "类型逃逸（any / ts-ignore）",
+      "group": "复制与类型逃逸",
+      "level": "HARD",
+      "threshold": 0,
+      "unit": "处",
+      "tool": "oxlint",
+      "cost": "fast",
+      "scope": "file"
+    },
+    "Q-15": {
+      "name": "重复字符串",
+      "group": "复制与类型逃逸",
+      "level": "INFO",
+      "threshold": 0,
+      "unit": "组",
+      "tool": "ts-morph",
+      "cost": "fast",
+      "scope": "file"
+    },
+    "Q-16": {
+      "name": "可选字段比例",
+      "group": "复制与类型逃逸",
+      "level": "WARN",
+      "threshold": 0.3,
+      "unit": "",
+      "tool": "ts-morph",
+      "cost": "fast",
+      "scope": "file"
+    },
+    "Q-17": {
+      "name": "契约一致性",
+      "group": "契约、数据与运行时边界",
+      "level": "HARD",
+      "threshold": 0,
+      "unit": "fail",
+      "tool": "contract-command",
+      "cost": "slow",
+      "scope": "repo"
+    },
+    "Q-18": {
+      "name": "表宽度",
+      "group": "契约、数据与运行时边界",
+      "level": "WARN",
+      "threshold": 20,
+      "unit": "列",
+      "tool": "pgsql-ast-parser",
+      "cost": "slow",
+      "scope": "repo"
+    },
+    "Q-19": {
+      "name": "可空列比例",
+      "group": "契约、数据与运行时边界",
+      "level": "WARN",
+      "threshold": 0.5,
+      "unit": "",
+      "tool": "pgsql-ast-parser",
+      "cost": "slow",
+      "scope": "repo"
+    },
+    "Q-20": {
+      "name": "路由方法分支",
+      "group": "契约、数据与运行时边界",
+      "level": "HARD",
+      "threshold": 12,
+      "unit": "个",
+      "tool": "ts-morph",
+      "cost": "fast",
+      "scope": "file"
+    },
+    "Q-21": {
+      "name": "配置外 process.env",
+      "group": "契约、数据与运行时边界",
+      "level": "HARD",
+      "threshold": 0,
+      "unit": "处",
+      "tool": "ts-morph",
+      "cost": "fast",
+      "scope": "file"
+    },
+    "Q-22": {
+      "name": "运行时 API 越界",
+      "group": "契约、数据与运行时边界",
+      "level": "HARD",
+      "threshold": 0,
+      "unit": "处",
+      "tool": "ts-morph",
+      "cost": "fast",
+      "scope": "file"
+    },
+    "Q-23": {
+      "name": "非入口 console",
+      "group": "契约、数据与运行时边界",
+      "level": "HARD",
+      "threshold": 0,
+      "unit": "处",
+      "tool": "ts-morph",
+      "cost": "fast",
+      "scope": "file"
+    },
+    "Q-24": {
+      "name": "TODO/FIXME 年龄",
+      "group": "契约、数据与运行时边界",
+      "level": "WARN",
+      "threshold": 90,
+      "unit": "天",
+      "tool": "git",
+      "cost": "slow",
+      "scope": "repo"
+    },
+    "Q-25": {
+      "name": "弱断言 / skip",
+      "group": "契约、数据与运行时边界",
+      "level": "HARD",
+      "threshold": 0,
+      "unit": "处",
+      "tool": "text-scan",
+      "cost": "fast",
+      "scope": "file"
+    },
+    "Q-26": {
+      "name": "单文件直接导出",
+      "group": "预算与历史观察",
+      "level": "WARN",
+      "threshold": 20,
+      "unit": "个",
+      "tool": "ts-morph",
+      "cost": "fast",
+      "scope": "file"
+    },
+    "Q-27": {
+      "name": "单文件 import",
+      "group": "预算与历史观察",
+      "level": "WARN",
+      "threshold": 20,
+      "unit": "个",
+      "tool": "ts-morph",
+      "cost": "fast",
+      "scope": "file"
+    },
+    "Q-28": {
+      "name": "单文件函数数量",
+      "group": "预算与历史观察",
+      "level": "WARN",
+      "threshold": 20,
+      "unit": "个",
+      "tool": "ts-morph",
+      "cost": "fast",
+      "scope": "file"
+    },
+    "Q-29": {
+      "name": "单类方法数",
+      "group": "预算与历史观察",
+      "level": "WARN",
+      "threshold": 10,
+      "unit": "个",
+      "tool": "ts-morph",
+      "cost": "fast",
+      "scope": "file"
+    },
+    "Q-30": {
+      "name": "git 变化信号",
+      "group": "预算与历史观察",
+      "level": "INFO",
+      "threshold": 0,
+      "unit": "",
+      "tool": "git",
+      "cost": "slow",
+      "scope": "repo"
+    },
+    "Q-31": {
+      "name": "类型错误",
+      "group": "预算与历史观察",
+      "level": "HARD",
+      "threshold": 0,
+      "unit": "个",
+      "tool": "tsc",
+      "cost": "slow",
+      "scope": "repo"
+    }
+  }
+}

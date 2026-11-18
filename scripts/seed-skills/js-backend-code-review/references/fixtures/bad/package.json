@@ -1,0 +1,6 @@
+{
+  "name": "js-backend-fixture-bad",
+  "private": true,
+  "type": "module",
+  "main": "src/main.ts"
+}

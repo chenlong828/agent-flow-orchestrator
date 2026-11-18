@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "updated": "2026-11-18",
+  "paths": {
+    "source": [
+      "src"
+    ],
+    "tests": [
+      "tests"
+    ],
+    "migrations": [
+      "db/migrations"
+    ],
+    "entries": [
+      "src/main.ts"
+    ],
+    "ignore": [
+      "src/components/http-gateway/docs-assets/**"
+    ]
+  },
+  "components": {
+    "roots": [
+      "src/components",
+      "src/core"
+    ],
+    "publicFiles": [
+      "index.ts",
+      "contract.ts"
+    ],
+    "fanoutExempt": [
+      "src/main.ts"
+    ],
+    "deepImportExempt": [],
+    "deepImportRoots": [
+      "src/components"
+    ]
+  },
+  "routes": {
+    "roots": [
+      "src/components/http-gateway/routes"
+    ],
+    "methodSelector": "request.method"
+  },
+  "allow": {
+    "console": [
+      "src/main.ts",
+      "src/components/http-gateway/respond.ts#console.error"
+    ],
+    "env": [
+      "src/core/config/"
+    ],
+    "runtimeApis": {
+      "Bun.sql": [
+        "src/core/platform/db.ts"
+      ],
+      "Bun.file": [
+        "src/core/config/config.ts",
+        "src/core/platform/storage.ts",
+        "src/components/http-gateway/docs.ts"
+      ],
+      "Bun.write": [
+        "src/core/platform/storage.ts"
+      ]
+    }
+  },
+  "commit": {
+    "taskPattern": "T-[A-Z0-9-]+",
+    "fixPrefix": "fix",
+    "churnTaskThreshold": 3
+  },
+  "jscpd": {
+    "format": "typescript",
+    "minLines": 8,
+    "minTokens": 70
+  },
+  "contracts": {
+    "command": [
+      "bun",
+      "test",
+      "tests/components/http-gateway/openapi-fields.test.ts"
+    ]
+  },
+  "rules": {}
+}
