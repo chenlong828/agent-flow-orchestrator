@@ -1,0 +1,101 @@
+stage: fixtures done
+stage: client spawned
+stage: observer healthy
+stage: slow run start
+stage: slow dispatched
+stage: slow files/session
+stage: slow cancel
+stage: normal run start
+stage: normal waiting_confirm
+stage: normal session queries
+stage: normal queries done
+stage: confirm pass
+stage: client down check
+{
+  "clientObserver": {
+    "port": 54586
+  },
+  "slow": {
+    "runId": "01a1ea37-a09c-76c5-bd5f-35c65df4f408",
+    "state": "running",
+    "taskSpacePath": "/var/folders/xn/k0m13x916j38wd6gbr7v36c40000gn/T/afc-e2e-mwkvi01m-WSXmjF/workspace/task-spaces/20261117-235436",
+    "files": {
+      "workspace": {
+        "status": 200,
+        "entries": [
+          "review.md"
+        ]
+      },
+      "taskSpace": {
+        "status": 200,
+        "entries": [
+          "slow.md"
+        ]
+      }
+    },
+    "productSession": {
+      "status": 200,
+      "code": null
+    },
+    "clientAttempt": {
+      "sessionId": "s-1",
+      "status": "running"
+    },
+    "clientSession": {
+      "status": 200,
+      "hasSessionId": true
+    },
+    "liveSse": {
+      "status": 200,
+      "hasSnapshot": true,
+      "hasEvent": false,
+      "leaksSessionId": false
+    }
+  },
+  "normal": {
+    "runId": "01a1ea37-a193-7612-9a18-ee3b04fb032d",
+    "state": "waiting_confirm",
+    "session": {
+      "status": 200,
+      "hasSessionId": false,
+      "code": null,
+      "eventCount": 4
+    },
+    "events": {
+      "status": 200,
+      "count": 3,
+      "hasTopLevelSessionId": false,
+      "hasAnySessionId": false,
+      "firstData": {}
+    },
+    "raw": {
+      "status": 409,
+      "code": "archive_not_ready"
+    },
+    "sse": {
+      "status": 200,
+      "hasSnapshot": true,
+      "hasEnd": true,
+      "leaksSessionId": false
+    },
+    "files": {
+      "status": 200,
+      "entries": [
+        "normal.md"
+      ]
+    },
+    "content": {
+      "status": 200,
+      "content": "# normal\n"
+    },
+    "final": {
+      "state": "done",
+      "outcome": "succeeded",
+      "currentNodeId": "n3"
+    }
+  },
+  "clientDown": {
+    "status": 504,
+    "code": "client_observability_unavailable"
+  }
+}

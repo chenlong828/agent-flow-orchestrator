@@ -32,7 +32,7 @@ updated: 2026-11-10
 - `client_id` 与 `client_token` 只能经 `bindClient` / `unbindClient` 修改，不进入 `create` / `update`：避免全量 `PUT` 漏传即解绑。
 - `client_id` 与 `client_token` 同时写入、同时清空；`client_token` 非空时 `client_id` 必填（表级 check 兜底）。两者都是 1–64 / 1–128 个不含空白与控制字符的字符串。
 - `client_token` 是该节点的 Bearer 凭据，**永久保存在 Harness 表**（不是 `.env`、不是启动配置）；仅供本机调试从详情读回，不进入列表读模型，不出现在错误 `details` 与日志中。
-- 有工具引用时不可删除；删除前调用 `ReferenceGuard`，非空抛 `ReferencedError`。
+- 有工具或未终态 run 引用时不可删除；删除前调用 `ReferenceGuard`，非空抛 `ReferencedError`。终态 run 已在 `finishRun` 把 `harness_id` 置空，不阻止删除。
 - 标签同 Harness 内唯一、按 `position` 连续；数量上限在表级设计确认。
 
 ## 3 公共契约
@@ -72,7 +72,7 @@ type HarnessRead = {
 ```
 
 - 输入/输出使用领域字段（`camelCase`），不出现 HTTP 状态码、DTO 包装、SQL 列名。
-- `delete` 先 `ReferenceGuard.check("harness", id)`；有引用直接抛 `ReferencedError`，不先删。
+- `delete` 先 `ReferenceGuard.check("harness", id)`；有工具或未终态 run 引用直接抛 `ReferencedError`，不先删。
 - 版本冲突抛 `RevisionConflictError`；不存在抛 `NotFoundError`；名称冲突抛 `NameConflictError`。
 - `health` / `lastHeartbeatAt` 不在写契约中；两列不再被写入，读值派生（§3.3）。
 - `clientId` 在 `HarnessSummary` 中可读；写入只经 `bindClient` / `unbindClient`。
@@ -145,7 +145,7 @@ type HarnessQuery = {
 | `bindClient` | 登记/换绑节点并写入凭据 | `id`、`revision`、`HarnessClientBinding` | `{ id, revision }` | `NotFoundError`、`RevisionConflictError`、`ValidationError`（`clientId`/`token` 为空、含空白或超长）、`BindingConflictError`（`clientId` 或 token 已被其他 Harness 占用） | 单行更新并递增 `revision`；两个唯一索引兜底 |
 | `unbindClient` | 解绑节点并清空凭据 | `id`、`revision` | `{ id, revision }` | `NotFoundError`、`RevisionConflictError` | 幂等：本就未绑定视为成功，仍递增 `revision` |
 | `ensureNode` | 开发期自注册：确保该 `clientId` 有可派发节点行 | `clientId`、`{ address?, actor? }` | `{ id, created }` | `ValidationError`（`clientId` 形状非法）、`NameConflictError`（后缀用尽） | 先按 `client_id` 唯一索引查；不存在则在单事务内插入（`client_id` 随插入写入）；已存在不改任何字段 |
-| `delete` | 删除 Harness | `id`、`revision` | `void` | `NotFoundError`、`RevisionConflictError`、`ReferencedError` | 先 `ReferenceGuard`，再删除；同一事务 |
+| `delete` | 删除 Harness | `id`、`revision` | `void` | `NotFoundError`、`RevisionConflictError`、`ReferencedError` | 先 `ReferenceGuard`（工具 + 未终态 run），再删除；同一事务 |
 | `list` | 列表查询 | `HarnessQuery` | `Page<HarnessSummary>` | `ValidationError` | 读 |
 | `get` | 详情查询 | `id` | `HarnessDetail` | `NotFoundError` | 读 |
 | `getByClientId` | 按节点反查 | `clientId` | `HarnessSummary \| null` | 无 | 读；唯一索引命中 |
@@ -192,7 +192,7 @@ Harness 是执行节点目录：`client_id` 绑定 `CMP-instance` 里实例所�
 
 - 规则：名称唯一、枚举、`concurrencyMax` 下限、标签顺序/唯一。
 - 存储：创建带标签、更新整体替换标签、启停、删除级联。
-- 删除保护：注入假的 `ReferenceGuard` 返回工具列表，断言不删除并抛 `ReferencedError`。
+- 删除保护：注入假的 `ReferenceGuard` 返回工具或 run 列表，断言不删除并抛 `ReferencedError`；终态 run 的 `harness_id` 为空后删除成功。
 - 读契约：列表筛选/分页/排序、详情。`toolCount` 由 `catalog` 通过工具读契约组合，Harness 组件不读工具表。
 - 节点目录：登记/解绑幂等；`clientId` 空串、空白、超长拒绝；同一 `clientId` 或同一 token 被第二个 Harness 使用 → `BindingConflictError`，凭据冲突不回显 token；解绑后 `isDispatchable` 为 `false`、旧 token 解析为 `null`。
 - 凭据读模型：详情返回 `clientToken`，列表不返回；`getByClientId` 不返回凭据。

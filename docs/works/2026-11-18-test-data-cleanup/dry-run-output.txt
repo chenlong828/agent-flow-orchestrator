@@ -1,0 +1,42 @@
+TARGET {
+  workflows: 8,
+  experts: 8,
+  harnesses: 8,
+  runs: 11,
+  instances: 6,
+  tasks: 17,
+  artifacts: 18,
+}
+BEFORE {
+  workflows: 12,
+  experts: 20,
+  harnesses: 9,
+  runs: 38,
+  instances: 7,
+  tasks: 173,
+  attempts: 173,
+  artifacts: 200,
+  nodes: 190,
+}
+AFTER {
+  workflows: 4,
+  experts: 12,
+  harnesses: 1,
+  runs: 27,
+  instances: 1,
+  tasks: 156,
+  attempts: 156,
+  artifacts: 182,
+  nodes: 168,
+}
+DRY_RUN_ROLLBACK
+DRY_RUN_OK
+ARCHIVE_ROOT /Users/chenlong/harness/agent-flow-orchaster/.local/archive
+ARCHIVE_TARGETS [
+  "runs/01a1d7fe-02ec-7069-96ae-19f333413fa8", "history/01a1d7fe-02ea-707c-b7fc-72b4c5cc562b/01a1d7fe-02ec-7069-96ae-19f333413fa8",
+  "runs/01a1ea04-c923-774e-8d4a-0676cfbf2fbf", "runs/01a1ea04-c95f-7371-b049-2e09ba7df1b0",
+  "runs/01a1ea06-1b99-7528-bfae-19a02fceb5fa", "runs/01a1ea06-1caf-773a-9890-67e3b1b49f56",
+  "runs/01a1ea06-fd18-7596-9484-1d84cd2903ae", "runs/01a1ea06-fe14-7794-8bc7-8278f8bb0d5a",
+  "runs/01a1ea2f-5d11-76b2-b0a4-8a4e865c10e3", "runs/01a1ea2f-5dfa-7733-bbf7-e4f84c5d6930",
+  "runs/01a1ea37-a09c-76c5-bd5f-35c65df4f408", "runs/01a1ea37-a193-7612-9a18-ee3b04fb032d"
+]

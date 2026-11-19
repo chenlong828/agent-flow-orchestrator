@@ -2,7 +2,7 @@
 layer: design
 module: workflow-orchestration
 status: verified
-updated: 2026-11-12
+updated: 2026-11-19
 flow: FLOW-RUN-002
 scenario: SCN-0302
 domain: 工作流编排
@@ -43,7 +43,7 @@ externalRefs: []
 
 ## 1 场景与价值
 
-每个执行节点结束后，client 先把本节点的 ACP 事件日志（JSONL + gzip）上传给调度器，再上报结果。`review` 节点的最终消息里必须带结构化 verdict：`pass` 继续走 seq 出边，`fail` 沿该节点预设的回退边退回指定祖先节点重新执行。调度器负责解析 verdict、执行回退与轮次控制，client 不参与判定。
+每个执行节点结束后，client 先把本节点的 ACP 事件日志（JSONL + gzip）上传给调度器，再上报结果。`review` 节点通过 MCP 信号提交结构化 verdict：`pass` 继续走 seq 出边，`fail` 沿该节点预设的回退边退回指定祖先节点重新执行。调度器负责校验 verdict、执行回退与轮次控制，client 不参与判定，最终消息正文不参与判定。
 
 结果：节点日志可按 run/节点回读；判定失败时执行回到设计期指定的节点而不是模型随机选择；反复失败有轮次上限，不会无限烧 token。
 
@@ -62,16 +62,16 @@ externalRefs: []
 1. client 节点执行结束 → 打包 ACP 事件为 `application/x-ndjson` + `Content-Encoding: gzip` → `P-04` 上传（带 `attempt`）。
 2. 服务端校验：任务属于该 client、`attempt` 匹配、解压后 ≤ `maxSessionLogBytes`（64 MiB）、sha256 计算；同 `taskId+attempt` 重复上传且内容相同 → `200`（幂等）；内容不同 → `409`。
 3. 日志落 `<archive.root>/runs/<runId>/nodes/<nodeId>-<visit>.jsonl.gz`，写 `run_artifact` 元数据。
-4. client 上报结果 → `CMP-run.handleTaskResult`：找 `run_node` → **日志不存在 → `409 session_log_missing`，不调 `acceptResult`、不结算**；存在 → `scheduler.acceptResult`。
+4. client 上报结果 → `CMP-run.handleTaskResult`：找 `run_node` → **日志不存在 → `409 session_log_missing`，不调 `acceptResult`、不结算**；存在 → `scheduler.acceptResult`。结果被接受后，节点结算的同一事务把结果里的可选 `sessionId` 写入 `run_node.session_id`；未带则保持 `null`，不补写、不推导。
 5. 结算 `succeeded`：
    - 普通节点：`run_node(succeeded)`，推进 seq 后继。
-   - `review`：取最终消息末尾最后一个 verdict JSON 对象 `{verdict: "pass"|"fail", reason?}`（裸 JSON，不要求独占一行）；`pass` → `succeeded` + 推进；`fail` → `run_node(rejected)`，取该节点唯一 `rollback` 边的 `to` 作为回退目标。
+   - `review`：只取结果 `signals` 中最后一个合法 `review_verdict`；`pass` → `succeeded` + 推进；`fail` → `run_node(rejected)`，取该节点唯一 `rollback` 边的 `to` 作为回退目标。`message` 不参与判定。
 6. 回退：目标节点起重新执行，`run_node` 写 `visit+1` 新行；目标到 review 之间的节点依次重跑；旧行保留为历史。
 7. 轮次上限：任一节点 `visit+1 > run.max_node_visits`（默认 5）→ `run.failed(visit_limit_exceeded)`，不再入队。
 
 失败路径：
 
-- verdict 缺失、JSON 非法、`verdict` 非 `pass`/`fail` → `run_node(failed, verdict_invalid)`，`run.failed`，**不猜测、不默认 pass**。
+- verdict 缺失/非法：没有合法 `review_verdict` 信号 → `run_node(failed, verdict_invalid)`，`run.failed`，**不猜测、不默认 pass、不解析 message JSON**。
 - `review` 判定 fail 但没有 `rollback` 出边 → `run_node(failed, missing_rollback_edge)`，`run.failed`（保存校验应已拦截，运行期兜底）。
 - 日志超限 → `413`，不落存储、不结算；client 需以明确错误上报。
 - 结果先到、日志未到 → `409`；client 补传后重试结果成功，任务不重跑（同一 `taskId`）。
@@ -89,9 +89,9 @@ externalRefs: []
 | 角色 | 测试 ID | 断言 |
 |---|---|---|
 | R1 | `TC-RUN-005` | 上传日志 → `200` 且可按 `taskId+attempt` 回读；重复上传按后到覆盖返回 `200` 与 `stored` |
-| R2 | `TC-RUN-006` | `review` 返回 `pass` → 节点 `succeeded`、继续 seq；返回 `fail` → 节点 `rejected`、回退边目标以 `visit+1` 重新执行 |
+| R2 | `TC-RUN-006` | `review` 返回 `pass` → 节点 `succeeded`、继续 seq；返回 `fail` → 节点 `rejected`、回退边目标以 `visit+1` 重新执行；结果里的 `sessionId` 落对应 `run_node.session_id`，但不出现在产品 API |
 | R3 | `TC-RUN-007` | 回退轮次用尽（`visit > max_node_visits`）→ `run.failed(visit_limit_exceeded)`，不再入队 |
-| N1 | `TC-RUN-008` | 未上传日志直接报结果 → `409 session_log_missing`，任务不结算；补传后重试成功；verdict 非法 → 节点 `failed(verdict_invalid)`，run 失败 |
+| N1 | `TC-RUN-008` | 未上传日志直接报结果 → `409 session_log_missing`，任务不结算；补传后重试成功；没有 `review_verdict` 信号（即使 message 里有合法 verdict JSON）→ 节点 `failed(verdict_invalid)`，run 失败；结果未带 `sessionId` 时 `run_node.session_id` 保持 `null` |
 
 测试已落盘（`tests/components/http-gateway/`），frontmatter `tests` 已补齐并转 `verified`。
 

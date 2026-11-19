@@ -1,0 +1,36 @@
+316 |         unsubscribeClose();
+317 |         close();
+318 |       };
+319 |       request.signal.addEventListener("abort", () => {
+320 |         cleanup();
+321 |         controller.close();
+                         ^
+TypeError: Invalid state: Controller is already closed
+      at <anonymous> (/Users/chenlong/harness/agent-flow-client/src/components/observer/server.ts:321:20)
+      at callFirstEvent (/Users/chenlong/harness/agent-flow-orchaster/docs/works/2026-11-17-client-observability-verification/probe/probe.ts:76:14)
+{"check":"health.startedAt","expected":"真实服务启动时间","actual":"2026-11-17T12:39:58.151Z","verdict":"note"}
+{"check":"health.uptimeMs","expected":"真实 uptime","actual":"0","verdict":"note"}
+{"check":"health.status","expected":"ok/degraded 按写盘失败","actual":"ok","verdict":"note"}
+{"check":"health.counts","expected":"activeAttempts/retainedAttempts/sessions/runs","actual":"{\"status\":\"ok\",\"observabilityVersion\":\"2026-11-17.1\",\"clientVersion\":\"0.1.0\",\"startedAt\":\"2026-11-17T12:39:58.151Z\",\"uptimeMs\":0,\"activeAttempts\":1,\"retainedAttempts\":1,\"activeSessions\":1,\"retainedSessions\":1,\"registeredRuns\":1,\"filesEnabled\":true,\"richStreamEnabled\":true,\"authRequired\":false}","verdict":"note"}
+{"check":"O-02 attempts","expected":"200 + items","actual":"200","verdict":"pass"}
+{"check":"O-03 attempt detail","expected":"200 + session/logRange","actual":"{\"status\":200,\"hasSession\":true,\"logRange\":{\"firstSeq\":1,\"lastSeq\":3}}","verdict":"note"}
+{"check":"O-04 preview logs","expected":"200 + preview items","actual":"{\"status\":200,\"items\":3}","verdict":"pass"}
+{"check":"O-06 session detail","expected":"200 + archive","actual":"{\"status\":200,\"archive\":{\"status\":\"stored\",\"sizeBytes\":11,\"sha256\":\"485e67c5a376c861d5d53f290bba8e15125eb5580fcc4881661af91071db7301\",\"downloadUrl\":\"/api/v1/observability/sessions/s1/raw\"}}","verdict":"pass"}
+{"check":"O-07 session events","expected":"200 + items","actual":"{\"status\":200,\"items\":3}","verdict":"pass"}
+{"check":"O-05 Last-Event-ID","expected":"从 seq>1 补发","actual":"true","verdict":"note"}
+{"check":"O-05 snapshot.truncatedBefore","expected":"snapshot 带 truncatedBefore","actual":"false","verdict":"note"}
+{"check":"O-05 ended","expected":"snapshot + end 或 end","actual":"event: end\ndata: {\"status\":\"completed\",\"finishedAt\":\"2026-11-17T12:39:58.154Z\"}\n\n","verdict":"note"}
+{"check":"O-11 Last-Event-ID","expected":"从 seq>1 补发","actual":"true","verdict":"note"}
+{"check":"O-11 disabled","expected":"503 rich_stream_disabled","actual":"{\"status\":503,\"body\":\"{\\\"error\\\":{\\\"code\\\":\\\"rich_stream_disabled\\\",\\\"message\\\":\\\"富事件流已关闭\\\"}}\"}","verdict":"pass"}
+{"check":"O-08 raw headers","expected":"content-type/etag/checksum/Accept-Ranges","actual":"{\"status\":200,\"acceptRanges\":null,\"etag\":\"\\\"sha256-485e67c5a376c861d5d53f290bba8e15125eb5580fcc4881661af91071db7301\\\"\",\"checksum\":\"485e67c5a376c861d5d53f290bba8e15125eb5580fcc4881661af91071db7301\"}","verdict":"note"}
+{"check":"O-08 disabled","expected":"403 raw_disabled","actual":"403","verdict":"pass"}
+{"check":"O-08 not ready","expected":"409 archive_not_ready","actual":"{\"status\":409,\"body\":{\"error\":{\"code\":\"archive_not_ready\",\"message\":\"session 归档尚未完成\"}}}","verdict":"note"}
+{"check":"O-09 files","expected":"200 + a.md","actual":"{\"status\":200,\"first\":{\"name\":\"a.md\",\"type\":\"file\",\"sizeBytes\":5,\"modifiedAt\":\"2026-11-17T12:39:58.146Z\"}}","verdict":"pass"}
+{"check":"O-10 content","expected":"200 + content","actual":"{\"status\":200,\"content\":\"# hi\\n\"}","verdict":"pass"}
+{"check":"O-10 path escape","expected":"400 path_escape","actual":"{\"status\":400,\"code\":\"path_escape\"}","verdict":"pass"}
+{"check":"O-09 run_gone","expected":"410 run_gone（契约）","actual":"{\"status\":404,\"code\":\"run_not_found\"}","verdict":"note"}
+{"check":"auth missing","expected":"401","actual":"401","verdict":"pass"}
+{"check":"auth valid","expected":"200","actual":"200","verdict":"pass"}
+{"check":"error envelope","expected":"error.code + x-request-id 回显","actual":"{\"status\":404,\"body\":{\"error\":{\"code\":\"not_found\",\"message\":\"路径不存在\"}},\"requestId\":\"probe-1\"}","verdict":"note"}
+{"check":"sessions/meta.json","expected":"契约 §15：sessions/<id>/meta.json","actual":"missing","verdict":"note"}
+{"check":"retention config used","expected":"retentionDays/maxBytes/maxAttemptEventBytes 被读取","actual":"config 有字段；probe 未触发清理","verdict":"note"}

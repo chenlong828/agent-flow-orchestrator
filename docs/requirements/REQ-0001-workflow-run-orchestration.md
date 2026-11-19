@@ -2,7 +2,7 @@
 layer: requirements
 module: workflow-execution
 status: accepted
-updated: 2026-11-11
+updated: 2026-11-17
 req: REQ-0001
 ---
 
@@ -48,6 +48,7 @@ req: REQ-0001
 | 2026-11-11 | 上下文传递 | 以 task-space 目录为唯一上下文载体，prompt 只注入路径；task-space 按 run 隔离，靠提示词与 skill 规范约束，不靠文件权限 |
 | 2026-11-11 | 制品与归档 | task.db 用 SQLite、由 skill 脚本生成、client 上传、调度器只读校验；session-log 全量 JSONL + gzip，上传成功才算节点完成；run 结束 client 打包 task-space 上传，服务端存 `<archive.root>/history/<instanceId>/` |
 | 2026-11-11 | 分期 | 第一期：run 骨架 + 常规 + 审核回退 + confirm + session-log + 归档；第二期：split + fanout |
+| 2026-11-17 | 是否记录 client 回传的 sessionId | 记录到 `run_node.session_id`（每个节点每轮一个）；只落库，不改运行详情 API；历史与未回传不补写 |
 
 详细定案见 [`2026-11-11-workflow-run-orchestration/design-proposal.md`](../history/works/2026-11-11-workflow-run-orchestration/design-proposal.md) §2。
 

@@ -101,7 +101,7 @@ externalRefs:
 
 ## 7 覆盖边界
 
-- 当前场景覆盖创建、列表和聚合更新；删除、引用保护、启停等子流程尚未进入本场景的 3+1。
+- 当前场景覆盖创建、列表和聚合更新；删除、引用保护、启停等子流程尚未进入本场景的 3+1。删除保护的新规则（未终态 run 阻止、终态 run 不阻止）由 [`2026-11-18-run-asset-detach`](../../../../../works/2026-11-18-run-asset-detach/result.md) 覆盖，契约见 [`expert/spec.md`](../../../../components/expert/spec.md)。
 - 同一专家内 Skill `slug` 重复的入口断言由 `tests/components/expert/service.test.ts` 覆盖，未映射到 3+1 测试 ID。
 - CRUD 是运行序步骤，不拆成多个业务场景；后续只有在某个子流程形成独立流程定义和独立场景集合时，才评估升层。
 - 索引中引用的是文档章节、代码导出符号、测试 ID 和 OpenAPI operationId，不使用行号。

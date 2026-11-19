@@ -197,9 +197,9 @@ type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
 };
 ```
 
-- `ReferenceGuard` 由本组件实现；领域删除服务通过端口调用，不直接依赖本组件类型。
+- `ReferenceGuard` 的定义侧由本组件实现；未终态 run 引用由 `CMP-run` 的 `RunReferenceReader` 实现，组合根合成后注入领域删除服务。本组件不读 run 表。
 - 视图类型（`HarnessListItem`、`ToolListItem`、`ExpertDetailView` 等）由本组件定义；`http-gateway` 只做字段映射。
-- `ReferenceGuard.check` 对 Harness 返回引用工具，对工具/Skill 返回引用专家；无引用返回 `[]`。
+- `ReferenceGuard.check` 对 Harness 返回引用工具，对工具/Skill 返回引用专家，对专家返回引用工作流，对工作流返回 `[]`（工作流没有定义侧引用页）；无引用返回 `[]`。未终态 run 的引用由组合根叠加。
 - 读投影是组件层视图；`http-gateway` 负责映射 REST DTO，不重新定义读模型语义。
 - 不存在抛 `NotFoundError`；不返回半成品对象。
 - `listToolsByHarness` / `listExpertsUsing*` 只返回引用摘要，不返回内部行。
@@ -260,7 +260,7 @@ type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
 - 组合：每个列表/详情字段完整；跨组件名称/计数正确；空集合返回空数组而非 `null`。
 - 节点状态：Harness 列表/详情的 `health`/`lastHeartbeatAt` 按 `SchedulerPresenceRead` 派生四类值（`unknown`/`online`/`overloaded`/`offline`）；未绑定 `clientId` 的 Harness 恒为 `unknown`；presence 读失败时降级 `unknown` 并记 warning。
 - 引用：Harness 被工具引用、工具/Skill 被专家引用；删除前引用列表与详情一致。
-- 端口：`ReferenceGuard` 对 Harness/工具/Skill/专家分别返回正确引用；专家引用项 `type="workflow"`；无引用返回 `[]`。
+- 端口：`ReferenceGuard` 对 Harness/工具/Skill/专家/工作流分别返回定义侧引用；专家引用项 `type="workflow"`，工作流返回 `[]`；未终态 run 由组合根叠加，不在本组件读 run 表。
 - 工作流：列表/详情透传；专家 `refCount` 与 `WorkflowRead.countByExperts` 一致。
 - 架构：无写操作、无 SQL、无 store 导入。
 - 契约：对应 REST 读端点的 3 正 1 反在 `http-gateway` 规格中列明。

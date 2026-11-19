@@ -2,14 +2,14 @@
 layer: plan
 module: global
 status: current
-updated: 2026-11-12
+updated: 2026-11-17
 ---
 
 # 开放问题
 
 本表只收跨工序疑问；需求请建 `requirements/REQ-xxxx.md`。工序领取时在 `brief.md` 记编号；有结论后写去向（转 REQ / 落 `history/decisions/`），条目不删除。
 
-当前无阻塞性开放问题（OQ-29 为 2026-11-12 联调发现的待定项）；2026-10-29 技术债清理留下 6 项 hold，见下表 OQ-5～OQ-7、OQ-9～OQ-11（OQ-8 已于 2026-11-02 关闭）；OQ-12～OQ-19 为 2026-11-10 执行面契约 v2 接口验证转出；OQ-18、OQ-20 已于 2026-11-10 由调度层设计关闭；OQ-22、OQ-24、OQ-25 已于 2026-11-11 由运行编排设计（`REQ-0001`）关闭，并转出 OQ-26～OQ-28。OQ-1～OQ-4 已于 2026-10-25 关闭归档，条目保留供追溯，结论见 [项目边界与早期开放问题归档](../history/decisions/2026-10-25-project-boundary-and-open-questions.md)。
+当前无阻塞性开放问题（OQ-29 为 2026-11-12 联调发现的待定项）；2026-10-29 技术债清理留下 6 项 hold，见下表 OQ-5～OQ-7、OQ-9～OQ-11（OQ-8 已于 2026-11-02 关闭）；OQ-12～OQ-19 为 2026-11-10 执行面契约 v2 接口验证转出；OQ-18、OQ-20 已于 2026-11-10 由调度层设计关闭；OQ-22、OQ-24、OQ-25 已于 2026-11-11 由运行编排设计（`REQ-0001`）关闭，并转出 OQ-26～OQ-28。OQ-34～OQ-36 为 2026-11-17 运行文件浏览设计（`REQ-0002`）转出。OQ-37～OQ-39 为 2026-11-17 client 观测面修正设计转出。OQ-40 已关闭（用户接受 client 文件限制）；OQ-30 已于 2026-11-18 由运行终态脱钩关闭。OQ-1～OQ-4 已于 2026-10-25 关闭归档，条目保留供追溯，结论见 [项目边界与早期开放问题归档](../history/decisions/2026-10-25-project-boundary-and-open-questions.md)。
 
 | # | 问题 | 结论 / 去向 |
 |---|---|---|
@@ -42,7 +42,14 @@ updated: 2026-11-12
 | OQ-27 | **session-log 与归档的容量、保留期**：单节点日志可能上百 MB，归档包含整个 task-space；当前只定单次上传上限（64 MiB / 512 MiB），没有保留期、清理与配额策略。 | 待定（2026-11-11 运行编排设计转出）：等真实日志体积与归档频率数据出现后再定；在此之前超过上限的节点直接失败并报明确错误码。 |
 | OQ-28 | **节点失败后的原地重试**：当前节点失败即 run 失败，运维只能重开一个 run（新 runId、新 task-space），代价是整个流程重跑。是否需要「从失败节点原地重试、复用 task-space」？ | 待定（2026-11-11 运行编排设计转出）：第一期按「失败即终态」实现；若运维反馈重跑成本高，再评估在 run 内加 `retry` 动作（只对当前节点，`visit` 不递增）。 |
 | OQ-29 | **取消后未被 client 认领的 dispatched 任务会占住实例容量**：run 取消后调度器对 `dispatched` 任务只打 `cancel_requested_at` 电平；若 client 重启丢掉了本地 in-flight，下一次 poll 仍会重发该任务，但 client 按「`cancelInstances` 中的实例丢弃 `tasks`」直接跳过、不回报，任务永远停在 `dispatched`，同实例的新任务因容量被占用而无法派发（联调实测：cancelled run 的 n1 任务阻塞同工作区下一次启动约 30 分钟直到 `S-02` 超时）。 | 待定（2026-11-12 T-RUN-09 联调发现）：二选一——client 对「实例已取消但任务未在本地运行」回报 `cancelled`，或调度器在 `cancel_requested_at` 超过阈值后自行结算 `cancelled`。当前联调用「库内手工结算」绕过；下一次动 client 或调度器取消语义时定。 |
-| OQ-30 | **删除 Harness 与运行记录的冲突**：`workflow_run.harness_id` 是 `ON DELETE RESTRICT`，只要该节点跑过任何一次运行，Harness 就永久不可删除（开发期实测：遗留节点被 12 条终态 run 挡住）；引用检查（`API-07`）只列工具，不列运行，错误里的 `references` 为空。 | 待定（2026-11-12 联调发现）：三选一——保留 `RESTRICT` 并在删除错误里回带 run 列表；`harness_id` 改 `ON DELETE SET NULL` + 冗余节点名快照；给运行记录加保留期/清理入口。当前开发期用「解绑」而非删除绕过。 |
+| OQ-30 | **删除 Harness 与运行记录的冲突**：`workflow_run.harness_id` 是 `ON DELETE RESTRICT`，只要该节点跑过任何一次运行，Harness 就永久不可删除（开发期实测：遗留节点被 12 条终态 run 挡住）；引用检查（`API-07`）只列工具，不列运行，错误里的 `references` 为空。 | 已关闭（2026-11-18）：终态脱钩 + 快照；run 进入 `done` 时清空活跃外键，历史读 `harness_ref_id`/`harness_name`；活跃 run 仍由 FK 阻止并在 409 中列 `type="run"`。同一机制覆盖工作流与专家。见 [`2026-11-18-run-asset-detach`](../works/2026-11-18-run-asset-detach/design-proposal.md)。 |
 | OQ-31 | **技能包内 `SKILL.md` 的 `name` 格式**：编排侧按技能展示名生成 frontmatter（现有数据是中文），执行端要求 kebab-case，安装即 `invalid_skill_format`。 | 已关闭（2026-11-12，用户裁决方案 A）：`skill` 增 `slug`（kebab-case，展示名仍用 `name`），包内 frontmatter 与下载文件名改用 `slug`；`0006` 迁移回填 `skill-<尾8>`，存量两条重打包为可读名。真实运行通过。见 [`2026-11-12-skill-slug`](../works/2026-11-12-skill-slug/result.md)。 |
 | OQ-32 | **实例 `blocked` 后同工作区静默排队**：执行失败的 run 会把实例置 `blocked`；再次用同一 `workspacePath` 启动会复用该实例，任务永远 `queued`、界面无任何提示；`unblock` 只有领域方法。 | 已关闭（2026-11-12，用户裁决）：**删除 `blocked` 状态**，实例只有 `active`/`retired`；`failed(workspace)` 只结算同实例排队任务，不再摘除实例。迁移 `0007` 把存量恢复为 `active`；实测同工作区重跑正常派发。见 [`2026-11-12-drop-instance-blocked`](../works/2026-11-12-drop-instance-blocked/result.md)。 |
 | OQ-33 | **多技能包的安装目录互相覆盖**：客户端把每个包解到同一个 staging 根（`assets.ts` 的 `for (const pkg of skillSet.packages) materializePackage(pkg, staging)`），编排侧 zip 根只有 `SKILL.md`；单包时最终树是平铺 `<skills>/SKILL.md`（DSH 能读到，实测会话日志含技能名），多包时后一个覆盖前一个，且摘要校验只覆盖单包、发现不了。 | 已关闭（2026-11-12）：客户端已按 frontmatter `name`（即 `slug`）落独立目录，重名报 `invalid_skill_format` 而不是覆盖（`agent-flow-client` commit `bef1bb5`，见其 `CMP-assets` §2.1）；编排侧在专家装配入口拒绝同一专家内 `slug` 重复，坏装配不再推迟到运行期。见 [`2026-11-12-expert-skill-slug-guard`](../history/works/2026-11-12-expert-skill-slug-guard/result.md)。 |
+| OQ-34 | **运行结束后从归档浏览 task-space**：`P-05` 归档是 tar.gz，要在服务端列目录/读文件需要解包或建索引；解包产物、索引、保留期与资源上限都未定。 | 待定（2026-11-17 运行文件浏览设计转出）：v1 只做运行中实时读取；归档浏览另行评估，见 [`design-proposal.md`](../works/2026-11-17-run-file-browser/design-proposal.md) §11。 |
+| OQ-35 | **confirm 等待期是否自动快照文件**：client 下线后审核页不可读；自动快照需要一次 task-space 上传、存储、保留与失败处理，且只覆盖 task-space、不覆盖 workspace。 | 待定（2026-11-17 运行文件浏览设计转出）：v1 不做；等真实离线反馈或审计需求出现再评估。 |
+| OQ-36 | **运行文件浏览的鉴权与敏感文件策略**：当前服务仅监听本机、无鉴权；工作区可能含 `.env`、凭据与业务数据。是否隐藏敏感文件/目录、生产前用哪种鉴权，均未定。 | 待定（2026-11-17 运行文件浏览设计转出）：v1 只读 + run 级 + 上限；生产前必须补鉴权或访问控制，见 `R-005`。 |
+| OQ-37 | **client 观测面的发现与 SSRF 边界**：orchestrator 直连 client 观测面需要知道 base URL；静态配置安全但多 client 维护成本高，client 自报方便但可被伪造/利用访问内网。 | 待定（2026-11-17 client 观测面修正设计转出）：提案建议「静态配置优先 + loopback/受控自报 + URL 校验/禁重定向/allowlist」；生产是否只允许静态配置待定。见 [`proposal.md`](../works/2026-11-17-client-observability/proposal.md) §7。 |
+| OQ-38 | **client 观测面的鉴权与默认绑定**：P1 是 `0.0.0.0` + 可选 token；文件浏览扩大暴露面。复用 executor token 还是独立观测 token、默认 loopback 还是 `0.0.0.0`、`serve` 启动失败降级还是退出，均需确认。 | 待定（2026-11-17 client 观测面修正设计转出）：提案建议默认 `127.0.0.1`、非 loopback 强制 token、复用 executor token、`required=false` 降级。见 [`proposal.md`](../works/2026-11-17-client-observability/proposal.md) §7。 |
+| OQ-39 | **跨 NAT/公网 client 的文件浏览**：观测面是入站，client 在 NAT 后不可达；poll 反向请求没有该限制，但已作为备选。是否保留 poll 通道、加中继/隧道，还是只支持同机/同网段，未定。 | 待定（2026-11-17 client 观测面修正设计转出）：提案 v1 接受「同机/同网段/隧道；NAT 不可达时文件浏览失败、任务不受影响」；是否长期保留 poll 备选待定。 |
+| OQ-40 | **观测面文件/session 的业务上限**：用户曾决定 v1 先不设目录条数/文件字节/响应字节上限；但 client v1 已实现 2000 条 / 1 MiB，两者不一致。 | 已关闭（2026-11-17，用户裁决）：接受 client 2000 条 / 1 MiB；2 MiB/5s 在适配器/UI BFF 侧；不为此改 client。见 [`verification/result.md`](../works/2026-11-17-client-observability-verification/result.md) §4。 |

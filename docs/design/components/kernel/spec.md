@@ -128,12 +128,17 @@ const MAX_PAGE_LIMIT = 200;
 ### 3.3 引用检查端口
 
 ```ts
-type ReferenceOwner = "harness" | "tool" | "skill" | "expert";
+type ReferenceOwner = "harness" | "tool" | "skill" | "expert" | "workflow";
 
 type Reference = {
-  type: "tool" | "expert" | "workflow";
+  type: "tool" | "expert" | "workflow" | "run";
   id: string;
   name: string;
+};
+
+/** 未终态 run 的引用；由 CMP-run 实现。 */
+type RunReferenceReader = {
+  active(owner: "workflow" | "harness" | "expert", id: string): Promise<Reference[]>;
 };
 
 /** 只读专家状态端口；由 CMP-expert 实现，组合根注入工作流服务。 */
@@ -152,7 +157,8 @@ type ReferenceGuard = {
 };
 ```
 
-- `ReferenceGuard` 是端口，由 `catalog` 实现；领域删除服务只依赖本端口。`expert` owner 返回引用该专家的去重工作流摘要（`type="workflow"`）。
+- `ReferenceGuard` 是端口：定义侧引用由 `catalog` 实现，未终态 run 引用由 `CMP-run` 的 `RunReferenceReader` 实现，组合根合成后注入领域删除服务。`expert` owner 返回引用该专家的去重工作流摘要（`type="workflow"`）与未终态 run（`type="run"`）；`workflow` owner 只返回未终态 run。
+- `RunReferenceReader.active` 只返回 `created`/`running`/`waiting_confirm`/`waiting_resume` 的 run；终态 run 不返回，也不负责删除后的补偿。
 - 返回空数组表示可删除；返回非空数组表示被引用，由领域服务抛 `ReferencedError`。
 - 本端口不负责删除后的级联清理；工作流删除级联自身定义/引用，不跨聚合删除专家。
 - `ExpertStatusReader` 只返回启停状态，不暴露专家实体；供工作流保存/校验判断 `expert_missing` / `expert_disabled`。

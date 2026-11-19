@@ -10,7 +10,8 @@
 docs/
 ├── README.md
 ├── requirements/                           ← 需求：为什么做（一卡一文件）
-│   └── REQ-0001-workflow-run-orchestration.md
+│   ├── REQ-0001-workflow-run-orchestration.md
+│   └── REQ-0002-run-file-browsing.md
 ├── plan/                                   ← 调度：接下来做什么
 │   ├── roadmap.md
 │   └── open-questions.md
@@ -30,7 +31,8 @@ docs/
 │   │   ├── http-gateway/spec.md
 │   │   ├── scheduler/spec.md               ← 执行面任务列表与派发（active）
 │   │   ├── instance/spec.md                ← 执行面实例与工作区登记（active）
-│   │   └── run/spec.md                     ← 工作流运行编排（active）
+│   │   ├── run/spec.md                     ← 工作流运行编排（active）
+│   └── observability-client/spec.md     ← client 观测面 HTTP 适配器（active）
 │   └── scenarios/
 │       ├── _index.md
 │       ├── agent-capability-assets/
@@ -65,7 +67,7 @@ docs/
 ├── playbook/                               ← 方法：同类问题怎么判断（项目本地，待技能合并）
 │   ├── backend-contract-boundaries.md
 │   └── code-health-rules.md
-├── works/                                  ← 执行：正在做什么（当前在办：2026-11-10-node-registry-implementation、2026-11-11-executor-joint-debug、2026-11-11-workflow-run-orchestration）
+├── works/                                  ← 执行：正在做什么（当前在办：2026-11-14-prompt-entry-reason、2026-11-17-run-file-browser、2026-11-17-client-ui-handoff、2026-11-17-ui-observability-layer）
 └── history/                                ← 记忆：怎么走到这里（冻结只读）
     ├── decisions/                          ← 整篇决策记录，按日期命名
     └── works/                              ← 已归档工序，按日期命名
@@ -87,7 +89,7 @@ docs/
 1. [`../README.md`](../README.md) —— 项目定位与当前阶段
 2. [`../AGENTS.md`](../AGENTS.md) —— 技能加载、门禁与文档纪律
 3. [`plan/roadmap.md`](plan/roadmap.md) —— 里程碑、工序与依赖
-4. [`plan/open-questions.md`](plan/open-questions.md) —— 开放问题登记；当前有 6 项 hold（OQ-5～OQ-7、OQ-9～OQ-11）与 11 项待定（OQ-12～OQ-19、OQ-21、OQ-26～OQ-28），无阻塞项；OQ-22/OQ-24/OQ-25 已于 2026-11-11 由运行编排设计关闭
+4. [`plan/open-questions.md`](plan/open-questions.md) —— 开放问题登记；当前有 22 项待定（其中 6 项为 hold：OQ-5～OQ-7、OQ-9～OQ-11）与 2 项部分关闭（OQ-21、OQ-26），无阻塞项；OQ-22/OQ-24/OQ-25 已于 2026-11-11 由运行编排设计关闭
 5. [`design/architecture.md`](design/architecture.md) —— 现行组件边界、依赖与数据所有权
 6. [`design/scenarios/_index.md`](design/scenarios/_index.md) —— 业务域/价值流/场景的生成索引；先看场景再看组件
 7. [`design/scenarios/agent-capability-assets/expert-capability-definition-and-assembly/expert-definition-and-assembly-management/scenario.md`](design/scenarios/agent-capability-assets/expert-capability-definition-and-assembly/expert-definition-and-assembly-management/scenario.md) —— 首个试点场景：入口、运行序、外部引用与 3+1
@@ -108,6 +110,7 @@ docs/
 19. [`history/decisions/2026-10-25-project-boundary-and-open-questions.md`](history/decisions/2026-10-25-project-boundary-and-open-questions.md) —— 仅 HTTP API、无 CLI/库/产品 UI，以及早期开放问题归档
 20. [`history/decisions/2026-10-25-playbook-method-layer.md`](history/decisions/2026-10-25-playbook-method-layer.md) —— `playbook/` 方法层、首份 playbook 的范围与上游技能延迟合并
 21. [`playbook/code-health-rules.md`](playbook/code-health-rules.md) —— 代码健康规则的阈值、级别、基线策略与 agent 反馈闭环
+22. [`playbook/orchestration-assets.md`](playbook/orchestration-assets.md) —— 工作流、专家、技能与工具的配置与管理：变更/重构/检查/运维四类形态、拓扑与回退、证据分级、边界与状态、运行观测与反模式
 
 ## 维护纪律（速记）
 

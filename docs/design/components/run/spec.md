@@ -3,7 +3,7 @@ layer: design
 module: run
 status: active
 component: CMP-run
-updated: 2026-11-12
+updated: 2026-11-19
 ---
 
 # `CMP-run` 组件规格
@@ -46,22 +46,25 @@ updated: 2026-11-12
 
 | 表 | 关键字段 | 说明 |
 |---|---|---|
-| `workflow_run` | `id`、`workflow_id`、`workflow_revision`、`graph_snapshot`、`intent_markdown`、`harness_id`、`client_id`、`instance_id`、`workspace_path`、`task_space_path`、`auto_confirm`、`state`、`outcome`、`current_node_id`、`result`（`finalMessage`/`error`）、`archive_state`、`finished_at`、`created_at`/`updated_at`/`created_by` | 运行聚合根；`graph_snapshot` 是启动时冻结的 `WorkflowGraph`；运行创建即开始，`startedAt` 对外取 `created_at`（`0005` 迁移收敛表宽） |
-| `run_node` | `run_id`、`node_id`、`visit`、`node_type`、`expert_id`、`state`、`task_id`、`verdict`、`message`、`error`、`enter_reason`、`dispatched_at`、`finished_at` | 追加写为主：同一节点每次重访新增一行，旧行保留；`attempt` 归调度器，不在本表留第二真相 |
+| `workflow_run` | `id`、`workflow_id`、`workflow_ref_id`、`workflow_name`、`workflow_revision`、`graph_snapshot`、`intent_markdown`、`harness_id`、`harness_ref_id`、`harness_name`、`client_id`、`instance_id`、`workspace_path`、`task_space_path`、`auto_confirm`、`state`、`outcome`、`current_node_id`、`result`（`finalMessage`/`error`）、`archive_state`、`finished_at`、`created_at`/`updated_at`/`created_by` | 运行聚合根；`graph_snapshot` 是启动时冻结的 `WorkflowGraph`；`workflow_id`/`harness_id` 是活跃引用，只在 run 未终态时非空；`workflow_ref_id`/`harness_ref_id`/`*_name` 是历史快照，启动时写入、永不改变；运行创建即开始，`startedAt` 对外取 `created_at`（`0005` 迁移收敛表宽） |
+| `run_node` | `run_id`、`node_id`、`visit`、`node_type`、`expert_id`、`expert_name`、`state`、`task_id`、`session_id`、`verdict`、`message`、`error`、`enter_reason`、`dispatched_at`、`finished_at` | 追加写为主：同一节点每次重访新增一行，旧行保留；`attempt` 归调度器，不在本表留第二真相；`expert_id` 是活跃引用，run 终态时置空；`expert_name` 是建行时冻结的历史名；`session_id` 是 client 在结果里回传的会话标识，可空且当前不对外暴露；确认点等待时 `verdict` 暂存 question/context/options，`session_id` 用于 `resumeSessionId` 续跑 |
 | `run_artifact` | `run_id`、`node_id`（归档为 null）、`visit`、`attempt`（归档为 null）、`kind`（`session_log` / `archive`）、`store_key`、`size_bytes`、`sha256`、`created_at` | 制品元数据；一次尝试一份日志，字节在 `FileStore`，本组件不持有字节 |
 
 不变量：
 
-- `workflow_run.id` 为 UUIDv7，全生命周期唯一；`graph_snapshot` 写入后不再改变。
+- `workflow_run.id` 为 UUIDv7，全生命周期唯一；`graph_snapshot`、`workflow_ref_id`、`harness_ref_id`、`workflow_name`、`harness_name` 写入后不再改变。
+- **终态脱钩**：`workflow_run.state = 'done'` 时 `workflow_id`/`harness_id` 必须为 null，`run_node.expert_id` 必须为 null；`finishRun` 在同一事务完成 run 脱钩与该 run 全部节点脱钩。check 约束 `workflow_run_history_detached` 兜底 run 根，节点行由 `finishRun` 统一处理。
+- 活跃引用由外键 `RESTRICT` 保护：工作流、Harness、专家被未终态 run 引用时不能删除；终态 run 不阻止删除。删除 409 的 `references` 可含 `type="run"`。
 - `task_space_path` 由服务端在启动时生成：`<workspace_path>/task-spaces/<YYYYMMDD-HHmmss>`（本地时间，冲突追加 `-2`），**不接收调用方提供的路径分量**。工作区本身的形态（普通目录 / git 超项目 + submodule）由用户决定，编排只把它当不透明绝对路径，不做 git 校验。
-- 同一个 run 同一时刻最多一个 `run_node` 处于 `queued` / `dispatched` / `waiting_confirm`（串行推进）。
+- 同一个 run 同一时刻最多一个 `run_node` 处于 `queued` / `dispatched` / `waiting_confirm` / `waiting_resume`（串行推进）。
 - 同一 `(run_id, node_id, visit)` 唯一；`visit` 从 1 开始，回退重访 +1。
-- `workflow_run.state` 闭集 `created` / `running` / `waiting_confirm` / `done`；`outcome` 只在 `done` 时存在，取 `succeeded` / `failed` / `cancelled`。
-- `run_node.state` 闭集 `queued` / `dispatched` / `waiting_confirm` / `succeeded` / `rejected` / `failed`；`rejected` 只来自 `review` 判定 fail 或 `confirm` 拒绝。
+- `workflow_run.state` 闭集 `created` / `running` / `waiting_confirm` / `waiting_resume` / `done`；`outcome` 只在 `done` 时存在，取 `succeeded` / `failed` / `cancelled`。
+- `run_node.state` 闭集 `queued` / `dispatched` / `waiting_confirm` / `waiting_resume` / `succeeded` / `rejected` / `failed`；`rejected` 只来自 `review` 判定 fail 或 `confirm` 拒绝。
 - `archive_state` 闭集 `none` / `pending` / `stored` / `failed`；它**不参与** run 状态判定，run 终态不因归档失败回退。
 - 结果前置：`P-02` 到达时该 `taskId+attempt` 必须有通过校验的 `run_artifact(kind=session_log)`，否则不接受。
+- `run_node.session_id` 只来自被接受的 `P-02` 结果里的可选 `sessionId`，在节点结算的同一事务写入；结果未带、历史行与重启补结算保持 `null`，不回填、不推导。它只在运行期供排查/对接使用；session 代理通过 `run_node.session_id` 内部读取，**不进入 `RunNodeView` 或产品响应字段**。
 - 文本上限：`intent_markdown` ≤ 256 KiB；组装后的 `prompt` 必须 ≤ `maxPromptBytes`（1 MiB），超限启动失败。
-- **同一 `instance_id`（同一工作区）同一时刻最多一个活跃 run**（`running` 或 `waiting_confirm`）；启动第二个 run 返回 `409 run_conflict`。原因：`S-06` 要求同实例并发任务同一技能集，而不同 run 的节点专家不同；fan-out 是唯一例外（同一 run、同一专家、同一 digest，第二期）。
+- **同一 `instance_id`（同一工作区）同一时刻最多一个活跃 run**（`running` / `waiting_confirm` / `waiting_resume`）；启动第二个 run 返回 `409 run_conflict`。原因：`S-06` 要求同实例并发任务同一技能集，而不同 run 的节点专家不同；fan-out 是唯一例外（同一 run、同一专家、同一 digest，第二期）。
 - 不同工作区（不同 `instance_id`）可以各自跑 run，互不影响。
 
 ## 3 公共契约
@@ -69,9 +72,9 @@ updated: 2026-11-12
 ### 3.1 类型
 
 ```ts
-type RunState = "created" | "running" | "waiting_confirm" | "done";
+type RunState = "created" | "running" | "waiting_confirm" | "waiting_resume" | "done";
 type RunOutcome = "succeeded" | "failed" | "cancelled";
-type RunNodeState = "queued" | "dispatched" | "waiting_confirm"
+type RunNodeState = "queued" | "dispatched" | "waiting_confirm" | "waiting_resume"
                   | "succeeded" | "rejected" | "failed";
 type ArchiveState = "none" | "pending" | "stored" | "failed";
 type RunArtifactKind = "session_log" | "archive";
@@ -94,33 +97,38 @@ type RunNodeView = {
   verdict: Record<string, unknown> | null;
   message: string;
   error: { code: string; message: string } | null;
+  expertName: string | null;   // confirm 为 null；删除专家后仍保留
   dispatchedAt: string | null;
   finishedAt: string | null;
 };
 
-type RunDetail = {
-  runId: string;
-  workflowId: string;
-  workflowRevision: number;
-  harnessId: string;
-  clientId: string;
-  instanceId: string;
+type RunDetail = RunSummary & {
+  graph: WorkflowGraph;        // 启动时冻结；工作流删除后仍可展示
   workspacePath: string;
   taskSpacePath: string;
   autoConfirm: boolean;
+  finalMessage: string | null;
+  error: { code: string; message: string } | null;
+  nodes: RunNodeView[];
+};
+
+type RunSummary = {
+  runId: string;
+  workflowId: string;          // 历史 ID；工作流删除后仍保留
+  workflowName: string;
+  workflowRevision: number;
+  harnessId: string;           // 历史 ID；Harness 删除后仍保留
+  harnessName: string;
+  clientId: string;
+  instanceId: string;
   state: RunState;
   outcome: RunOutcome | null;
   currentNodeId: string | null;
   archiveState: ArchiveState;
-  nodes: RunNodeView[];
-  finalMessage: string | null;
-  error: { code: string; message: string } | null;
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
 };
-
-type RunSummary = Omit<RunDetail, "nodes" | "finalMessage">;
 
 type RunQuery = {
   workflowId?: string;
@@ -177,6 +185,13 @@ type RunService = {
     actor?: string;
   }): Promise<RunDetail>;
 
+  /** 人工续跑：仅 waiting_resume 可接受；同一 task 重开下一 attempt。 */
+  resumeNode(input: {
+    runId: string;
+    nodeId: string;
+    actor?: string;
+  }): Promise<RunDetail>;
+
   /** 取消：幂等；在跑任务经调度器实例级取消。 */
   cancel(runId: string, actor?: string): Promise<RunDetail>;
 
@@ -201,13 +216,14 @@ type RunService = {
 
 | 方法 | 目的 | 输入 | 输出 | 错误 | 并发/事务 |
 |---|---|---|---|---|---|
-| `start` | 建 run 并推进首节点 | `StartRun` | `RunDetail` | `ValidationError`（图/专家/字段）、`NotFoundError`（工作流/节点）、`BindingConflictError`（实例登记）、`RunConflictError`（同工作区已有活跃 run）、`PayloadTooLargeError`（intent 或 prompt 超限） | 校验与建 run 两段：校验只读；建 run + 首节点单事务；`enqueue` 在事务外 |
+| `start` | 建 run 并推进首节点 | `StartRun` | `RunDetail` | `ValidationError`（图/专家/字段）、`NotFoundError`（工作流/Harness/节点；含启动窗口并发删除）、`BindingConflictError`（实例登记）、`RunConflictError`（同工作区已有活跃 run）、`PayloadTooLargeError`（intent 或 prompt 超限） | 校验与建 run 两段：校验只读；建 run + 首节点单事务；`enqueue` 在事务外 |
 | `advance` | 推进一个节点 | `runId` | `void` | `NotFoundError` | 同一 run 进程内单飞；状态迁移单事务 |
 | `handleTaskResult` | 结算并推进 | `clientId`、`TaskResult` | `ResultAck` | `TaskNotFoundError`、`ValidationError` | 同一 run 单飞；`acceptResult` 与 `run_node` 结算分属两个事务，先调度器后编排 |
 | `attachSessionLog` | 登记日志 | `clientId`、`taskId`、`attempt`、`bytes`、`sha256` | `{stored}` | `TaskNotFoundError`、`PayloadTooLargeError` | 先写临时键、校验后原子改名；同键后到覆盖，`stored` 为 `created`/`replaced`/`unchanged` |
 | `storeArchive` | 登记归档 | `clientId`、`runId`、`bytes`、`sha256` | `{stored}` | `RunNotFoundError`、`ValidationError`（解包非法）、`InvalidStateError`（未终态）、`PayloadTooLargeError` | 同上；后到覆盖；落盘后置 `archive_state=stored` |
 | `archiveRequestsFor` / `ackArchived` | 归档电平 | `clientId`、`runIds` | 列表 / `void` | 无 | 幂等；只读 `pending` 且属于该 client 的 run |
 | `decide` | confirm 决策 | `runId`、`nodeId`、`decision`、`comment`、`actor` | `RunDetail` | `NotFoundError`、`ValidationError`（状态不符/节点不是 confirm） | 同一 run 单飞；幂等：同决策重复提交返回当前详情 |
+| `resumeNode` | 超时节点续跑 | `runId`、`nodeId`、`actor` | `RunDetail` | `NotFoundError`、`InvalidStateError`（非 waiting_resume / 缺 task 或 session / 实例不可派发 / task 不可重开） | 同一 run 单飞；scheduler 先重开 task，再在同一事务写 run_node/run；已 dispatched 幂等 |
 | `cancel` | 取消 run | `runId`、`actor` | `RunDetail` | `NotFoundError` | 幂等；先置 run 终态再取消实例任务 |
 | `get` / `list` | 读 run | `runId` / `RunQuery` | `RunDetail` / `Page<RunSummary>` | `NotFoundError` | 只读；`nodes` 按 `dispatchedAt`、`nodeId`、`visit` 排序 |
 | `readSessionLog` | 读日志 | `runId`、`nodeId`、`visit`、`attempt` | 流 + 大小 或 `null` | 无 | 只读；`visit` 缺省取该节点最大 `visit`，`attempt` 缺省取该行最大 `attempt` |
@@ -219,13 +235,45 @@ type RunService = {
 - `decide` 的幂等：`waiting_confirm` 下同决策重复提交返回当前详情；run 已推进后再提交 → `ValidationError`（`details.reason=invalid_state`）。
 - 错误经 `kernel` 统一类型；`http-gateway` 负责映射（见 [`CMP-http-gateway` §4.5](../http-gateway/spec.md)）。
 
+### 3.3 client 观测读（文件 + session）
+
+`CMP-run` 新增只读方法，全部经 `CMP-observability-client` 端口，不直接发 HTTP：
+
+```ts
+type RunFileRoot = "task-space" | "workspace";
+
+type RunService = {
+  listFiles(input: { runId: string; root: RunFileRoot; path: string }): Promise<RunFileListing>;
+  readFile(input: { runId: string; root: RunFileRoot; path: string }): Promise<RunFileContent>;
+  getSession(input: { runId: string; nodeId: string; visit?: number }): Promise<RunSessionView>;
+  listSessionEvents(input: {
+    runId: string; nodeId: string; visit?: number; cursor?: string; limit?: number;
+  }): Promise<RunSessionEventPage>;
+  openSessionEvents(input: {
+    runId: string; nodeId: string; visit?: number; lastEventId?: string;
+  }): Promise<ReadableStream<Uint8Array>>;
+  openSessionRaw(input: {
+    runId: string; nodeId: string; visit?: number;
+  }): Promise<{ stream: ReadableStream<Uint8Array>; sizeBytes: number; sha256: string; etag?: string }>;
+  runIdForTask(taskId: string): Promise<string | null>;
+};
+```
+
+不变量：
+
+- 文件 root 只允许 `task-space`/`workspace`；path 相对、拒绝 `..`/绝对路径/反斜杠/NUL；不额外截断，client 的 `truncated` 原样表达。
+- session 通过 `runId + nodeId (+visit)` 找 `run_node.session_id`；为空且 `task_id` 存在时，用 client `O-02` 按 `runId/nodeId/taskId` 反查 sessionId（不代理 attempt、不暴露给产品）；仍为空才抛 `SessionNotLinkedError`（404 `session_not_linked`）。
+- session 产品 DTO 剥离 `sessionId`/`attemptId`（含事件 `data` 中的同名键）；raw 只返回流 + size/sha/etag。
+- `runIdForTask` 只读 `run_node.task_id`；手工任务返回 null。
+- 文件/session 内容不落库、不写 `FileStore`。
+
 ## 4 状态机与不变量
 
 ### 4.1 run 状态机
 
 ```
 start ──▶ created ──advance──▶ running ⇄ waiting_confirm ──▶ done
-                                 │                            ├─ succeeded（end 成功）
+                                 │  ⇅ waiting_resume            ├─ succeeded（end 成功）
                                  └────────── cancel ─────────▶├─ failed（节点失败/轮次用尽）
                                                               └─ cancelled
 ```
@@ -233,7 +281,8 @@ start ──▶ created ──advance──▶ running ⇄ waiting_confirm ─�
 - `created`：已建 run 与首节点，尚未入队；`start` 内部随即转 `running`。
 - `running`：有一个节点在 `queued`/`dispatched`。
 - `waiting_confirm`：当前节点 `waiting_confirm`，无任务在跑。
-- `done`：终态，`outcome` 一次写入，不再改变；`archive_state` 可继续从 `pending` 变 `stored`/`failed`。
+- `waiting_resume`：当前节点因超时等待人工续跑，无任务在跑；`finished_at` 为空，不归档。
+- `done`：终态，`outcome` 一次写入，不再改变；`archive_state` 可继续从 `pending` 变 `stored`/`failed`。进入 `done` 的同一事务把 `workflow_id`/`harness_id` 与该 run 全部 `run_node.expert_id` 置空，历史展示改用快照列。
 
 ### 4.2 run_node 状态机
 
@@ -243,7 +292,9 @@ queued ────┤
            ├─（confirm）────▶ waiting_confirm ──pass──▶ succeeded ──▶ 推进
            │                                     └─reject─▶ rejected ──▶ 回退
            └─（review fail）─▶ rejected ──▶ 回退
-dispatched ──失败/超时/verdict 非法──▶ failed ──▶ run.failed
+dispatched ──失败/verdict 非法──▶ failed ──▶ run.failed
+dispatched ──timeout + sessionId──▶ waiting_resume ──resume──▶ dispatched
+waiting_resume ──cancel / 无 sessionId──▶ failed(cancelled / timeout)
 ```
 
 ### 4.3 推进规则
@@ -287,20 +338,23 @@ dispatched ──失败/超时/verdict 非法──▶ failed ──▶ run.fail
 
 ### 4.5 判定与回退
 
-1. `review` 结果结算：取 `message` 末尾窗口内**最后一个**可解析的 verdict JSON 对象（裸 JSON，不要求独占一行、不要求代码围栏）；`verdict` 必须是 `"pass"` 或 `"fail"` 字符串，否则 `run_node(failed, verdict_invalid)`、`run.failed`。
+1. `review` 结果结算只取 `TaskResult.signals` 中最后一个合法的 `review_verdict` 信号（`verdict` 必须是 `pass`/`fail`）；没有合法信号 → `run_node(failed, verdict_invalid)`、`run.failed`。`message` 只作叙述，不参与判定。
 2. `pass` → `succeeded` → 推进 seq。
 3. `fail` → `rejected`：在冻结图中找该节点唯一 `rollback` 出边；无 → `run.failed(missing_rollback_edge)`。目标必须是当前节点的祖先（按 seq 入边回溯），否则 `run.failed(invalid_rollback_target)`。
 4. 回退：`current_node_id = 目标节点`，目标节点下次执行时 `visit = 该节点历史最大 visit + 1`；目标到 `review` 之间的节点依次重跑，各自 `visit+1`，新行写入同一个 `enter_reason` 指针（指向被驳回行），派发时渲染成 prompt 的 `[本次进入]` 块。
 5. 轮次上限：任一节点本次 `visit > run.max_node_visits`（默认 5）→ `run.failed(visit_limit_exceeded)`，不再入队。
 6. `confirm` 决策：`pass` → `succeeded` → 推进；`reject` → `rejected` → 按第 3–5 条回退。
+7. `review` 派发时 `TaskRequest.resultSignal.kind = "review_verdict"`；schema 见 §4.9。
 
 ### 4.6 失败与取消
 
 | 情形 | run_node | run | 后续 |
 |---|---|---|---|
-| 结果 `failed`/`timeout` | `failed` | `failed` | 停在此节点，不自动重试（`OQ-28`） |
+| 结果 `failed` | `failed` | `failed` | 停在此节点，不自动重试（`OQ-28`） |
+| 结果 `timeout` 且有 `sessionId` | `waiting_resume` | `waiting_resume` | 人工 `resumeNode`：同一 task 重开 attempt，继续同一 session |
+| 结果 `timeout` 无 `sessionId` | `failed` | `failed` | 停在此节点，不自动重试 |
 | 结果 `cancelled` | `failed(cancelled)` | `cancelled`（若由 cancel 触发） | 不再推进 |
-| verdict 非法 | `failed(verdict_invalid)` | `failed` | 停在此节点 |
+| review_verdict 缺失/非法 | `failed(verdict_invalid)` | `failed` | 停在此节点 |
 | 回边缺失/目标非法 | `failed` | `failed` | 保存校验应已拦截，运行期兜底 |
 | 轮次用尽 | `failed(visit_limit_exceeded)` | `failed` | 停在此节点 |
 | 取消 | 当前节点 `failed(cancelled)` | `cancelled` | `scheduler.cancelInstances(instanceId)` |
@@ -320,10 +374,22 @@ dispatched ──失败/超时/verdict 非法──▶ failed ──▶ run.fail
 
 - **单飞**：`advance` / `handleTaskResult` / `decide` / `cancel` 按 `runId` 进程内串行（`Map<runId, Promise>`），避免同一 run 的并发推进。
 - **跨 run**：按工作区互斥——同一 `instance_id` 同一时刻只允许一个活跃 run（`run_conflict`），因此不存在两个 run 争同一容器的技能集；不同工作区之间互不影响。fan-out 在同一 run 内并发多个任务（第二期），共用同一专家与 digest，不违反 `S-06`。
-- **重启恢复**（`resumePending`）：扫描 `running` 与 `waiting_confirm`；
+- **重启恢复**（`resumePending`）：扫描 `running` 与 `waiting_confirm`；`waiting_resume` 不自动续跑，保持等待。
   - 当前节点 `dispatched` 且有 `taskId` → `scheduler.inspect(taskId)`：`done` 则用结果补结算再推进；`queued`/`dispatched` 则等待（调度器 `S-02` 会重派）；
   - 当前节点 `queued` 且无 `taskId` → 重新入队。**已知代价**：若崩溃发生在「enqueue 已提交、run_node 未回填 taskId」之间，会重复入队一次并可能重复执行该节点；这与契约的 at-least-once 口径一致，不额外引入幂等键（若将来需要，给 `enqueue` 加幂等键属调度器变更）。
   - `waiting_confirm` → 保持等待，不自动决策。
+  - `waiting_resume` → 保持等待，等人工 `resumeNode` 或取消。
+
+### 4.9 结果信号与临时确认点
+
+- `agent` 节点派发时 `TaskRequest.resultSignal.kind = "confirmation_request"`；`review` 节点为 `review_verdict`。契约由 `signals.ts` 的 `REVIEW_VERDICT_SIGNAL` / `CONFIRMATION_SIGNAL` 定义，调度器视为 opaque JSON 持久化。
+- `TaskResult.signals` 只在 `succeeded` 时应用：
+  - `review_verdict` → §4.5；
+  - `confirmation_request` → 当前 `run_node` 与 run 置 `waiting_confirm`，保存 question/context/options 与 `session_id`；不推进、不结束。
+- 人工 `decide(pass|reject, comment)` 对确认点都**不结算节点、不推进/回退**：用 `row.session_id` 作为 `TaskRequest.resumeSessionId`，创建同一节点的新任务；`task_id` 替换、`visit` 不变；prompt 追加 `[人工确认]`（问题、决定、comment）。model 在同一 session 继续，最终结果再走正常结算。
+- `decide` 的 `reject` 对确认点表示“拒绝意见”，不是节点失败；只有 `confirm` 节点的 reject 走回退。
+- 确认点等待期间没有在跑任务，调度器任务已 `done`；`CMP-scheduler` 不需要新增状态或语义。
+- 若 `row.session_id` 为空，`decide` 返回 `InvalidStateError`（无法续跑），不偷偷新建 session。
 
 ## 5 依赖与边界
 
@@ -334,8 +400,10 @@ dispatched ──失败/超时/verdict 非法──▶ failed ──▶ run.fail
 - `CMP-harness` 的 `HarnessRead.get`（`harnessId → clientId` 与 `enabled`）；
 - `CMP-instance` 的 `InstanceService.enroll` / `get`（登记与读工作区）；
 - `CMP-scheduler` 的 `SchedulerService.enqueue` / `cancelInstances` / `inspect`；
-- `CMP-kernel` 的 `FileStore` 端口、`Clock`、`IdGenerator`、错误类型、分页；
+- `CMP-kernel` 的 `FileStore` 端口、`ClientRunFiles`/`ClientSessionObservability` 端口、`Clock`、`IdGenerator`、错误类型、分页；
 - `CMP-platform` 的 `Db`（事务与查询）。
+
+本组件实现 `kernel.RunReferenceReader`：按活跃 run 查询工作流/Harness/专家的引用，供组合根与 `catalog` 的引用合并成删除 guard。该端口只读，不写其他组件的数据。
 
 禁止依赖：
 
@@ -352,14 +420,20 @@ dispatched ──失败/超时/verdict 非法──▶ failed ──▶ run.fail
 |---|---|
 | 启动 | 合法图建 run 并派发首节点；`split`/`fanout`/缺专家/缺 `start` 均 400 且不建 run；instance 重复登记冲突 409 |
 | 推进 | 首节点成功→后继入队；`end` 成功→`done(succeeded)`；无出边→`failed` |
-| 判定 | verdict pass 推进；fail 回退到祖先且 `visit+1`；verdict 缺失/非法→`failed(verdict_invalid)`；无回边→`failed` |
+| 判定 | `review_verdict` 信号 pass 推进；fail 回退到祖先且 `visit+1`；信号缺失/非法→`failed(verdict_invalid)`，message JSON 不参与判定；无回边→`failed` |
 | 轮次 | `visit > max_node_visits` → `failed(visit_limit_exceeded)`，不再入队 |
 | 确认 | `waiting_confirm` 无任务；pass 推进、reject 回退；`auto_confirm` 不等待；非 `waiting_confirm` 决策 409 |
 | 日志 | 缺日志报结果 409 且不结算；补传后接受；同内容重复 200 `unchanged`、异内容后到覆盖 200 `replaced`；超限 413 |
+| 会话绑定 | 结果带 `sessionId` 时落 `run_node.session_id`（成功与失败路径）；未带、历史行与重启补结算保持 `null`；产品 API 不出现该字段 |
+| 超时续跑 | timeout + `sessionId` 进入 `waiting_resume`；`resumeNode` 调 scheduler 重开同一 task，节点回 `dispatched`、run 回 `running`；无 session 仍失败；等待期可取消 |
 | 归档 | 终态后电平下发；上传后落 `history/<instanceId>/<runId>/` 并置 `stored`；`archivedRuns` 确认后停止；损坏包 400；未终态 409 |
 | 取消 | 在跑任务经 `cancelInstances` 取消；`waiting_confirm` 直接取消；重复取消幂等 |
 | 恢复 | `dispatched` 已结算补结算；`queued` 无 `taskId` 重新入队；`waiting_confirm` 保持 |
-| 边界 | 不依赖 `http-gateway`/`catalog`/`skill` 写服务；无跨组件 store 导入；无 Bun 文件 API |
+| 脱钩 | 四条终态路径（end 成功、失败、取消、超时失败/重启补结算）后 `workflow_id`/`harness_id`/`run_node.expert_id` 为空，快照列不变；`waiting_resume` 保持活跃外键；check 约束拒绝终态非空 |
+| 删除 | 终态 run 不阻止删除工作流/Harness/专家；未终态 run 返回 409 且 `references` 含 `type="run"`；删除后 `get` 仍返回 `workflowName`/`harnessName`/`graph`/`expertName` |
+| 边界 | 不依赖 `http-gateway`/`catalog`/`skill` 写服务；无跨组件 store 导入；无 Bun 文件 API；文件/session 只经 client 端口 |
+| 契约 | `RunSummary.workflowName`/`harnessName`、`RunDetail.graph`、`RunNodeView.expertName` 在 HTTP 响应中可读；`workflowId` 过滤按 `workflow_ref_id` 命中已删除工作流的历史 run |
+| client 观测 | 文件列表/内容映射 `truncated`；session 详情/事件剥 ID；`session_not_linked`；`runIdForTask` |
 | prompt | 组成顺序固定；超 `maxPromptBytes` 不截断直接失败；`confirm` 不组装 |
 
 ## 7 预算与运行
@@ -371,6 +445,7 @@ dispatched ──失败/超时/verdict 非法──▶ failed ──▶ run.fail
 ## 8 待定
 
 - 节点级超时覆盖（当前统一取 `run.default_timeout_ms`）。
+- 超时续跑的 TTL / 次数上限（当前不做；等待期靠人工续跑或取消）。
 - 失败后「从当前节点原地重试」（`OQ-28`）。
 - `split`/`fanout` 的执行语义（第二期；`OQ-26`）。
 - 会话日志与归档的保留期与清理（`OQ-27`）。

@@ -31,18 +31,20 @@ updated: 2026-11-11
 
 | 实体 | 说明 |
 |---|---|
-| `Task` | 任务列表条目：`taskId`、`instanceId`、`nodeId`、`attempt`、`state`、不可变快照（`prompt`/`workspacePath`/`timeoutMs`/`skillSet`）、`outcome`、`error`、`notBefore`、`dispatchedAt`、`cancelRequestedAt`、`finishedAt`、审计字段 |
+| `Task` | 任务列表条目：`taskId`、`instanceId`、`nodeId`、`attempt`、`state`、不可变快照（`prompt`/`workspacePath`/`taskSpacePath`/`timeoutMs`/`skillSet`/`resultSignal`）、`resumeSessionId`、`outcome`、`error`、`notBefore`、`dispatchedAt`、`cancelRequestedAt`、`finishedAt`、审计字段 |
 | `TaskAttempt` | 每次下发与结算的事实流水（追加写）：`taskId`、`attempt`、`clientId`、`dispatchedAt`、`settledAt`、`result` 摘要。用于对账、排障与「未确认重发」判定，不作为第二真相 |
 | `ClientPresence` | 判活与电平控制：`clientId`、`lastPollAt`、`stopRequested`、`cancelRequestedAt`（按实例去重）。进程内状态可重建，落库仅为重启后对账 |
 
 不变量：
 
 - `taskId` 由本组件生成（UUIDv7），全生命周期唯一；同一 `taskId` 的不可变快照写入后不再改变（`S-05`）。
-- `Task.state` 三值闭集 `queued` / `dispatched` / `done`（`S-01`）；`outcome` 只在 `done` 时存在，取 `succeeded` / `failed` / `cancelled` / `timeout`。
+- `Task.state` 三值闭集 `queued` / `dispatched` / `done`（`S-01`）；`outcome` 只在 `done` 时存在，取 `succeeded` / `failed` / `cancelled` / `timeout`。`done` 默认终态；只有 `resumeTask` 能把 `done` 且 `error.class=timeout` 的任务重开为下一 attempt。
 - 同一 `taskId` 同一时刻最多一条 `dispatched` 事实；结果只接受一次（`S-08`）。
 - `cancelRequestedAt` 是取消请求的标记，不是第四个状态：置位后任务仍按 `dispatched → done` 收敛，由 `poll` 的 `cancelInstances` 与 client 的 `cancelled` 结果兑现。
 - 任务归属的 `clientId` 来自实例绑定，任务表不单独存「可改派给谁」的字段；跨 client 改派不是本组件的隐式行为（见 §4.7）。
 - v3 起 `task` 增加 `task_space_path`：由上游编排在入队时传入并冻结，重派不变（`S-05`）；入队必填、非空绝对路径，历史行可能仍为空串。
+- `task.result_signal` 为 opaque JSON（由 `CMP-run` 定义 schema，本组件只持久化与透传），纳入 `S-05` 稳定内容；上限 8 KiB。
+- `task.resume_session_id` 为可选 session 标识；存在时 client 续跑该 session，只透传，不解释。
 - 技能集 digest 由本组件在入队时计算并冻结；规范见 §4.4。
 
 ## 3 公共契约
@@ -60,6 +62,15 @@ type TaskDraft = {
   timeoutMs: number;       // > 0
   skillIds: string[];      // 由上游给出；解析为不可变 skillSet
   taskSpacePath: string;   // v3：run 的 task-space 绝对路径；入队必填、非空
+  resultSignal?: ResultSignalContract; // v3 加法：opaque JSON；≤ 8 KiB
+  resumeSessionId?: string;            // v3 加法：确认点续跑 session
+};
+
+type ResultSignalContract = {
+  version: number;
+  kind: "review_verdict" | "confirmation_request";
+  required: boolean;
+  schema: Record<string, unknown>;
 };
 
 type EnqueueInput = { tasks: TaskDraft[]; actor?: string };
@@ -93,6 +104,8 @@ type TaskEnvelope = {
   taskSpacePath: string;
   timeoutMs: number;
   skillSet: SkillSet;
+  resultSignal?: ResultSignalContract;
+  resumeSessionId?: string;
 };
 
 type DispatchDecision = {
@@ -157,6 +170,9 @@ type SchedulerService = {
   /** P-02：首份结果为准；未知任务 404。 */
   acceptResult(clientId: string, result: TaskResult): Promise<ResultAck>;
 
+  /** 人工续跑：把 done(timeout) 的同一 task 重开为下一 attempt，写入 resumeSessionId。 */
+  resumeTask(clientId: string, taskId: string, resumeSessionId: string): Promise<TaskSnapshot>;
+
   /** 置位 `stop` 电平；不影响已下发任务。 */
   requestStop(clientId: string): Promise<void>;
 
@@ -179,7 +195,8 @@ type SchedulerPresenceRead = {
 |---|---|---|---|---|---|
 | `enqueue` | 冻结快照并入队 | `EnqueueInput` | `EnqueueResult` | `ValidationError`、`PayloadTooLargeError`、`NotFoundError`（实例未登记）、`DatabaseUnavailableError` | 一批一个事务；同批同实例的 `skillIds` 投影不一致、或与该实例已下发未结算任务的 digest 不一致 → 整批拒绝 |
 | `poll` | 派发与对账 | `clientId`、`ClientReport`、`PollOptions` | `DispatchDecision` | `ValidationError`、`DatabaseUnavailableError` | 同 `clientId` 串行（单飞）；派发预留与任务状态同事务 |
-| `acceptResult` | 接受结果并结算 | `clientId`、`TaskResult` | `ResultAck` | `TaskNotFoundError`、`ValidationError`、`DatabaseUnavailableError` | 单事务；首份为准，后到只回 `accepted=false` |
+| `acceptResult` | 接受结果并结算 | `clientId`、`TaskResult` | `ResultAck` | `TaskNotFoundError`、`ValidationError`、`DatabaseUnavailableError` | 单事务；首份为准，后到只回 `accepted=false`；已结算 attempt 的迟到结果同样 `accepted=false` |
+| `resumeTask` | 人工重开超时任务 | `clientId`、`taskId`、`resumeSessionId` | `TaskSnapshot` | `TaskNotFoundError`、`InvalidStateError`（非 done(timeout) 或非本 client）、`ValidationError`（sessionId 长度） | 单事务；同一任务 `attempt+1`、`resume_session_id` 写入；幂等：已 queued/dispatched 且 session 相同直接返回 |
 | `requestStop` | 置位停止电平 | `clientId` | `void` | 无 | 幂等 |
 | `cancelInstances` | 取消实例任务 | `instanceIds` | `{requested}` | `ValidationError` | 幂等；按实例去重 |
 | `inspect` | 读任务快照 | `taskId` | `TaskSnapshot` | `TaskNotFoundError` | 只读 |
@@ -198,6 +215,7 @@ type SchedulerPresenceRead = {
 enqueue ──▶ queued ──dispatch──▶ dispatched ──settle──▶ done
                 ▲                    │
                 └──requeue（attempt+1）┘
+done(timeout) ──resumeTask──▶ queued（attempt+1，resumeSessionId）
 ```
 
 - `queued`：可派发。`notBefore` 未到（退避中）或实例不可派发（retired / 未登记）时不派发。
@@ -260,7 +278,7 @@ type SkillSet = { digest: string; packages: SkillPackageRef[] };
 
 1. `taskId` 未知或不属于该 `clientId` 的实例 → `TaskNotFoundError`（`404 task_not_found`）。
 2. 任务已 `done` → `accepted: false`。
-3. 否则接受：写 `done` 与 `outcome`/`error`；`attempt` 不参与判定（旧副本结果也算首份）。
+3. 否则按 `(taskId, attempt)` 查 `task_attempt`：无该行或已 `settled_at` → `accepted=false`；否则接受，写 `done` 与 `outcome`/`error`。同一 attempt 只接受一次；未结算的旧副本结果仍算首份。
 
 **失败或超时的结果直接结算，不自动重派**（用户 2026-11-11 裁决）：
 
@@ -275,6 +293,7 @@ type SkillSet = { digest: string; packages: SkillPackageRef[] };
 - 失败原因仍按 `status`/`error.class`/`error.code` 写入任务，供上游展示与排障；只是不再自动回队。
 - 需要重跑时由上游新建任务（新 `taskId`、重新入队），或等 `S-02` 的未回报重派；不在调度器内隐式重试。
 - **未回报的重派不是失败重试**：`S-02` 的静默或 `timeoutMs + resultGraceMs` 过期（client 崩溃、响应丢失）仍会回队，否则任务会永久卡在 `dispatched`。回队次数上限 `taskMaxAttempts`（默认 3，可配置），用尽后 `done(failed)`。
+- **人工续跑不是自动重派**：`resumeTask` 只由上游在 `waiting_resume` 时显式调用；重开 `done(timeout)` 为下一 attempt，写 `resume_session_id`，不改快照的 prompt/taskSpace/workspace/timeout/skillSet。重开会递增 `attempt`，因此也会消耗 `taskMaxAttempts` 的未回报回队预算；client 正常回报的超时结果不受影响。
 - 「调度器误判重派、被 client 拒绝」不计入尝试次数：`failed(scheduler)` 直接结算。
 - 重派不改变快照；`attempt` 单调递增。
 
@@ -332,7 +351,8 @@ type SkillSet = { digest: string; packages: SkillPackageRef[] };
 | `S-03` | 不在 `running[]`/`finished[]`/无结果 → 原样重发，`attempt` 不变 |
 | `S-02` | 静默超过 `clientSilentMs` 回队；`timeoutMs + resultGraceMs` 过期回队；回队后 `attempt + 1`、快照不变 |
 | `S-06` | 同实例不同 digest 入队被拒；同实例已下发未结算任务同 digest 才派发 |
-| `S-08` | 首份 `accepted=true`、第二份 `accepted=false`；未知 `taskId` → `TaskNotFoundError`；旧副本先到结果被接受 |
+| `S-08` | 首份 `accepted=true`、第二份 `accepted=false`；未知 `taskId` → `TaskNotFoundError`；旧副本先到结果被接受；已结算 attempt 的迟到结果被拒绝 |
+| 人工续跑 | `done(timeout)` 经 `resumeTask` 变 `queued`、`attempt+1`、`resumeSessionId`；非 timeout 不可重开；重复调用幂等；重开后旧 attempt 结果被拒绝 |
 | 结算策略 | 上表每类 `status`/`class` 各一例，均直接 `done` 且不再派发；未回报回队用尽 `taskMaxAttempts` 后 `done(failed)`；退避期不派发 |
 | 控制 | `stop` 后 `tasks` 为空且 `stop=true`；取消后 `cancelInstances` 持续到结算；重复请求幂等 |
 | 节点门禁 | 节点未绑定/停用 → 不派发且 `attempt` 不变；节点恢复后继续派发；在跑任务在停用后仍完成 |
@@ -351,3 +371,4 @@ type SkillSet = { digest: string; packages: SkillPackageRef[] };
 - 任务列表规模上界（几十 vs 上千）与批量下发查询的索引策略，属实现取舍，不改契约。
 - 失败不自动重派已定（2026-11-11）；若将来要按类别重试，需重开本节并给出 token 成本评估。
 - `inspect` 是否升级为对外只读面（契约 §12 待定），待排障需求出现后定。
+- 人工续跑与未回报回队共用 `attempt`，是否拆分两套计数（当前共用，人工续跑会计入 `taskMaxAttempts`）。

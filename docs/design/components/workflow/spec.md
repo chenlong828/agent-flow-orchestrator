@@ -26,7 +26,7 @@ updated: 2026-11-11
 
 - 不建版本、发布、behavior、实例、运行表。
 - 专家引用按工作流去重计数；不从 `expert` 反向写。
-- 删除工作流级联定义与引用；专家被引用时由外键 `RESTRICT` 阻止删除。
+- 删除工作流级联定义与引用；被未终态 run 引用时返回 409 `referenced`，终态 run 不阻止删除（run 在终态已脱钩并保留快照）。
 
 ## 3 公共契约
 
@@ -80,7 +80,7 @@ type WorkflowRead = {
 允许依赖：
 
 - `platform` 的 `Db`；
-- `kernel` 的 `Clock`、`IdGenerator`、错误类型、分页、`ExpertStatusReader` 端口。
+- `kernel` 的 `Clock`、`IdGenerator`、错误类型、分页、`ExpertStatusReader` 端口、`ReferenceGuard` 端口。
 
 禁止依赖：
 
@@ -88,7 +88,7 @@ type WorkflowRead = {
 - 在组件内拼 HTTP 响应或 DTO；
 - 运行组件、Bun 文件 API、ACP。
 
-专家删除保护通过组合根注入 `ReferenceGuard`；专家存在性与启停状态通过 `ExpertStatusReader` 端口只读查询，由组合根注入专家读实现；`CMP-workflow` 不导入专家组件，也不写 `expert` 表。`workflow_expert_ref.expert_id` 外键是并发兜底。
+专家删除保护与工作流自身删除保护通过组合根注入 `ReferenceGuard`；专家存在性与启停状态通过 `ExpertStatusReader` 端口只读查询，由组合根注入专家读实现；`CMP-workflow` 不导入专家或 run 组件，也不写 `expert`/`workflow_run` 表。`workflow_expert_ref.expert_id` 与 `workflow_run.workflow_id` 外键是并发兜底；工作流删除的 guard 只列**未终态** run。
 
 ## 5 领域不变量
 

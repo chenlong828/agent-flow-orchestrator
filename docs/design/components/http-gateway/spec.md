@@ -97,7 +97,7 @@ updated: 2026-11-12
 | 409 | `name_conflict` | 名称大小写不敏感重复 |
 | 409 | `binding_conflict` | Harness 登记执行节点时 `clientId` 已被其他 Harness 占用（`details.clientId`），或该 token 已被其他节点使用（`details.field=clientToken`，不回显 token 值） |
 | 409 | `revision_conflict` | `If-Match`/baseRevision 与当前 revision 不一致 |
-| 409 | `referenced` | 删除时仍有引用；`details.references` 非空 |
+| 409 | `referenced` | 删除时仍有引用；`details.references` 非空，可含 `type="run"` 的未终态运行；终态 run 不阻止删除 |
 | 409 | `file_conflict` | 草稿附件改名目标已存在；`details.path`、`newPath` |
 | 410 | `draft_expired` | 草稿记录仍在但已过期；`details.expiresAt` |
 | 413 | `payload_too_large` | 单文件/文件数/包总量/草稿总量超限；`details.limit` |
@@ -116,7 +116,7 @@ updated: 2026-11-12
 
 ## 4 端点总表
 
-54 个已实现的产品业务端点（B1 38 个 + B3 工作流 10 个 + 运行编排 6 个），`openapi.yaml` 的 `x-api-count` 为 54。`/healthz` 单独列在 §4.2；执行面 5 个已实现端点见 §4.3，不计入产品业务端点；开发者文档端点见 §4.4，不计入业务端点。
+61 个已实现的产品业务端点，`openapi.yaml` 的 `x-api-count` 为 61。`/healthz` 单独列在 §4.2；执行面 5 个已实现端点见 §4.3，不计入产品业务端点；开发者文档端点见 §4.4，不计入业务端点。
 
 ### 4.1 业务端点
 
@@ -127,7 +127,7 @@ updated: 2026-11-12
 | `API-03` | POST | `/harnesses` | `UC-B1-01` | 创建 Harness | 201 + Location |
 | `API-04` | PUT | `/harnesses/{id}` | `UC-B1-01` | 全量更新 Harness | 200 详情 |
 | `API-05` | PATCH | `/harnesses/{id}/enabled` | `UC-B1-01` | 启用/停用 | 200 详情 |
-| `API-06` | DELETE | `/harnesses/{id}` | `UC-B1-01` | 删除；被工具引用则 409 | 204 |
+| `API-06` | DELETE | `/harnesses/{id}` | `UC-B1-01` | 删除；被工具或未终态 run 引用则 409，终态 run 不阻止 | 204 |
 | `API-07` | GET | `/harnesses/{id}/references` | `UC-B1-06` | 查询引用工具 | 200 引用页 |
 | `API-41` | PATCH | `/harnesses/{id}/client` | `UC-B1-01` | 登记/解绑执行节点（`clientId` + 凭据） | 200 详情 |
 | `API-08` | GET | `/tools` | `UC-B1-02` | 工具列表/检索 | 200 列表 |
@@ -156,7 +156,7 @@ updated: 2026-11-12
 | `API-24` | POST | `/experts` | `UC-B1-04` | 创建专家；可带初始有序装配 | 201 + Location |
 | `API-25` | PUT | `/experts/{id}` | `UC-B1-04` | 全量更新（不含装配） | 200 详情 |
 | `API-26` | PATCH | `/experts/{id}/enabled` | `UC-B1-04` | 启用/停用 | 200 详情 |
-| `API-27` | DELETE | `/experts/{id}` | `UC-B1-04` | 删除；被工作流引用则 409 | 204 |
+| `API-27` | DELETE | `/experts/{id}` | `UC-B1-04` | 删除；被工作流或未终态 run 引用则 409，终态 run 不阻止 | 204 |
 | `API-28` | PUT | `/experts/{id}/skills` | `UC-B1-05` | 整体替换有序 Skill | 200 专家详情 |
 | `API-29` | PUT | `/experts/{id}/tools` | `UC-B1-05` | 整体替换有序工具 | 200 专家详情 |
 | `API-30` | PATCH | `/experts/{id}` | `UC-B1-04` / `UC-B1-05` | 聚合部分更新五区、引用与装配；一次事务 | 200 专家详情 |
@@ -164,7 +164,7 @@ updated: 2026-11-12
 | `API-32` | POST | `/workflows` | `UC-B3-01` | 创建工作流并同时写入合法图 | 201 `{id,revision,warnings}` + Location |
 | `API-33` | GET | `/workflows/{id}` | `UC-B3-01` | 工作流详情（含 graph） | 200 详情 |
 | `API-34` | PUT | `/workflows/{id}` | `UC-B3-01` | 更新名称/类型/描述 | 200 详情 |
-| `API-35` | DELETE | `/workflows/{id}` | `UC-B3-01` | 删除工作流及定义/引用 | 204 |
+| `API-35` | DELETE | `/workflows/{id}` | `UC-B3-01` | 删除工作流及定义/引用；被未终态 run 引用则 409 | 204 |
 | `API-36` | POST | `/workflows/{id}/copy` | `UC-B3-01` | 校验并复制图，自动处理名称后缀 | 201 `{id,revision,warnings}` + Location |
 | `API-37` | PUT | `/workflows/{id}/definition` | `UC-B3-02` | 保存当前图；结构/拓扑/绑定错误 400，停用专家 warning | 200 `{workflow,warnings}` |
 | `API-38` | POST | `/workflows/{id}/validate` | `UC-B3-02` | 只校验图，不写入 | 200 `ValidationReport` |
@@ -181,12 +181,20 @@ updated: 2026-11-12
 | `API-43` | GET | `/runs/{id}` | run 详情（状态、当前节点、节点列表、归档状态） | 200 `RunDetail` |
 | `API-44` | GET | `/runs` | run 列表；按 `workflowId`、`state` 过滤 | 200 `Page<RunSummary>` |
 | `API-45` | POST | `/runs/{id}/cancel` | 取消 run；幂等 | 200 `RunDetail` |
-| `API-46` | POST | `/runs/{id}/nodes/{nodeId}/decision` | `confirm` 决策 `pass` / `reject` | 200 `RunDetail` |
+| `API-46` | POST | `/runs/{id}/nodes/{nodeId}/decision` | `confirm` 或 `confirmation_request` 确认点决策 `pass` / `reject` | 200 `RunDetail` |
 | `API-47` | GET | `/runs/{id}/nodes/{nodeId}/session-log` | 下载会话日志（gzip JSONL） | 200 + `Content-Encoding: gzip` |
+| `API-48` | GET | `/runs/{id}/files` | client 运行文件列表（`root=task-space/workspace`） | 200 `RunFileListing` |
+| `API-49` | GET | `/runs/{id}/files/content` | client 运行文件内容 | 200 `RunFileContent` |
+| `API-50` | GET | `/runs/{id}/nodes/{nodeId}/session` | 代理 client session 详情 | 200 `RunSessionView` |
+| `API-51` | GET | `/runs/{id}/nodes/{nodeId}/session/events` | 代理 session preview 事件 | 200 `RunSessionEventPage` |
+| `API-52` | GET | `/runs/{id}/nodes/{nodeId}/session/events/stream` | 代理 client O-11 富事件 SSE | 200 `text/event-stream` |
+| `API-53` | GET | `/runs/{id}/nodes/{nodeId}/session/raw` | 代理 client raw（zstd） | 200 `application/zstd` |
+| `API-54` | POST | `/runs/{id}/nodes/{nodeId}/resume` | `waiting_resume` 节点继续跑：同一 task 重开 attempt，写 `resumeSessionId` | 200 `RunDetail` |
 
-- 错误映射：工作流/harness/run/节点不存在 → `404`；图含 `split`/`fanout`、字段非法 → `400`（`unsupported_node_type` / `validation_error`）；同工作区已有活跃 run → `409 run_conflict`；实例登记冲突 → `409 binding_conflict`；决策时节点不在 `waiting_confirm` → `409 invalid_state`；会话日志不存在 → `404 not_found`。
+- 错误映射：工作流/harness/run/节点不存在 → `404`；图含 `split`/`fanout`、字段非法 → `400`（`unsupported_node_type` / `validation_error`）；同工作区已有活跃 run → `409 run_conflict`；实例登记冲突 → `409 binding_conflict`；决策时节点不在 `waiting_confirm`、续跑时节点不在 `waiting_resume` → `409 invalid_state`；会话日志不存在 → `404 not_found`。
 - `API-42` 的 `intentMarkdown` 上限 256 KiB，超出 `400 validation_error`（`details.field=intent`）。
 - `API-47` 的 `visit`、`attempt` 为可选查询参数，缺省分别取该节点最大 `visit` 与该行最大 `attempt`；响应头带 `Content-Length` 与 `X-Checksum-Sha256`。
+- `API-48`–`API-53` 是 client 观测面的产品代理：消费 `client-observability-v1` 的 `O-06`–`O-11`，内部用 `O-02` 按 taskId 反查运行中 sessionId（不代理 attempt）；session/事件/SSE 响应不包含 client `sessionId`/`attemptId`。文件沿用 client 2000 条 / 1 MiB 截断并以 `truncated` 表达。
 
 ### 4.2 健康检查
 
@@ -213,7 +221,7 @@ updated: 2026-11-12
 - 版本闸门：契约现行版本为 `3`，`X-Executor-Protocol` 必须精确等于 `3`；缺失或不等 → `400 unsupported_protocol`，不进入调度；不保留 v2 兼容窗口。
 - 常量（代码常量，不通过配置协商）：`maxResultBytes=262144`、`maxPromptBytes=1048576`、`maxSkillPackageBytes=67108864`、`maxTasksPerPoll=10`、`pollHoldMs=30000`、`clientPollTimeoutMs=40000`、`clientSilentMs=120000`、`resultGraceMs=60000`；v3 新增 `maxSessionLogBytes=67108864`、`maxArchiveBytes=536870912`、`maxArchiveEntries=100000`、`maxArchiveUncompressedBytes=2147483648`（`API-42` 的 intent 上限仍是产品面 256 KiB，不是执行面常量）。
 - `P-01` 长轮询：网关按 `pollHoldMs` 调 `SchedulerService.poll`，返回后合并 `CMP-run.archiveRequestsFor(clientId)`；**不因归档指令缩短挂起**（首次下发的同一跳由编排侧唤醒一次）。请求体透传 `capacity`/`running`/`finished`/`archivedRuns`，响应透传 `tasks`/`stop`/`cancelInstances`/`nextPollAfterMs` + `archiveRequests`。
-- `P-02`：网关先调 `CMP-run.handleTaskResult(clientId, result)`；有 run 归属时由编排校验日志并结算，无归属时委托调度器。缺日志 → `409 session_log_missing`，任务不结算。
+- `P-02`：网关先调 `CMP-run.handleTaskResult(clientId, result)`；有 run 归属时由编排校验日志并结算，无归属时委托调度器。缺日志 → `409 session_log_missing`，任务不结算。结果体可带 `signals`（只在 `succeeded`），网关校验形状/条数/字节后透传。
 - `P-03` 头部：`Content-Length`、`ETag`（来自 `SkillPackageRef.etag`）、`X-Checksum-Sha256`、`Cache-Control: private, max-age=3600`；`If-None-Match` 与 ETag 相等 → `304`，无响应体。`304` 只在客户端本地已有副本时有意义（`VR-01`，client 侧修复）。
 - `P-03` 的 `packageId` 与内容一一对应：Skill 保存新版本后旧 `packageId` 返回 `404`；包缺失/损坏返回 `500 package_unavailable`，不返回部分字节。
 - `EXE-04`：`Content-Type: application/x-ndjson` + `Content-Encoding: gzip`；按 `taskId+attempt` 后到覆盖，响应 `stored`（`created`/`replaced`/`unchanged`）；允许 0 行；超限 `413`（`details.limit=session_log_bytes`）；先写临时键再原子改名。
@@ -701,7 +709,7 @@ type PollRequest = {
 
 **`PollResponse`**（`EXE-01` 响应）：`{tasks: TaskRequest[]; stop: boolean; cancelInstances: string[]; nextPollAfterMs: number; archiveRequests?: ArchiveRequest[]}`；`tasks.length ≤ min(free, 10)`；`free=0` 时为空数组；`archiveRequests` 为 v3 电平字段。
 
-**`TaskRequest`**（下发项）：`{taskId, instanceId, nodeId, attempt, prompt, workspacePath, timeoutMs, skillSet, taskSpacePath}`；`skillSet` 为 `{digest, packages: SkillPackage[]}`；`downloadUrl` 由服务端拼为 `/api/v1/executor/skill-packages/{packageId}`；启动诉求已并入 `prompt`（v3）。
+**`TaskRequest`**（下发项）：`{taskId, instanceId, nodeId, attempt, prompt, workspacePath, timeoutMs, skillSet, taskSpacePath, resultSignal?, resumeSessionId?}`；`skillSet` 为 `{digest, packages: SkillPackage[]}`；`downloadUrl` 由服务端拼为 `/api/v1/executor/skill-packages/{packageId}`；启动诉求已并入 `prompt`（v3）；`resultSignal` 为 opaque JSON，`resumeSessionId` 用于确认点续跑。
 
 **`TaskResult`**（`EXE-02` 请求）：`{taskId, attempt, status, sessionId?, message, truncated, stopReason, usage, error, startedAt?, finishedAt?}`；`status` 闭集 `succeeded/failed/cancelled/timeout`；`error.class` 闭集见契约 §5。
 
@@ -723,18 +731,24 @@ type PollRequest = {
 | `intentMarkdown` | string | 是 | ≤ 256 KiB；编排侧写入首节点 `prompt`，由 start 节点模型落盘 |
 | `autoConfirm` | boolean | 否 | 默认 `false`；`true` 时 `confirm` 节点自动通过 |
 
-**`RunSummary`**（`API-44` 列表项）：`{runId, workflowId, workflowRevision, harnessId, clientId, instanceId, state, outcome, currentNodeId, archiveState, createdAt, startedAt, finishedAt}`。
+**`RunSummary`**（`API-44` 列表项）：`{runId, workflowId, workflowName, workflowRevision, harnessId, harnessName, clientId, instanceId, state, outcome, currentNodeId, archiveState, createdAt, startedAt, finishedAt}`；`workflowId`/`harnessId` 是启动时历史 ID，资产删除后仍保留，`workflowName`/`harnessName` 是启动时冻结名。
 
-**`RunDetail`**（`API-42`/`API-43`/`API-45`/`API-46` 响应）：`RunSummary` + `{workspacePath, taskSpacePath, autoConfirm, finalMessage, error, nodes: RunNodeView[]}`。
+**`RunDetail`**（`API-42`/`API-43`/`API-45`/`API-46`/`API-54` 响应）：`RunSummary` + `{graph, workspacePath, taskSpacePath, autoConfirm, finalMessage, error, nodes: RunNodeView[]}`；`graph` 是启动时冻结的 `WorkflowGraph`，工作流删除后仍可展示。
 
-**`RunNodeView`**：`{nodeId, nodeType, visit, state, taskId, verdict, message, error, dispatchedAt, finishedAt}`；`attempt` 归执行面任务，不在 run 视图重复；`state` 闭集 `queued/dispatched/waiting_confirm/succeeded/rejected/failed`。
+**`RunNodeView`**：`{nodeId, nodeType, visit, state, taskId, verdict, message, error, expertName, dispatchedAt, finishedAt}`；`expertName` 是启动时冻结名（`confirm` 为 null），专家删除后仍保留；`attempt` 归执行面任务，不在 run 视图重复；`state` 闭集 `queued/dispatched/waiting_confirm/waiting_resume/succeeded/rejected/failed`。
 
-**`DecisionRequest`**（`API-46`）：`{decision: "pass" | "reject", comment?: string}`；仅 `waiting_confirm` 可接受，同决策重复提交幂等。
+**`DecisionRequest`**（`API-46`）：`{decision: "pass" | "reject", comment?: string}`；`confirm` 或 `confirmation_request` 确认点的 `waiting_confirm` 可接受，同决策重复提交幂等；确认点的 `comment` 作为人工回答注入续跑 prompt。
 
 **`ArchiveRequest`**（`EXE-01` 响应内）：`{runId, instanceId, workspacePath, taskSpacePath}`。
 
+**`RunFileEntry` / `RunFileListing` / `RunFileContent`**：运行文件列表/内容；`path` 相对 root，`truncated` 表示 client 侧上限截断，二进制 `content=null`。
+
+**`RunSessionView` / `RunSessionEvent` / `RunSessionEventPage`**：session 代理 DTO；不含 `sessionId`/`attemptId`。
+
+**执行面 poll 头**：client 可选带 `X-Observability-Url`；网关只登记到内存目录，不改变派发。`TaskRequest.runId?` 由网关从 `run_node.task_id` 反查补齐。
+
 - `API-47` 响应：`application/x-ndjson` + `Content-Encoding: gzip` + `Content-Length` + `X-Checksum-Sha256`；`visit`/`attempt` 缺省取最新。
-- 运行编排 DTO 在实现时进入 `openapi.yaml`（`API-42`–`API-47`），`x-api-count` 同步 48 → 54。
+- 运行编排 DTO 在实现时进入 `openapi.yaml`（`API-42`–`API-54`），`x-api-count` 同步为 61。
 
 ## 6 外部 UI 页面映射（参考，不属于本仓库交付与验收）
 
@@ -778,7 +792,7 @@ B1/B3 不提供的页面动作：Harness 连接测试/心跳刷新、工具调�
 - 工作流：列表/详情、复制后缀、图保存/校验、DSL JSON/YAML、导入缺失专家、revision 冲突、validate 404。
 - 契约快照：响应字段集合与 DTO 表一致；新增字段必须更新本文。
 - 执行面（§4.3）：协议版本闸门、Bearer → `clientId`、未知字段 400、`maxResultBytes` 413、`P-03` 的 ETag/304/`X-Checksum-Sha256`/404/500；三个已实现端点各自 3 正 1 反，断言见场景 `SCN-0201`–`SCN-0205`。
-- 运行编排（`API-42`–`API-47`）：启动校验（含 `split`/`fanout` 拒绝）、run 详情/列表、取消幂等、决策状态校验、日志下载头；断言见场景 `SCN-0301`–`SCN-0304`。
+- 运行编排（`API-42`–`API-47`、`API-54`）：启动校验（含 `split`/`fanout` 拒绝）、run 详情/列表、取消幂等、决策状态校验、日志下载头；断言见场景 `SCN-0301`–`SCN-0304`。
 - 执行面 v3（`EXE-04`/`EXE-05`）：日志先传后报、`409 session_log_missing`、`413`、归档路径安全校验；断言见场景 `SCN-0302`、`SCN-0304` 与契约 v3 §11。
 - 外部 UI 若接入，可用同一份端点/DTO 表做适配层契约测试；不共享代码。
 
