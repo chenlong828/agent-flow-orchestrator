@@ -109,7 +109,12 @@ export function composeNodePrompt(input: PromptInput): string {
   lines.push("[输出要求] 无特别要求，跟随Skill执行。");
   if (input.node.type === "agent") {
     lines.push(
-      "[确认通道] 遇到契约变更、严重超出范围、关键信息缺失或无法解决的冲突时，调用 mcp__agentflow__confirm 提交需要人确认的问题；普通可判断的问题不要打断人。",
+      "[确认通道] 仅严重场景调用 mcp__agentflow__confirm：契约变更、规则突破、不可逆/外部副作用、P0/P1、用户意图冲突、关键信息缺失；普通决策按 auto-confirm §2 默认确认，不打断人。",
+    );
+  }
+  if (input.node.type === "review") {
+    lines.push(
+      "[确认通道] 评审节点仅在「必须澄清已 accepted 需求/契约口径，且该口径直接决定 verdict」时调用 mcp__agentflow__confirm；不得把评审判断本身交给人，不得用 confirm 代替 review_verdict；一次一个问题；回答后仍须自行提交 verdict。",
     );
   }
   if (input.entry !== undefined) lines.push(...entryBlock(input.entry));

@@ -8,24 +8,24 @@ const UUID_PATTERN =
 const MAX_RESULT_SIGNAL_BYTES = 8192;
 const SIGNAL_KINDS = ["review_verdict", "confirmation_request"] as const;
 
-function validateResultSignal(value: unknown): ResultSignalContract {
+function validateSignalContract(value: unknown, field: string): ResultSignalContract {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    throw new ValidationError("resultSignal", "必须是对象");
+    throw new ValidationError(field, "必须是对象");
   }
   const signal = value as Record<string, unknown>;
-  if (signal.version !== 1) throw new ValidationError("resultSignal.version", "只支持 1");
+  if (signal.version !== 1) throw new ValidationError(`${field}.version`, "只支持 1");
   if (!SIGNAL_KINDS.includes(signal.kind as never)) {
-    throw new ValidationError("resultSignal.kind", "必须是 review_verdict 或 confirmation_request");
+    throw new ValidationError(`${field}.kind`, "必须是 review_verdict 或 confirmation_request");
   }
   if (typeof signal.required !== "boolean") {
-    throw new ValidationError("resultSignal.required", "必须是布尔值");
+    throw new ValidationError(`${field}.required`, "必须是布尔值");
   }
   if (signal.schema === null || typeof signal.schema !== "object" || Array.isArray(signal.schema)) {
-    throw new ValidationError("resultSignal.schema", "必须是对象");
+    throw new ValidationError(`${field}.schema`, "必须是对象");
   }
   const bytes = new TextEncoder().encode(JSON.stringify(signal)).byteLength;
   if (bytes > MAX_RESULT_SIGNAL_BYTES) {
-    throw new ValidationError("resultSignal", `超过 ${MAX_RESULT_SIGNAL_BYTES} 字节`);
+    throw new ValidationError(field, `超过 ${MAX_RESULT_SIGNAL_BYTES} 字节`);
   }
   return {
     version: 1,
@@ -33,6 +33,22 @@ function validateResultSignal(value: unknown): ResultSignalContract {
     required: signal.required,
     schema: signal.schema as Record<string, unknown>,
   };
+}
+
+function validateResultSignal(value: unknown): ResultSignalContract {
+  return validateSignalContract(value, "resultSignal");
+}
+
+/** 额外确认契约：只允许 `confirmation_request` 且非必需（verdict 才是必需结果）。 */
+function validateConfirmation(value: unknown): ResultSignalContract {
+  const signal = validateSignalContract(value, "confirmation");
+  if (signal.kind !== "confirmation_request") {
+    throw new ValidationError("confirmation.kind", "必须是 confirmation_request");
+  }
+  if (signal.required !== false) {
+    throw new ValidationError("confirmation.required", "必须是 false");
+  }
+  return signal;
 }
 
 export function ensureClientId(value: unknown): string {
@@ -59,7 +75,7 @@ function ensurePositiveInt(value: unknown, field: string, max: number): number {
 }
 
 type DraftBase = Pick<TaskDraft, "instanceId" | "nodeId" | "prompt" | "timeoutMs" | "skillIds" | "taskSpacePath">;
-type DraftOptional = Pick<TaskDraft, "resultSignal" | "resumeSessionId">;
+type DraftOptional = Pick<TaskDraft, "resultSignal" | "confirmation" | "resumeSessionId">;
 
 function validateDraftBase(draft: TaskDraft): DraftBase {
   const instanceId = ensureUuid(draft.instanceId, "instanceId");
@@ -94,6 +110,7 @@ function validateDraftBase(draft: TaskDraft): DraftBase {
 
 function validateDraftOptional(draft: TaskDraft): DraftOptional {
   const resultSignal = draft.resultSignal === undefined ? undefined : validateResultSignal(draft.resultSignal);
+  const confirmation = draft.confirmation === undefined ? undefined : validateConfirmation(draft.confirmation);
   if (
     draft.resumeSessionId !== undefined
     && (typeof draft.resumeSessionId !== "string" || draft.resumeSessionId.length < 1 || draft.resumeSessionId.length > 200)
@@ -102,6 +119,7 @@ function validateDraftOptional(draft: TaskDraft): DraftOptional {
   }
   return {
     ...(resultSignal === undefined ? {} : { resultSignal }),
+    ...(confirmation === undefined ? {} : { confirmation }),
     ...(draft.resumeSessionId === undefined ? {} : { resumeSessionId: draft.resumeSessionId }),
   };
 }

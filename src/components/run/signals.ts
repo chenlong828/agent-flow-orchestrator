@@ -18,7 +18,7 @@ const REVIEW_VERDICT_SIGNAL: ResultSignalContract = {
   },
 };
 
-/** agent/design 节点的确认点契约：模型在必须人工确认时发问。 */
+/** agent 节点的确认点契约：模型在必须人工确认时发问。 */
 const CONFIRMATION_SIGNAL: ResultSignalContract = {
   version: 1,
   kind: "confirmation_request",
@@ -36,10 +36,26 @@ const CONFIRMATION_SIGNAL: ResultSignalContract = {
   },
 };
 
+/**
+ * review 节点的可选确认契约：与 agent 共用同一 schema，但 `required=false`——
+ * verdict 才是必需结果，呼人只是评审的补充入口。
+ */
+const REVIEW_CONFIRMATION_SIGNAL: ResultSignalContract = {
+  version: CONFIRMATION_SIGNAL.version,
+  kind: CONFIRMATION_SIGNAL.kind,
+  required: false,
+  schema: CONFIRMATION_SIGNAL.schema,
+};
+
 export function signalForNode(type: NodeType): ResultSignalContract | undefined {
   if (type === "review") return REVIEW_VERDICT_SIGNAL;
   if (type === "agent") return CONFIRMATION_SIGNAL;
   return undefined;
+}
+
+/** 节点额外挂载的确认工具契约；目前只有 review 需要（agent 的确认走 `resultSignal`）。 */
+export function confirmationForNode(type: NodeType): ResultSignalContract | undefined {
+  return type === "review" ? REVIEW_CONFIRMATION_SIGNAL : undefined;
 }
 
 export type ReviewVerdict = {

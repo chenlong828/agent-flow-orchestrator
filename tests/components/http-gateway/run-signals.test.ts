@@ -98,6 +98,7 @@ describe("执行面结果信号与确认点", () => {
     const reviewTask = (await nextTask(ctx, fixture.token))!;
     expect(reviewTask.nodeId).toBe("n3");
     expect(reviewTask.resultSignal?.kind).toBe("review_verdict");
+    expect(reviewTask.confirmation).toMatchObject({ kind: "confirmation_request", required: false });
     await uploadSessionLog(ctx, fixture.token, reviewTask.taskId, 1);
     const reported = await reportTask(ctx, fixture.token, reviewTask, "succeeded", "只有自然语言，没有 JSON", {
       sessionId: "session-review-signal",
@@ -155,6 +156,7 @@ describe("执行面结果信号与确认点", () => {
     const agentTask = (await nextTask(ctx, fixture.token))!;
     expect(agentTask.nodeId).toBe("n2");
     expect(agentTask.resultSignal?.kind).toBe("confirmation_request");
+    expect(agentTask.confirmation).toBeUndefined();
     await uploadSessionLog(ctx, fixture.token, agentTask.taskId, 1);
     const paused = await reportTask(ctx, fixture.token, agentTask, "succeeded", "需要人确认", {
       sessionId: "session-confirm-1",
@@ -223,6 +225,153 @@ describe("执行面结果信号与确认点", () => {
   });
 });
 
+describe("review 节点的应急确认", () => {
+  test("review 确认后 waiting_confirm；pass 续跑同一 session，评审仍自行提交 verdict", async () => {
+    const fixture = await createRunFixture(ctx, graphReview);
+    const started = await startRun(ctx, fixture, { workspacePath: "/work/review-confirm-pass" });
+    const runId = started.body.runId as string;
+    await completeNextTask(ctx, fixture.token, "n1");
+    await completeNextTask(ctx, fixture.token, "n2");
+
+    const reviewTask = (await nextTask(ctx, fixture.token))!;
+    expect(reviewTask.nodeId).toBe("n3");
+    expect(reviewTask.confirmation).toMatchObject({ kind: "confirmation_request", required: false });
+    await uploadSessionLog(ctx, fixture.token, reviewTask.taskId, 1);
+    const paused = await reportTask(ctx, fixture.token, reviewTask, "succeeded", "需要澄清契约口径", {
+      sessionId: "session-review-confirm-pass",
+      signals: confirmationSignal("口径按 A 还是 B 解读？", "两种解读都成立，直接决定 verdict"),
+    });
+    expect(paused.status).toBe(200);
+
+    let detail = await getRun(ctx, runId);
+    expect(detail.body.state).toBe("waiting_confirm");
+    const waiting = detail.body.nodes.find((node: any) => node.nodeId === "n3");
+    expect(waiting.state).toBe("waiting_confirm");
+    expect(waiting.verdict).toMatchObject({
+      kind: "confirmation_request",
+      question: "口径按 A 还是 B 解读？",
+    });
+    expect(waiting.verdict.verdict).toBeUndefined();
+    expect(await nextTask(ctx, fixture.token)).toBeNull();
+
+    const passed = await decide(runId, "n3", "pass", "按 A 解读");
+    expect(passed.status).toBe(200);
+    expect(passed.body.state).toBe("running");
+
+    const continuation = (await nextTask(ctx, fixture.token))!;
+    expect(continuation.nodeId).toBe("n3");
+    expect(continuation.resumeSessionId).toBe("session-review-confirm-pass");
+    expect(continuation.prompt).toContain("[人工确认]");
+    expect(continuation.prompt).toContain("按 A 解读");
+    expect(continuation.resultSignal?.kind).toBe("review_verdict");
+    expect(continuation.confirmation?.kind).toBe("confirmation_request");
+
+    await uploadSessionLog(ctx, fixture.token, continuation.taskId, 1);
+    await reportTask(ctx, fixture.token, continuation, "succeeded", "评审完成", {
+      signals: reviewSignal("pass", "口径已按 A 澄清"),
+    });
+    detail = await getRun(ctx, runId);
+    expect(detail.body.nodes.find((node: any) => node.nodeId === "n3").state).toBe("succeeded");
+    expect(detail.body.nodes.find((node: any) => node.nodeId === "n4").state).toBe("dispatched");
+  });
+
+  test("review 确认的 reject 只作评审输入：续跑后 verdict fail 仍按回退边推进", async () => {
+    const fixture = await createRunFixture(ctx, graphReview);
+    const started = await startRun(ctx, fixture, { workspacePath: "/work/review-confirm-reject" });
+    const runId = started.body.runId as string;
+    await completeNextTask(ctx, fixture.token, "n1");
+    await completeNextTask(ctx, fixture.token, "n2");
+
+    const reviewTask = (await nextTask(ctx, fixture.token))!;
+    await uploadSessionLog(ctx, fixture.token, reviewTask.taskId, 1);
+    await reportTask(ctx, fixture.token, reviewTask, "succeeded", "需要澄清契约口径", {
+      sessionId: "session-review-confirm-reject",
+      signals: confirmationSignal("证据文件以哪一版为准？", "没有它无法判定"),
+    });
+
+    const rejected = await decide(runId, "n3", "reject", "以第二版为准");
+    expect(rejected.status).toBe(200);
+    const continuation = (await nextTask(ctx, fixture.token))!;
+    expect(continuation.resumeSessionId).toBe("session-review-confirm-reject");
+    expect(continuation.prompt).toContain("人工决定：拒绝");
+    expect(continuation.prompt).toContain("以第二版为准");
+
+    await uploadSessionLog(ctx, fixture.token, continuation.taskId, 1);
+    await reportTask(ctx, fixture.token, continuation, "succeeded", "评审完成", {
+      signals: reviewSignal("fail", "第二版缺少测试结论"),
+    });
+    const detail = await getRun(ctx, runId);
+    expect(detail.body.nodes.find((node: any) => node.nodeId === "n3" && node.visit === 1).state).toBe("rejected");
+    expect(detail.body.nodes.find((node: any) => node.nodeId === "n2" && node.visit === 2).state).toBe("dispatched");
+  });
+
+  test("review 同时回 confirm 与 verdict 时确认优先：先暂停，不结算 verdict", async () => {
+    const fixture = await createRunFixture(ctx, graphReview);
+    const started = await startRun(ctx, fixture, { workspacePath: "/work/review-confirm-both" });
+    const runId = started.body.runId as string;
+    await completeNextTask(ctx, fixture.token, "n1");
+    await completeNextTask(ctx, fixture.token, "n2");
+
+    const reviewTask = (await nextTask(ctx, fixture.token))!;
+    await uploadSessionLog(ctx, fixture.token, reviewTask.taskId, 1);
+    await reportTask(ctx, fixture.token, reviewTask, "succeeded", "先确认再判定", {
+      sessionId: "session-review-confirm-both",
+      signals: [
+        {
+          seq: 1,
+          at: "2026-11-18T00:00:00.000Z",
+          kind: "confirmation_request" as const,
+          data: { question: "口径按 A 还是 B？" },
+        },
+        {
+          seq: 2,
+          at: "2026-11-18T00:00:01.000Z",
+          kind: "review_verdict" as const,
+          data: { verdict: "pass", reason: "提前给出的结论" },
+        },
+      ],
+    });
+
+    const detail = await getRun(ctx, runId);
+    expect(detail.body.state).toBe("waiting_confirm");
+    const node = detail.body.nodes.find((item: any) => item.nodeId === "n3" && item.visit === 1);
+    expect(node.state).toBe("waiting_confirm");
+    expect(node.verdict).toMatchObject({ kind: "confirmation_request", question: "口径按 A 还是 B？" });
+    expect(node.verdict.verdict).toBeUndefined();
+    expect(detail.body.nodes.find((item: any) => item.nodeId === "n4")).toBeUndefined();
+  });
+
+  test("review 确认无答复保持 waiting_confirm，不自动 pass；取消后不产生 verdict", async () => {
+    const fixture = await createRunFixture(ctx, graphReview);
+    const started = await startRun(ctx, fixture, { workspacePath: "/work/review-confirm-cancel" });
+    const runId = started.body.runId as string;
+    await completeNextTask(ctx, fixture.token, "n1");
+    await completeNextTask(ctx, fixture.token, "n2");
+
+    const reviewTask = (await nextTask(ctx, fixture.token))!;
+    await uploadSessionLog(ctx, fixture.token, reviewTask.taskId, 1);
+    await reportTask(ctx, fixture.token, reviewTask, "succeeded", "需要澄清契约口径", {
+      sessionId: "session-review-confirm-cancel",
+      signals: confirmationSignal("口径按 A 还是 B 解读？", "两种解读都成立"),
+    });
+
+    const detail = await getRun(ctx, runId);
+    expect(detail.body.state).toBe("waiting_confirm");
+    expect(detail.body.nodes.find((node: any) => node.nodeId === "n3").state).toBe("waiting_confirm");
+    expect(await nextTask(ctx, fixture.token)).toBeNull();
+
+    const cancelled = await call(ctx.app, "POST", `/api/v1/runs/${runId}/cancel`, { body: {} });
+    expect(cancelled.status).toBe(200);
+    const after = await getRun(ctx, runId);
+    expect(after.body.state).toBe("done");
+    expect(after.body.outcome).toBe("cancelled");
+    const node = after.body.nodes.find((node: any) => node.nodeId === "n3" && node.visit === 1);
+    expect(node.state).toBe("failed");
+    expect(node.error.code).toBe("cancelled");
+    expect(node.verdict).toBeNull();
+    expect(await nextTask(ctx, fixture.token)).toBeNull();
+  });
+});
 
 describe("超时节点继续跑", () => {
   test("TC-RUN-018 agent 超时进入 waiting_resume；resume 用同一 taskId 的下一 attempt 继续", async () => {

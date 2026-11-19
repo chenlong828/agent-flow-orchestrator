@@ -1,5 +1,5 @@
 import type { Db } from "../../core/platform/index.ts";
-import type { SkillSet, TaskError, TaskOutcome, TaskState } from "./types.ts";
+import type { SkillSet, TaskError, TaskOutcome, TaskSignalBundle, TaskState } from "./types.ts";
 
 export type TaskRow = {
   id: string;
@@ -36,7 +36,7 @@ export type NewTaskRow = {
   timeoutMs: number;
   skillSet: SkillSet;
   skillSetDigest: string;
-  resultSignal: Record<string, unknown> | null;
+  signalBundle: TaskSignalBundle | null;
   resumeSessionId: string | null;
   notBefore: Date;
   now: Date;
@@ -73,7 +73,7 @@ async function insertTask(tx: Db, row: NewTaskRow): Promise<void> {
       row.timeoutMs,
       row.skillSet,
       row.skillSetDigest,
-      row.resultSignal,
+      row.signalBundle,
       row.resumeSessionId,
       row.notBefore,
       row.now,

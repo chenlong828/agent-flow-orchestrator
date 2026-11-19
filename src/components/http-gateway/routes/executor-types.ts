@@ -49,6 +49,13 @@ export type ExecutorTask = {
     required: boolean;
     schema: Record<string, unknown>;
   };
+  /** v3 加法：review 额外挂载的确认工具契约；缺省时 client 只挂 `resultSignal` 对应工具。 */
+  confirmation?: {
+    version: number;
+    kind: "review_verdict" | "confirmation_request";
+    required: boolean;
+    schema: Record<string, unknown>;
+  };
   resumeSessionId?: string;
 };
 

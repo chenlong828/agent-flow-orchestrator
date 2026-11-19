@@ -9,7 +9,7 @@ import type { SchedulerDeps } from "./deps.ts";
 import { skillSetDigest } from "./digest.ts";
 import type { NewTaskRow, SchedulerStore } from "./store.ts";
 import { validateDraft } from "./validate.ts";
-import type { EnqueueInput, EnqueueOptions, EnqueueResult, SkillSet, TaskDraft } from "./types.ts";
+import type { EnqueueInput, EnqueueOptions, EnqueueResult, SkillSet, TaskDraft, TaskSignalBundle } from "./types.ts";
 
 async function resolveSkillSet(deps: SchedulerDeps, skillIds: string[]): Promise<SkillSet> {
   const packages: SkillPackageRef[] = [];
@@ -35,6 +35,15 @@ type InstanceBatch = {
   ids: string[];
   rows: NewTaskRow[];
 };
+
+/** 两个信号契约一起冻结到 `task.result_signal`；都没有时为 null。 */
+function signalBundleOf(draft: TaskDraft): TaskSignalBundle | null {
+  if (draft.resultSignal === undefined && draft.confirmation === undefined) return null;
+  return {
+    ...(draft.resultSignal === undefined ? {} : { resultSignal: draft.resultSignal }),
+    ...(draft.confirmation === undefined ? {} : { confirmation: draft.confirmation }),
+  };
+}
 
 /** 单个实例的入队规划：校验技能集一致、解析技能包与工作区，返回待插入行。 */
 async function planInstanceBatch(
@@ -67,7 +76,7 @@ async function planInstanceBatch(
     timeoutMs: draft.timeoutMs,
     skillSet,
     skillSetDigest: skillSet.digest,
-    resultSignal: draft.resultSignal ?? null,
+    signalBundle: signalBundleOf(draft),
     resumeSessionId: draft.resumeSessionId ?? null,
     notBefore: now,
     now,

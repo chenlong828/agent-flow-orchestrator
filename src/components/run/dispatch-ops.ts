@@ -4,7 +4,7 @@ import type { RunCore } from "./core.ts";
 import { startNode } from "./graph-checks.ts";
 import { resolveEntry } from "./entry.ts";
 import { composeNodePrompt, type PromptConfirmation } from "./prompt.ts";
-import { signalForNode } from "./signals.ts";
+import { confirmationForNode, signalForNode } from "./signals.ts";
 import type { RunNodeRow, RunRow } from "./types.ts";
 
 export type DispatchOptions = {
@@ -51,6 +51,7 @@ async function dispatchNode(
     ...(options.confirmation === undefined ? {} : { confirmation: options.confirmation }),
   });
   const resultSignal = signalForNode(node.type);
+  const confirmationSignal = confirmationForNode(node.type);
   const now = deps.clock.now();
   let clientId: string | undefined;
   // 任务行与 run_node.task_id 必须同一次提交：否则被唤醒的 poll 可能读到尚无 task_id 的节点，
@@ -67,6 +68,7 @@ async function dispatchNode(
             timeoutMs: deps.defaultTimeoutMs,
             skillIds: expert.skillIds,
             ...(resultSignal === undefined ? {} : { resultSignal }),
+            ...(confirmationSignal === undefined ? {} : { confirmation: confirmationSignal }),
             ...(options.resumeSessionId === undefined ? {} : { resumeSessionId: options.resumeSessionId }),
           },
         ],

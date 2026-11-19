@@ -245,6 +245,60 @@ describe("任务派发与容量（S-01/S-04/S-05/S-06）", () => {
       ).tasks,
     ).toEqual([]);
   });
+
+  test("TC-EXD-009 结果与确认两个契约一起冻结，重派 attempt+1 原样下发（S-05）", async () => {
+    const clientId = "node-bundle";
+    await bindNode(clientId);
+    const instanceId = await enroll(clientId);
+    const skillId = await createSkill("双契约技能");
+    const { clock, advance } = mutableClock();
+    const scheduler = schedulerWith(clock);
+    const resultSignal = {
+      version: 1,
+      kind: "review_verdict" as const,
+      required: true,
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["verdict"],
+        properties: { verdict: { type: "string" } },
+      },
+    };
+    const confirmation = {
+      version: 1,
+      kind: "confirmation_request" as const,
+      required: false,
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["question"],
+        properties: { question: { type: "string" } },
+      },
+    };
+    await scheduler.enqueue({
+      tasks: [{
+        instanceId,
+        taskSpacePath: taskSpaceOf(instanceId),
+        nodeId: "n1",
+        prompt: "双契约",
+        timeoutMs: 1000,
+        skillIds: [skillId],
+        resultSignal,
+        confirmation,
+      }],
+    });
+
+    const first = (await poll(scheduler, clientId, 1)).tasks[0]!;
+    expect(first.resultSignal).toEqual(resultSignal);
+    expect(first.confirmation).toEqual(confirmation);
+
+    advance(1000 + 60000 + 1);
+    const second = (await poll(scheduler, clientId, 1)).tasks[0]!;
+    expect(second.taskId).toBe(first.taskId);
+    expect(second.attempt).toBe(2);
+    expect(second.resultSignal).toEqual(resultSignal);
+    expect(second.confirmation).toEqual(confirmation);
+  });
 });
 
 describe("结果结算（S-08：失败不自动重派）", () => {

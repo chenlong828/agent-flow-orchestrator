@@ -30,6 +30,12 @@ export type ExecutorTask = {
     required: boolean;
     schema: Record<string, unknown>;
   };
+  confirmation?: {
+    version: number;
+    kind: "review_verdict" | "confirmation_request";
+    required: boolean;
+    schema: Record<string, unknown>;
+  };
   resumeSessionId?: string;
 };
 

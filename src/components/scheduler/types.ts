@@ -30,8 +30,16 @@ export type TaskDraft = {
   taskSpacePath: string;
   /** v3 加法：结果信号契约；opaque，调度器只持久化与透传。 */
   resultSignal?: ResultSignalContract;
+  /** v3 加法：额外挂载的确认工具契约（review 用）；opaque，纳入 S-05 稳定内容。 */
+  confirmation?: ResultSignalContract;
   /** v3 加法：确认点续跑同一 session；缺省新建。 */
   resumeSessionId?: string;
+};
+
+/** `task.result_signal` 列的内部形态：两个契约一起冻结，重派时原样下发。 */
+export type TaskSignalBundle = {
+  resultSignal?: ResultSignalContract;
+  confirmation?: ResultSignalContract;
 };
 
 export type EnqueueInput = { tasks: TaskDraft[]; actor?: string };
@@ -79,6 +87,7 @@ export type TaskEnvelope = {
   timeoutMs: number;
   skillSet: SkillSet;
   resultSignal?: ResultSignalContract;
+  confirmation?: ResultSignalContract;
   resumeSessionId?: string;
 };
 

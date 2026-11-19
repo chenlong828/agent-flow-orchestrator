@@ -1,4 +1,4 @@
-import type { ResultSignalContract, SkillSet, TaskEnvelope, TaskError, TaskSnapshot } from "./types.ts";
+import type { SkillSet, TaskEnvelope, TaskError, TaskSignalBundle, TaskSnapshot } from "./types.ts";
 import type { TaskRow } from "./store.ts";
 
 export function toIso(value: Date | string): string {
@@ -14,14 +14,19 @@ function errorOf(row: TaskRow): TaskError | null {
   return typeof row.error === "string" ? (JSON.parse(row.error) as TaskError) : row.error;
 }
 
-function resultSignalOf(row: TaskRow): ResultSignalContract | undefined {
-  if (row.result_signal === null) return undefined;
-  return typeof row.result_signal === "string"
-    ? (JSON.parse(row.result_signal) as ResultSignalContract)
-    : (row.result_signal as ResultSignalContract);
+function signalBundleOf(row: TaskRow): TaskSignalBundle {
+  if (row.result_signal === null) return {};
+  const value = typeof row.result_signal === "string"
+    ? (JSON.parse(row.result_signal) as TaskSignalBundle)
+    : (row.result_signal as TaskSignalBundle);
+  return {
+    ...(value.resultSignal === undefined ? {} : { resultSignal: value.resultSignal }),
+    ...(value.confirmation === undefined ? {} : { confirmation: value.confirmation }),
+  };
 }
 
 export function envelope(row: TaskRow): TaskEnvelope {
+  const signals = signalBundleOf(row);
   return {
     taskId: row.id,
     instanceId: row.instance_id,
@@ -32,7 +37,8 @@ export function envelope(row: TaskRow): TaskEnvelope {
     taskSpacePath: row.task_space_path,
     timeoutMs: row.timeout_ms,
     skillSet: skillSetOf(row),
-    ...(resultSignalOf(row) === undefined ? {} : { resultSignal: resultSignalOf(row) }),
+    ...(signals.resultSignal === undefined ? {} : { resultSignal: signals.resultSignal }),
+    ...(signals.confirmation === undefined ? {} : { confirmation: signals.confirmation }),
     ...(row.resume_session_id === null ? {} : { resumeSessionId: row.resume_session_id }),
   };
 }
