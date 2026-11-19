@@ -1,14 +1,16 @@
 ---
 name: "scenario-verify"
 description: "按场景卡里的 3 正 1 反例子逐条验证当前实现：锁定场景、建逐例清单、缺测试补 Tests/、分层执行（组件测试 + 必要冒烟）、逐例留证据，产出 test.md 与 evidence/。触发：测试节点、场景验收、回归"
-version: "v1.4"
+version: "v1.5"
 ---
 
 # 用途
 
 测试节点使用。验证单元是**场景卡里的例子**，不是「再跑一遍全量套件」。输出一份逐例对照表，让后续的实现鉴定能按证据判断实现是否走完。
 
-输入：场景卡（本次改动对应的 SCN，见 `doc/design/scenarios/`）、`intent.md`、`dev.md`、组件规格。
+输入：场景卡（本次改动对应的 SCN，见 `doc/design/scenarios/`）、`intent.md`、`dev.md`、对应组件 spec。
+
+正例/反例都按场景卡的可观察结果与对应 spec 的行为/边界断言；spec 只给方向时，以场景卡为准。
 输出：`task-space/test.md`（逐例对照表 + 回归结果 + 未覆盖/阻塞项）与 `task-space/evidence/`（命令输出、断言片段）。
 
 ## 步骤
