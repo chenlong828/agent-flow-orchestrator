@@ -1,7 +1,7 @@
 ---
 name: "auto-confirm"
-description: "无人值守确认：普通决策按推荐/默认自动确认并记录「未经人工」；严重场景（契约变更、规则突破、不可逆/外部副作用、用户意图冲突）调用 mcp__agentflow__confirm 请求人工确认，任务暂停，收到 [人工确认] 后按意见继续；不伪造人工确认。所有 AF 节点共享。触发：需要拍板、待确认、默认值、无人值守、人工确认、应急确认"
-version: "v1.2"
+description: "无人值守确认：普通决策按推荐/默认自动确认并记录「未经人工」；严重场景（契约变更、规则突破、不可逆/外部副作用、P0/P1、用户意图冲突、关键信息缺失）调用 mcp__agentflow__confirm 请求人工确认，任务暂停，收到 [人工确认] 后按意见继续；评审节点仅可澄清已 accepted 口径，不得把评审判断交给人；不伪造人工确认。所有 AF 节点共享。触发：需要拍板、待确认、默认值、无人值守、人工确认、应急确认"
+version: "v1.3"
 ---
 
 # 用途
@@ -78,9 +78,15 @@ AF 默认**无人值守**，但不是"所有事都自动拍板"。本技能把�
 
 ## 5 与评审/确认节点的关系
 
-- `review`/`confirm` 节点按各自机制（verdict / confirm 节点）；`mcp__agentflow__confirm` 用于 `agent` 节点。
+- `confirm` 节点按节点机制等待 `pass`/`reject`；`agent` 节点用 `resultSignal=confirmation_request` 的 `mcp__agentflow__confirm`。
+- `review` 节点同时挂 `signal` 与 `confirm` 两个工具：**只允许**在「必须澄清已 accepted 需求/契约口径，且该口径直接决定 verdict」时呼人；评审判断本身不外包。
+- 评审确认的边界：
+  - 允许：已 accepted 卡有两种合理解读且直接改变 verdict；设计与上游 accepted 卡冲突、需要人定哪边权威；证据只能由人提供且缺它无法判定。
+  - 禁止：问「这个方案好不好」「该 pass 还是 fail」；用 confirm 代替 verdict、代替证据、代替回退；同一问题重复问；一次访问超过 1 个问题。
+  - `pass`/`reject` 都只作评审输入，不是 verdict；回答后评审仍须自行调用 `mcp__agentflow__signal` 提交 `review_verdict`。
+  - 无答复时 run 保持 `waiting_confirm`，不自动 pass；取消后评审不写「已通过」。
 - 评审不是人工确认的替代；评审 `pass` 不代表契约变更已获人同意。
-- 评审发现"需要人确认的契约问题"，按 `fail` 回退，由上游 agent 在下一轮用 §3 提问；评审不代写确认。
+- 评审无法确认的契约问题仍可按 `fail` 回退，由上游 agent 在下一轮用 §3 提问。
 - 默认确认与人工确认都不得写成「发起人确认」。
 
 ## 6 记录格式

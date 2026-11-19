@@ -1,7 +1,7 @@
 ---
 name: "review-verdict"
-description: "审核判定：核验 task-space 产物并通过 MCP 信号提交 verdict（pass/fail）；不再使用最终消息 JSON。触发：review 节点、审核、准出、判定"
-version: "v1.10"
+description: "审核判定：核验 task-space 产物并通过 MCP 信号提交 verdict（pass/fail）；必要时可用确认通道澄清已 accepted 口径，但不得把评审判断交给人。触发：review 节点、审核、准出、判定、口径澄清"
+version: "v1.11"
 ---
 
 # 用途
@@ -20,6 +20,22 @@ version: "v1.10"
    - `reason`：通过依据或可执行的回退理由
    - `evidence`：证据列表（文件/命令/测试结果，可选）
    - 参数错误时按工具返回的错误修正后重试；不要在正文里另写一份 verdict。
+
+## 应急呼人（确认通道）
+
+评审节点同时挂 `mcp__agentflow__signal` 与 `mcp__agentflow__confirm`。只有在以下情形才调用 confirm：
+
+- 已 accepted 需求/契约口径在文档里有两种合理解读，且选择直接改变 verdict；
+- 设计/产物与上游 accepted 卡冲突，需要人确认哪边权威；
+- 证据只能由人提供（例如「这个改动是否已获业务方同意」），缺它无法判定。
+
+调用规则：
+
+- 一次一个问题；`question` 短，`context` 写清现状、为什么现在必须决定、选项、推荐、影响、不回答的后果；
+- 不要问「这个方案好不好」「该 pass 还是 fail」；不要用 confirm 代替 verdict、证据或回退；
+- 人答复后任务用同一 session 续跑并注入 `[人工确认]`；把答复当输入，仍自行判断并提交 `review_verdict`；
+- 无答复时保持等待，不自动 pass；取消后不写「已通过」；
+- 每个 review 访问最多问 1 次；同一问题不重复问。
 
 ## 评审顺序
 
@@ -46,6 +62,7 @@ version: "v1.10"
 - `verdict` 用了 `passed`/`ok`/`true` 之类的值；工具会拒绝，按错误修正。
 - 为了推进流程默认给 pass，却没有证据。
 - 用「证据不够」判 fail，却指不出任务出口/场景卡的哪一条，或要求卡外的更高层级证据。
+- 把评审判断交给 confirm 决定：confirm 只用于澄清口径/事实，verdict 仍由评审自己提交。
 - 二轮评审重建整套探针；只应复核 delta 与最小复核集。
 - 把上一轮 `review.md` 覆盖掉，丢失为什么退。
 - 在自造契约内判 fail，让设计去修一个用户没要求的边界。
