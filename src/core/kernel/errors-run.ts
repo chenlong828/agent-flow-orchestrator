@@ -14,6 +14,22 @@ export class RunConflictError extends AppError {
   }
 }
 
+/** 启动带初始资料，但 client 未声明 `run-inputs` 能力；不建 run。 */
+export class ClientUnsupportedError extends AppError {
+  constructor(capability: string, reason: "client_not_seen" | "capability_missing") {
+    super("client_unsupported", "执行节点不支持该能力", {
+      details: { capability, reason },
+    });
+  }
+}
+
+/** run 初始资料不存在、不属于该 run，或尚未绑定。 */
+export class InputNotFoundError extends AppError {
+  constructor(inputId: string) {
+    super("input_not_found", "初始资料不存在", { details: { inputId } });
+  }
+}
+
 /** 结果到达时该 taskId+attempt 没有会话日志；任务不结算、不重派。 */
 export class SessionLogMissingError extends AppError {
   constructor(taskId: string, attempt: number) {

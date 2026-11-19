@@ -12,7 +12,7 @@ info:
     `spec.md` 是契约权威版本；若两者冲突，以 `spec.md` 为准。
 
     通用约定：
-    - `x-api-count` 统计产品业务端点（61 个），不含 `/healthz`；本文件共 62 个 operation、45 个 path。
+    - `x-api-count` 统计产品业务端点（65 个），不含 `/healthz`；本文件共 66 个 operation、49 个 path。
     - 请求/响应为 `application/json; charset=utf-8`；ID 为 UUIDv7；时间为 ISO-8601 UTC。
     - 列表响应为 `{items,total,limit,offset}`；`limit` 默认 50、上限 200。
     - 启停、删除、专家装配、工作流保存定义、已有 Skill 草稿保存需带 `If-Match: "<revision>"`；缺少为 428，旧版本为 409。工作流复制/导入/校验不需要 `If-Match`。
@@ -20,7 +20,7 @@ info:
     - 无登录/鉴权；`X-Actor` 仅用于显示，不是身份。请求可带 `X-Request-Id`，响应可回显。无 CORS 配置。
   x-source-spec: docs/design/components/http-gateway/spec.md
   x-contract-status: current
-  x-api-count: 61
+  x-api-count: 65
   license:
     name: Internal use only
   x-runtime-asset: true
@@ -2022,6 +2022,152 @@ paths:
                 format: binary
         '400':
           "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/run-inputs":
+    parameters:
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    post:
+      tags:
+      - Run
+      summary: API-57 暂存初始资料
+      operationId: uploadRunInput
+      x-api-id: API-57
+      x-component-method: run.stageInput
+      description: 上传单张图片为暂存初始资料；启动时用 inputId 绑定到 run。只支持 PNG/JPEG/WebP/GIF。
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 单个图片文件；服务端按魔数校验类型。
+      responses:
+        '201':
+          description: 暂存成功。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RunInputView"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '413':
+          "$ref": "#/components/responses/PayloadTooLarge"
+        '415':
+          "$ref": "#/components/responses/UnsupportedMediaType"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/run-inputs/{inputId}":
+    parameters:
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    - name: inputId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    delete:
+      tags:
+      - Run
+      summary: API-58 删除暂存初始资料
+      operationId: deleteRunInput
+      x-api-id: API-58
+      x-component-method: run.deleteStagedInput
+      description: 只允许删除尚未绑定的暂存项；已绑定返回 409。
+      responses:
+        '204':
+          description: 已删除。
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/runs/{id}/inputs":
+    parameters:
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    - "$ref": "#/components/parameters/Id"
+    get:
+      tags:
+      - Run
+      summary: API-55 列出运行初始资料
+      operationId: listRunInputs
+      x-api-id: API-55
+      x-component-method: run.listInputs
+      description: 列出已绑定到该 run 的图片；无图片返回空数组。
+      responses:
+        '200':
+          description: 初始资料列表。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RunInputList"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/runs/{id}/inputs/{inputId}/content":
+    parameters:
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    - "$ref": "#/components/parameters/Id"
+    - name: inputId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Run
+      summary: API-56 读取运行初始资料
+      operationId: getRunInputContent
+      x-api-id: API-56
+      x-component-method: run.readInput
+      description: 返回图片原图；响应头带校验摘要与 no-store。
+      responses:
+        '200':
+          description: 图片字节。
+          headers:
+            X-Checksum-Sha256:
+              schema:
+                type: string
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
         '404':
           "$ref": "#/components/responses/NotFound"
         '500':
@@ -4210,6 +4356,59 @@ components:
           type: string
           description: 面向排障的错误说明。
       description: 运行或节点错误摘要。
+    RunInputRef:
+      type: object
+      required:
+      - inputId
+      properties:
+        inputId:
+          type: string
+          format: uuid
+          description: 暂存初始资料 ID。
+      description: 启动请求引用的暂存初始资料。
+    RunInputView:
+      type: object
+      required:
+      - inputId
+      - name
+      - mediaType
+      - sizeBytes
+      - sha256
+      - createdAt
+      properties:
+        inputId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: 服务端清洗后的 task-space 文件名。
+        mediaType:
+          type: string
+          enum:
+          - image/png
+          - image/jpeg
+          - image/webp
+          - image/gif
+        sizeBytes:
+          type: integer
+          minimum: 1
+        sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        createdAt:
+          type: string
+          format: date-time
+      description: 已绑定的运行初始资料。
+    RunInputList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/RunInputView"
+      description: 运行初始资料列表。
     RunStartRequest:
       type: object
       required:
@@ -4231,6 +4430,12 @@ components:
           type: boolean
           default: false
           description: 为 true 时 confirm 节点自动通过，仅用于开发与联调。
+        inputs:
+          type: array
+          maxItems: 8
+          description: 已暂存的初始资料；顺序即 task-space 内的 position。
+          items:
+            "$ref": "#/components/schemas/RunInputRef"
       description: 启动运行请求。
     RunStartResult:
       type: object

@@ -43,9 +43,13 @@ procedure: 2026-11-19-run-start-images
 |---|---|---|---|---|
 | `T-IMG-01` | research | run / client / ui | 完成 | 现状盘点与证据（本文件 §2、proposal §2） |
 | `T-IMG-02` | design | run / client / ui | 完成 | 方案、契约草案、落点与测试（proposal） |
-| `T-IMG-03` | review | — | 完成（2026-11-19） | 用户裁决：client 支持并补模型 `input`；粘贴即上传；只支持图片 |
+| `T-IMG-03` | review | — | 完成（2026-11-19） | 用户裁决：client 支持并补模型 `input`；只支持图片；UI 实施时把上传时机改为提交时上传 |
 | `T-IMG-04` | design | ui | 完成 | 给 `agent-flow-ui` 的交互提案：[`ui-proposal.md`](ui-proposal.md) |
 | `T-IMG-05` | intake | — | 完成（2026-11-19） | 建 [`REQ-0003`](../../requirements/REQ-0003-run-start-image-inputs.md)；后续做 P1 设计冻结与实现工序拆分 |
+| `T-IMG-06` | design | client | 完成 | 给 `agent-flow-client` 的实现提案：[`client-proposal.md`](client-proposal.md) |
+| `T-IMG-07` | verify | client | 完成（2026-11-19） | client 已实现并经 285 项测试/读图探针验证；见 [client result](../../../../agent-flow-client/docs/works/2026-11-19-run-start-inputs/result.md) |
+| `T-IMG-08` | change | run / gateway | 完成（2026-11-19） | 编排侧 `EXE-06/07`、暂存上传/绑定、prompt 清单、`run_input` 与测试；451 测试通过 |
+| `T-IMG-09` | verify | run / client / ui | 待定 | 真实 client + UI 的端到端联调（上传→启动→client 落盘→read_image→归档） |
 
 ## 5 已读
 
@@ -60,8 +64,9 @@ procedure: 2026-11-19-run-start-images
 | 问题 | 结论 |
 |---|---|
 | client 是否支持图片 | **支持**；必须补 pi-ai 模型条目的 `input: ["text","image"]`，并用真实 `read_image` 复验 |
-| 上传形态 | **粘贴即上传**：`POST /run-inputs` 逐张暂存，启动引用 `inputId`；不采用启动请求 multipart |
+| 上传形态 | **提交时上传**：点「发起运行」后逐张 `POST /run-inputs`，全部成功再启动；服务端仍只认 `inputId`。UI 2026-11-19 实施修订，取代旧「粘贴即上传」 |
 | 首期范围 | **只支持图片**（PNG/JPEG/WebP/GIF），不做 PDF/文本等通用文件 |
-| UI 提案 | 由本仓库出 [`ui-proposal.md`](ui-proposal.md)，UI 项目按其立项实现 |
+| UI 提案/实现 | 本仓库出 [`ui-proposal.md`](ui-proposal.md)；UI 已实现（提交时上传），见 [UI result](../../../../agent-flow-ui/docs/history/works/2026-11-19-run-start-images/result.md) |
+| client 提案 | 由本仓库出 [`client-proposal.md`](client-proposal.md)，client 项目按其立项实现 |
 
-尚未定：上限（8 张 / 8 MiB / 20 MiB）、运行详情缩略图、暂存 TTL（建议 24 h）。见 [`proposal.md`](proposal.md) §11.2。
+设计冻结（2026-11-19）：上限 8 张 / 单张 8 MiB / 合计 20 MiB；运行详情带缩略图；暂存**不设 TTL**。见 [`proposal.md`](proposal.md) §11。

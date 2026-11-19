@@ -7,7 +7,7 @@ import { closeTestDb, resetBusinessData } from "../../helpers/test-db.ts";
 import { createTestContext, type TestContext } from "../../helpers/app.ts";
 import { createFileStore, systemClock, uuidv7Ids } from "../../../src/core/platform/index.ts";
 import { createRunService } from "../../../src/components/run/index.ts";
-import type { SchedulerService } from "../../../src/components/scheduler/index.ts";
+import type { SchedulerHandle } from "../../../src/components/scheduler/index.ts";
 import type { EnqueueInput, TaskResult } from "../../../src/components/scheduler/types.ts";
 import type { WorkflowGraph } from "../../../src/components/workflow/index.ts";
 
@@ -63,7 +63,12 @@ function graphConfirm(expertId: string): WorkflowGraph {
   };
 }
 
-function fakeScheduler(): SchedulerService & {
+type FakeSchedulerOptions = {
+  capabilities?: string[];
+  lastPollAt?: string | null;
+};
+
+function fakeScheduler(options: FakeSchedulerOptions = {}): SchedulerHandle & {
   cancelled: string[];
   enqueued: EnqueueInput[];
   resumed: { taskId: string; sessionId: string }[];
@@ -128,7 +133,15 @@ function fakeScheduler(): SchedulerService & {
     },
     poll: async () => ({ tasks: [], stop: false, cancelInstances: [], nextPollAfterMs: 0 }),
     requestStop: async () => {},
-  } as unknown as SchedulerService & {
+    presence: async (clientIds: string[]) =>
+      clientIds.map((clientId) => ({
+        clientId,
+        lastPollAt: options.lastPollAt === undefined ? new Date().toISOString() : options.lastPollAt,
+        free: null,
+        running: 0,
+        capabilities: options.capabilities ?? ["run-inputs"],
+      })),
+  } as unknown as SchedulerHandle & {
     cancelled: string[];
     enqueued: EnqueueInput[];
     resumed: { taskId: string; sessionId: string }[];
@@ -139,7 +152,11 @@ function sha256(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-async function makeHarness(graphOf: (expertId: string) => WorkflowGraph, workspacePath = "/work/run") {
+async function makeHarness(
+  graphOf: (expertId: string) => WorkflowGraph,
+  workspacePath = "/work/run",
+  schedulerOptions: FakeSchedulerOptions = {},
+) {
   const expertName = `流程专家-${Math.random().toString(16).slice(2, 8)}`;
   const expert = await ctx.expertService.create({
     name: expertName,
@@ -169,7 +186,7 @@ async function makeHarness(graphOf: (expertId: string) => WorkflowGraph, workspa
   });
   const directory = await mkdtemp(join(tmpdir(), "agentflow-run-"));
   directories.push(directory);
-  const scheduler = fakeScheduler();
+  const scheduler = fakeScheduler(schedulerOptions);
   const runService = createRunService({
     db: ctx.db,
     clock: systemClock,
@@ -182,6 +199,9 @@ async function makeHarness(graphOf: (expertId: string) => WorkflowGraph, workspa
     scheduler,
     defaultTimeoutMs: 60000,
     maxNodeVisits: 5,
+    maxInputFiles: 8,
+    maxInputFileBytes: 8 * 1024 * 1024,
+    maxInputBytes: 20 * 1024 * 1024,
   });
   return {
     runService,
@@ -745,8 +765,136 @@ describe("CMP-run 归档电平（取消与超时）", () => {
       scheduler: h.scheduler,
       defaultTimeoutMs: 60000,
       maxNodeVisits: 5,
+      maxInputFiles: 8,
+      maxInputFileBytes: 8 * 1024 * 1024,
+      maxInputBytes: 20 * 1024 * 1024,
     });
     expect(await expiring.archiveRequestsFor(h.clientId)).toHaveLength(0);
     expect((await h.runService.get(run.runId)).archiveState).toBe("failed");
+  });
+});
+
+describe("CMP-run 初始资料（图片）", () => {
+  const PNG = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
+    "base64",
+  );
+
+  test("TC-RUN-022 不带图片启动：prompt 无初始资料块", async () => {
+    const h = await makeHarness(graphLinear);
+    const run = await h.runService.start({
+      workflowId: h.workflowId,
+      harnessId: h.harnessId,
+      workspacePath: "/work/inputs-none",
+      intentMarkdown: "x",
+      actor: null,
+    });
+    expect(h.scheduler.enqueued[0]!.tasks[0]!.prompt).not.toContain("[初始资料]");
+    expect(await h.runService.listInputs(run.runId)).toEqual([]);
+  });
+
+  test("TC-RUN-021 暂存、启动绑定、prompt 清单与执行面读取", async () => {
+    const h = await makeHarness(graphLinear);
+    const first = await h.runService.stageInput({ name: "界面 截图.png", mediaType: "image/png", bytes: PNG });
+    const second = await h.runService.stageInput({ name: "界面 截图.png", mediaType: "image/png", bytes: Buffer.concat([PNG, Buffer.from([0])]) });
+    expect(first.inputId).not.toBe(second.inputId);
+
+    const run = await h.runService.start({
+      workflowId: h.workflowId,
+      harnessId: h.harnessId,
+      workspacePath: "/work/inputs",
+      intentMarkdown: "按图片实现",
+      inputs: [{ inputId: first.inputId }, { inputId: second.inputId }],
+      actor: null,
+    });
+
+    const inputs = await h.runService.listInputs(run.runId);
+    expect(inputs.map((item) => item.name)).toEqual(["界面 截图.png", "界面 截图-2.png"]);
+    expect(inputs.map((item) => item.sizeBytes)).toEqual([PNG.byteLength, PNG.byteLength + 1]);
+    const prompt = h.scheduler.enqueued[0]!.tasks[0]!.prompt;
+    expect(prompt).toContain("[初始资料]");
+    expect(prompt).toContain("界面 截图.png");
+    expect(prompt).toContain("把这份清单写入 intent.md");
+
+    const executorInputs = await h.runService.listExecutorInputs(h.clientId, run.runId);
+    expect(executorInputs.map((item) => item.downloadPath)).toEqual([
+      `/runs/${run.runId}/inputs/${first.inputId}`,
+      `/runs/${run.runId}/inputs/${second.inputId}`,
+    ]);
+    const content = await h.runService.readExecutorInput(h.clientId, run.runId, first.inputId);
+    const bytes = new Uint8Array(await new Response(content.stream).arrayBuffer());
+    expect(bytes).toEqual(new Uint8Array(PNG));
+
+    await driveSucceeded(h, run.runId, 1);
+    expect(h.scheduler.enqueued[1]!.tasks[0]!.prompt).toContain("[初始资料]");
+  });
+
+  test("TC-RUN-023 已绑定项不可删除；未绑定项可删除", async () => {
+    const h = await makeHarness(graphLinear);
+    const staged = await h.runService.stageInput({ name: "a.png", mediaType: "image/png", bytes: PNG });
+    await h.runService.deleteStagedInput(staged.inputId);
+    await expect(h.runService.deleteStagedInput(staged.inputId)).rejects.toThrow();
+
+    const bound = await h.runService.stageInput({ name: "b.png", mediaType: "image/png", bytes: PNG });
+    const run = await h.runService.start({
+      workflowId: h.workflowId,
+      harnessId: h.harnessId,
+      workspacePath: "/work/inputs-bound",
+      intentMarkdown: "x",
+      inputs: [{ inputId: bound.inputId }],
+      actor: null,
+    });
+    await expect(h.runService.deleteStagedInput(bound.inputId)).rejects.toThrow();
+    expect((await h.runService.listInputs(run.runId)).map((item) => item.inputId)).toEqual([bound.inputId]);
+  });
+
+  test("TC-RUN-024 client 未声明 run-inputs 时启动被拒，暂存项保留", async () => {
+    const h = await makeHarness(graphLinear, "/work/inputs-unsupported", { lastPollAt: null });
+    const staged = await h.runService.stageInput({ name: "c.png", mediaType: "image/png", bytes: PNG });
+    await expect(
+      h.runService.start({
+        workflowId: h.workflowId,
+        harnessId: h.harnessId,
+        workspacePath: "/work/inputs-unsupported",
+        intentMarkdown: "x",
+        inputs: [{ inputId: staged.inputId }],
+        actor: null,
+      }),
+    ).rejects.toThrow();
+    await h.runService.deleteStagedInput(staged.inputId);
+  });
+
+  test("TC-RUN-025 未知或重复的 inputId 被拒且不建 run", async () => {
+    const h = await makeHarness(graphLinear);
+    const staged = await h.runService.stageInput({ name: "d.png", mediaType: "image/png", bytes: PNG });
+    await expect(
+      h.runService.start({
+        workflowId: h.workflowId,
+        harnessId: h.harnessId,
+        workspacePath: "/work/inputs-duplicate",
+        intentMarkdown: "x",
+        inputs: [{ inputId: staged.inputId }, { inputId: staged.inputId }],
+        actor: null,
+      }),
+    ).rejects.toThrow();
+    const unknown = "0191f2f0-9999-7000-8000-000000000099";
+    await expect(
+      h.runService.start({
+        workflowId: h.workflowId,
+        harnessId: h.harnessId,
+        workspacePath: "/work/inputs-unknown",
+        intentMarkdown: "x",
+        inputs: [{ inputId: unknown }],
+        actor: null,
+      }),
+    ).rejects.toThrow();
+    expect((await h.runService.list({ page: { limit: 10, offset: 0 } })).items).toHaveLength(0);
+  });
+
+  test("非图片字节被拒", async () => {
+    const h = await makeHarness(graphLinear);
+    await expect(
+      h.runService.stageInput({ name: "x.txt", mediaType: "text/plain", bytes: Buffer.from("hello") }),
+    ).rejects.toThrow();
   });
 });

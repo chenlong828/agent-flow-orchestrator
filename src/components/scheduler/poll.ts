@@ -55,7 +55,7 @@ export function createPollHandler(
     const holdMs = Number.isFinite(options?.holdMs) ? Math.max(0, options.holdMs) : 0;
 
     return waiters.singleFlight(id, async () => {
-      tracker.touch(id, report.free, report.running.length);
+      tracker.touch(id, report.free, report.running.length, options.capabilities ?? []);
       await reconcile(deps.clock.now());
       const first = await decideOnce(id, report);
       if (first.tasks.length > 0 || first.stop || holdMs === 0) return first;

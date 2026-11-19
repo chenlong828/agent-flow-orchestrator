@@ -25,12 +25,19 @@ export type PromptConfirmation = {
   options?: string[];
 };
 
+export type PromptInitialInput = {
+  name: string;
+  mediaType: string;
+  sizeBytes: number;
+};
+
 export type PromptInput = {
   node: WorkflowNode;
   expert: PromptExpert;
   taskSpacePath: string;
   entry?: PromptEntry;
   intentMarkdown?: string;
+  inputs?: PromptInitialInput[];
   confirmation?: PromptConfirmation;
 };
 
@@ -79,6 +86,16 @@ function confirmationBlock(confirmation: PromptConfirmation): string[] {
   return lines;
 }
 
+function initialInputsBlock(inputs: PromptInitialInput[], start: boolean): string[] {
+  const lines = [`[初始资料] 本次启动带 ${inputs.length} 个图片文件，位于 <task-space>/inputs/：`];
+  for (const item of inputs) {
+    lines.push(`- ${item.name}（${item.mediaType}，${item.sizeBytes} 字节）`);
+  }
+  lines.push("需要查看时用 read_image 读取上面的绝对路径；同一张图只读一次，不要凭文件名猜测内容。");
+  if (start) lines.push("把这份清单写入 intent.md 的「初始资料」一节。");
+  return lines;
+}
+
 function truncate(text: string): string {
   const chars = [...text];
   return chars.length <= ENTRY_REASON_LIMIT
@@ -107,6 +124,9 @@ export function composeNodePrompt(input: PromptInput): string {
     );
   }
   lines.push("[输出要求] 无特别要求，跟随Skill执行。");
+  if (input.inputs !== undefined && input.inputs.length > 0) {
+    lines.push(...initialInputsBlock(input.inputs, input.node.type === "start"));
+  }
   if (input.node.type === "agent") {
     lines.push(
       "[确认通道] 仅严重场景调用 mcp__agentflow__confirm：契约变更、规则突破、不可逆/外部副作用、P0/P1、用户意图冲突、关键信息缺失；普通决策按 auto-confirm §2 默认确认，不打断人。",

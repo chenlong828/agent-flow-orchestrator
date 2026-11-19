@@ -18,6 +18,12 @@ export function createRunService(deps: RunDeps): RunService {
 
   return {
     start: commands.start,
+    stageInput: commands.stageInput,
+    deleteStagedInput: commands.deleteStagedInput,
+    listInputs: runtime.listInputs,
+    readInput: runtime.readInput,
+    listExecutorInputs: runtime.listExecutorInputs,
+    readExecutorInput: runtime.readExecutorInput,
     advance: createAdvance(runtime),
     handleTaskResult: createResultHandler(runtime),
     attachSessionLog: artifacts.attachSessionLog,

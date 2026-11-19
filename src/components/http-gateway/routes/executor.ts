@@ -10,7 +10,7 @@ import {
   UnsupportedProtocolError,
   ValidationError,
 } from "../../../core/kernel/index.ts";
-import { errorResponse, json } from "../respond.ts";
+import { errorResponse, image, json } from "../respond.ts";
 import {
   POLL_FIELDS,
   RESULT_FIELDS,
@@ -19,6 +19,7 @@ import {
   readJson,
 } from "./executor-request.ts";
 import type { ExecutorDeps, ExecutorPackageRef, ExecutorTask } from "./executor-types.ts";
+import { assertUuid } from "../validation.ts";
 
 export type { ExecutorBackend, ExecutorDeps } from "./executor-types.ts";
 
@@ -120,6 +121,23 @@ function matchArchive(ctx: ExecutorContext, clientId: string): Promise<Response>
   return uploadArchive(ctx, clientId, runId);
 }
 
+function matchRunInputs(ctx: ExecutorContext, clientId: string): Promise<Response> | null {
+  if (ctx.segments[1] !== "runs" || ctx.segments[3] !== "inputs") return null;
+  if (ctx.segments.length !== 4 || ctx.request.method !== "GET") return null;
+  const runId = ctx.segments[2];
+  if (runId === undefined) return null;
+  return listRunInputs(ctx, clientId, assertUuid(runId, "runId"));
+}
+
+function matchRunInput(ctx: ExecutorContext, clientId: string): Promise<Response> | null {
+  if (ctx.segments[1] !== "runs" || ctx.segments[3] !== "inputs") return null;
+  if (ctx.segments.length !== 5 || ctx.request.method !== "GET") return null;
+  const runId = ctx.segments[2];
+  const inputId = ctx.segments[4];
+  if (runId === undefined || inputId === undefined) return null;
+  return openRunInput(ctx, clientId, assertUuid(runId, "runId"), assertUuid(inputId, "inputId"));
+}
+
 function matchSkillPackage(ctx: ExecutorContext, clientId: string): Promise<Response> | null {
   const packageId = ctx.segments[2];
   if (ctx.segments[1] !== "skill-packages" || ctx.segments.length !== 3) return null;
@@ -133,6 +151,8 @@ async function route(ctx: ExecutorContext, clientId: string): Promise<Response> 
     matchResult,
     matchSessionLog,
     matchArchive,
+    matchRunInputs,
+    matchRunInput,
     matchSkillPackage,
   ];
   for (const matcher of matchers) {
@@ -140,6 +160,35 @@ async function route(ctx: ExecutorContext, clientId: string): Promise<Response> 
     if (response !== null) return response;
   }
   throw new ValidationError("path", "执行面路径不支持");
+}
+
+async function listRunInputs(ctx: ExecutorContext, clientId: string, runId: string): Promise<Response> {
+  if (ctx.deps.backend.listRunInputs === undefined) {
+    throw new ValidationError("path", "执行面初始资料未装配");
+  }
+  return json({ items: await ctx.deps.backend.listRunInputs(clientId, runId) });
+}
+
+async function openRunInput(
+  ctx: ExecutorContext,
+  clientId: string,
+  runId: string,
+  inputId: string,
+): Promise<Response> {
+  if (ctx.deps.backend.openRunInput === undefined) {
+    throw new ValidationError("path", "执行面初始资料未装配");
+  }
+  const content = await ctx.deps.backend.openRunInput(clientId, runId, inputId);
+  return image(content);
+}
+
+function parseCapabilities(raw: string | null): string[] | undefined {
+  if (raw === null) return undefined;
+  const tokens = raw
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => /^[a-z0-9-]{1,32}$/.test(item));
+  return tokens.length === 0 ? undefined : [...new Set(tokens)];
 }
 
 function withDownloadUrl(task: ExecutorTask): ExecutorTask & { skillSet: { packages: (ExecutorPackageRef & { downloadUrl: string })[] } } {
@@ -161,8 +210,10 @@ async function poll(ctx: ExecutorContext, clientId: string): Promise<Response> {
   if (observabilityUrl !== null && observabilityUrl.length <= 2048 && /^https?:\/\//.test(observabilityUrl)) {
     await ctx.deps.backend.registerObservability?.(clientId, observabilityUrl);
   }
+  const capabilities = parseCapabilities(ctx.request.headers.get("x-executor-capabilities"));
   const decision = await ctx.deps.backend.poll(clientId, report, {
     holdMs: ctx.deps.pollHoldMs ?? POLL_HOLD_MS,
+    ...(capabilities === undefined ? {} : { capabilities }),
   });
   if (report.archivedRuns !== undefined) {
     // 归档确认只做电平确认，失败不影响本次 poll。

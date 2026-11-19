@@ -1,16 +1,18 @@
 import {
   InvalidStateError,
   NotFoundError,
+  PayloadTooLargeError,
   RunConflictError,
   ValidationError,
 } from "../../core/kernel/index.ts";
 import { isForeignKeyViolation, violationConstraint } from "../../core/platform/index.ts";
-import type { DecideInput, ResumeNodeInput, RunDetail, StartRun } from "./types.ts";
+import type { DecideInput, ResumeNodeInput, RunDetail, RunInputStaged, RunInputUpload, StartRun } from "./types.ts";
 import { advanceLocked } from "./advance.ts";
 import { assertRunnableGraph, nodeById, startNode } from "./graph-checks.ts";
 import type { RunRuntime } from "./runtime.ts";
 import { confirmationFromVerdict } from "./signals.ts";
 import { ensureAbsolutePath, taskSpaceFor } from "./validate.ts";
+import { ensureInputId } from "./inputs.ts";
 
 type CommandsDeps = {
   get(runId: string): Promise<RunDetail>;
@@ -52,6 +54,24 @@ function ensureIntent(intentMarkdown: string): void {
   }
 }
 
+async function resolveStartInputs(
+  runtime: RunRuntime,
+  clientId: string,
+  inputs: { inputId: string }[] | undefined,
+): Promise<{ inputId: string }[]> {
+  const refs = (inputs ?? []).map((ref, index) => ({
+    inputId: ensureInputId(ref.inputId, `inputs[${index}].inputId`),
+  }));
+  if (refs.length > runtime.deps.maxInputFiles) {
+    throw new PayloadTooLargeError("run_input_count", runtime.deps.maxInputFiles, refs.length);
+  }
+  if (new Set(refs.map((ref) => ref.inputId)).size !== refs.length) {
+    throw new ValidationError("inputs", "inputId 不能重复");
+  }
+  if (refs.length > 0) await runtime.ensureClientSupports(clientId);
+  return refs;
+}
+
 /** 同一秒内重复启动时追加 `-2`、`-3`；路径一旦写入 run 即冻结。 */
 async function resolveTaskSpacePath(
   runtime: RunRuntime,
@@ -79,6 +99,7 @@ async function start(input: StartRun, runtime: RunRuntime, deps: CommandsDeps): 
   const clientId = harness.clientId;
   if (clientId === null) throw new ValidationError("harnessId", "节点未绑定客户端");
   if (!harness.enabled) throw new ValidationError("harnessId", "节点已停用");
+  const inputRefs = await resolveStartInputs(runtime, clientId, input.inputs);
   const workspacePath = ensureAbsolutePath("workspacePath", input.workspacePath);
   const instance = await resolveInstance(runtime, clientId, workspacePath);
   const active = await runtime.store.findActiveByInstance(runtime.deps.db, instance.instanceId);
@@ -122,6 +143,7 @@ async function start(input: StartRun, runtime: RunRuntime, deps: CommandsDeps): 
         now,
       });
       await runtime.store.setCurrentNode(tx, runId, startNodeValue.id, now);
+      await runtime.bindForStart(tx, runId, inputRefs, now);
     });
   } catch (error) {
     // 启动窗口内工作流/Harness 被并发删除：外键兜底，映射为 404 而不是 500。
@@ -277,6 +299,8 @@ async function cancel(runId: string, runtime: RunRuntime, deps: CommandsDeps, ac
 export function createCommands(runtime: RunRuntime, deps: CommandsDeps) {
   return {
     start: (input: StartRun) => start(input, runtime, deps),
+    stageInput: (input: RunInputUpload): Promise<RunInputStaged> => runtime.stageInput(input),
+    deleteStagedInput: (inputId: string): Promise<void> => runtime.deleteStagedInput(inputId),
     decide: (input: DecideInput) => decide(input, runtime, deps),
     resumeNode: (input: ResumeNodeInput) => resumeNode(input, runtime, deps),
     cancel: (runId: string, actor?: string) => cancel(runId, runtime, deps, actor),

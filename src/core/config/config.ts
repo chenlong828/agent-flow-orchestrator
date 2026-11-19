@@ -32,6 +32,9 @@ export type Config = {
   archiveRoot: string;
   runDefaultTimeoutMs: number;
   runMaxNodeVisits: number;
+  runMaxInputFiles: number;
+  runMaxInputFileBytes: number;
+  runMaxInputBytes: number;
 };
 
 export type LoadConfigOptions = {

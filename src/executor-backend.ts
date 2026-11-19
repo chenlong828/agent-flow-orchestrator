@@ -49,5 +49,13 @@ export function createExecutorBackend(deps: {
     ackArchived: async (clientId: string, runIds: string[]) => {
       if (deps.run !== undefined) await deps.run.ackArchived(clientId, runIds);
     },
+    listRunInputs: async (clientId: string, runId: string) => {
+      if (deps.run === undefined) throw new Error("run service 未装配");
+      return deps.run.listExecutorInputs(clientId, runId);
+    },
+    openRunInput: async (clientId: string, runId: string, inputId: string) => {
+      if (deps.run === undefined) throw new Error("run service 未装配");
+      return deps.run.readExecutorInput(clientId, runId, inputId);
+    },
   };
 }

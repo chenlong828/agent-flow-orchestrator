@@ -14,6 +14,7 @@ import { handleExecutor, type ExecutorDeps } from "./routes/executor.ts";
 import { handleExpert } from "./routes/expert.ts";
 import { handleHarness } from "./routes/harness.ts";
 import { handleRun } from "./routes/run.ts";
+import { handleRunInputs } from "./routes/run-inputs.ts";
 import { handleSkillDrafts } from "./routes/skill-drafts.ts";
 import { handleSkills } from "./routes/skills.ts";
 import { handleTool } from "./routes/tool.ts";
@@ -184,6 +185,8 @@ function dispatch(
       return handleWorkflow(ctx);
     case "runs":
       return handleRun(ctx);
+    case "run-inputs":
+      return handleRunInputs(ctx);
     default:
       throw new NotFoundError("路径", path);
   }

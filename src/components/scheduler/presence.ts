@@ -8,23 +8,25 @@ export type Presence = {
   free: number | null;
   running: number;
   stopRequested: boolean;
+  capabilities: string[];
 };
 
 export type PresenceTracker = ReturnType<typeof createPresenceTracker>;
 
-const IDLE: Presence = { lastPollAt: null, free: null, running: 0, stopRequested: false };
+const IDLE: Presence = { lastPollAt: null, free: null, running: 0, stopRequested: false, capabilities: [] };
 
 export function createPresenceTracker(waiters: Waiters, clock: Clock) {
   const map = new Map<string, Presence>();
 
   return {
-    touch(clientId: string, free: number, running: number): Presence {
+    touch(clientId: string, free: number, running: number, capabilities: string[] = []): Presence {
       const previous = map.get(clientId) ?? IDLE;
       const next: Presence = {
         lastPollAt: clock.now(),
         free,
         running,
         stopRequested: previous.stopRequested,
+        capabilities,
       };
       map.set(clientId, next);
       return next;
@@ -53,6 +55,7 @@ export function createPresenceTracker(waiters: Waiters, clock: Clock) {
           lastPollAt: seen?.lastPollAt == null ? null : toIso(seen.lastPollAt),
           free: seen?.free ?? null,
           running: seen?.running ?? 0,
+          capabilities: seen?.capabilities ?? [],
         };
       });
     },

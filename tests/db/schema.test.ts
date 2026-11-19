@@ -26,6 +26,7 @@ const BUSINESS_TABLES = [
   "workflow_run",
   "run_node",
   "run_artifact",
+  "run_input",
 ];
 
 beforeAll(async () => {
@@ -37,7 +38,7 @@ afterAll(async () => {
 });
 
 describe("数据库结构", () => {
-  test("业务表恰好 22 张，另有 schema_migrations", async () => {
+  test("业务表恰好 23 张，另有 schema_migrations", async () => {
     const rows = await db.query<{ table_name: string }>(
       `select table_name from information_schema.tables
        where table_schema = 'public' and table_type = 'BASE TABLE'
@@ -47,7 +48,7 @@ describe("数据库结构", () => {
     expect(names).toEqual([...BUSINESS_TABLES, "schema_migrations"].sort());
   });
 
-  test("13 个迁移按顺序记录，分类参考数据为 6 条", async () => {
+  test("14 个迁移按顺序记录，分类参考数据为 6 条", async () => {
     const migrations = await db.query<{ version: string }>(
       "select version from schema_migrations order by version",
     );
@@ -65,6 +66,7 @@ describe("数据库结构", () => {
       "0011_task_signal_continuation.sql",
       "0012_run_timeout_resume.sql",
       "0013_run_asset_snapshot.sql",
+      "0014_run_input.sql",
     ]);
 
     const categories = await db.query<{ code: string; position: number }>(

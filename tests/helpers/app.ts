@@ -103,6 +103,9 @@ export async function createTestContext(
     scheduler,
     defaultTimeoutMs: 60000,
     maxNodeVisits: 5,
+    maxInputFiles: 8,
+    maxInputFileBytes: 8 * 1024 * 1024,
+    maxInputBytes: 20 * 1024 * 1024,
   });
   const catalog = createCatalog({
     harnessRead,

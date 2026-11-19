@@ -710,7 +710,7 @@ describe("节点门禁与观测", () => {
     });
 
     expect(await ctx.scheduler.presence([clientId])).toEqual([
-      { clientId, lastPollAt: null, free: null, running: 0 },
+      { clientId, lastPollAt: null, free: null, running: 0, capabilities: [] },
     ]);
     const decision = await poll(ctx.scheduler, clientId, 2);
     const view = (await ctx.scheduler.presence([clientId]))[0]!;

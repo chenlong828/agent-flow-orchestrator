@@ -33,7 +33,7 @@ updated: 2026-11-11
 |---|---|
 | `Task` | 任务列表条目：`taskId`、`instanceId`、`nodeId`、`attempt`、`state`、不可变快照（`prompt`/`workspacePath`/`taskSpacePath`/`timeoutMs`/`skillSet`/`resultSignal`/`confirmation`）、`resumeSessionId`、`outcome`、`error`、`notBefore`、`dispatchedAt`、`cancelRequestedAt`、`finishedAt`、审计字段 |
 | `TaskAttempt` | 每次下发与结算的事实流水（追加写）：`taskId`、`attempt`、`clientId`、`dispatchedAt`、`settledAt`、`result` 摘要。用于对账、排障与「未确认重发」判定，不作为第二真相 |
-| `ClientPresence` | 判活与电平控制：`clientId`、`lastPollAt`、`stopRequested`、`cancelRequestedAt`（按实例去重）。进程内状态可重建，落库仅为重启后对账 |
+| `ClientPresence` | 判活与电平控制：`clientId`、`lastPollAt`、`free`、`running`、`capabilities`（最近 poll 头声明）、`stopRequested`、`cancelRequestedAt`（按实例去重）。进程内状态可重建，落库仅为重启后对账 |
 
 不变量：
 
@@ -145,6 +145,7 @@ type ClientPresenceView = {
   lastPollAt: string | null;   // 最近一次 poll；从未 poll 为 null
   free: number | null;         // 最近一次上报的可用槽位
   running: number;             // 当前在跑任务数（dispatched 未结算）
+  capabilities: string[];      // 最近一次 poll 声明的能力；旧 client 为 []
 };
 
 type TaskSnapshot = {
@@ -200,13 +201,13 @@ type SchedulerPresenceRead = {
 |---|---|---|---|---|---|
 | `enqueue` | 冻结快照并入队 | `EnqueueInput`、可选 `EnqueueOptions.tx` | `EnqueueResult`（含 `clientIds`） | `ValidationError`、`PayloadTooLargeError`、`NotFoundError`（实例未登记）、`DatabaseUnavailableError` | 一批一个事务；同批同实例的 `skillIds` 投影不一致、或与该实例已下发未结算任务的 digest 不一致 → 整批拒绝。传 `tx` 时插入加入调用方事务且**不唤醒**，由调用方提交后 `notifyClient` |
 | `notifyClient` | 唤醒指定 client 的长轮询 | `clientId` | `void` | `ValidationError`（clientId 非法） | 进程内唤醒，无持久化 |
-| `poll` | 派发与对账 | `clientId`、`ClientReport`、`PollOptions` | `DispatchDecision` | `ValidationError`、`DatabaseUnavailableError` | 同 `clientId` 串行（单飞）；派发预留与任务状态同事务 |
+| `poll` | 派发与对账 | `clientId`、`ClientReport`、`PollOptions`（含 `capabilities?`） | `DispatchDecision` | `ValidationError`、`DatabaseUnavailableError` | 同 `clientId` 串行（单飞）；派发预留与任务状态同事务；把能力头记入 presence |
 | `acceptResult` | 接受结果并结算 | `clientId`、`TaskResult` | `ResultAck` | `TaskNotFoundError`、`ValidationError`、`DatabaseUnavailableError` | 单事务；首份为准，后到只回 `accepted=false`；已结算 attempt 的迟到结果同样 `accepted=false` |
 | `resumeTask` | 人工重开超时任务 | `clientId`、`taskId`、`resumeSessionId` | `TaskSnapshot` | `TaskNotFoundError`、`InvalidStateError`（非 done(timeout) 或非本 client）、`ValidationError`（sessionId 长度） | 单事务；同一任务 `attempt+1`、`resume_session_id` 写入；幂等：已 queued/dispatched 且 session 相同直接返回 |
 | `requestStop` | 置位停止电平 | `clientId` | `void` | 无 | 幂等 |
 | `cancelInstances` | 取消实例任务 | `instanceIds` | `{requested}` | `ValidationError` | 幂等；按实例去重 |
 | `inspect` | 读任务快照 | `taskId` | `TaskSnapshot` | `TaskNotFoundError` | 只读 |
-| `presence` | 读 client 观测 | `clientIds[]` | `ClientPresenceView[]` | `DatabaseUnavailableError` | 只读；未观测过的 client 返回 `lastPollAt=null`、`free=null`、`running=0` |
+| `presence` | 读 client 观测 | `clientIds[]` | `ClientPresenceView[]` | `DatabaseUnavailableError` | 只读；未观测过的 client 返回 `lastPollAt=null`、`free=null`、`running=0`、`capabilities=[]` |
 
 - 错误类型定义在 [`CMP-kernel`](../kernel/spec.md)；`TaskNotFoundError` 对应 `404 task_not_found`，与「任务不存在」同义，用于 `P-02` 与未知 `taskId`。
 - `enqueue` 与 `poll` 的入参使用领域类型，不出现 HTTP 头、协议版本或 DTO 字段名；`CMP-http-gateway` 负责映射。

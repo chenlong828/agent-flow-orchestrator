@@ -116,7 +116,7 @@ updated: 2026-11-12
 
 ## 4 端点总表
 
-61 个已实现的产品业务端点，`openapi.yaml` 的 `x-api-count` 为 61。`/healthz` 单独列在 §4.2；执行面 5 个已实现端点见 §4.3，不计入产品业务端点；开发者文档端点见 §4.4，不计入业务端点。
+65 个已实现的产品业务端点，`openapi.yaml` 的 `x-api-count` 为 65。`/healthz` 单独列在 §4.2；执行面 7 个已实现端点见 §4.3，不计入产品业务端点；开发者文档端点见 §4.4，不计入业务端点。
 
 ### 4.1 业务端点
 
@@ -177,7 +177,7 @@ updated: 2026-11-12
 
 | ID | 方法 | 路径 | 用途 | 成功 |
 |---|---|---|---|---|
-| `API-42` | POST | `/workflows/{id}/runs` | 启动 run：校验可运行、登记/复用实例、冻结图快照、推进首节点 | 201 `{runId}` + Location |
+| `API-42` | POST | `/workflows/{id}/runs` | 启动 run：校验可运行、校验 client 能力、绑定暂存初始资料、登记/复用实例、冻结图快照、推进首节点 | 201 `{runId}` + Location |
 | `API-43` | GET | `/runs/{id}` | run 详情（状态、当前节点、节点列表、归档状态） | 200 `RunDetail` |
 | `API-44` | GET | `/runs` | run 列表；按 `workflowId`、`state` 过滤 | 200 `Page<RunSummary>` |
 | `API-45` | POST | `/runs/{id}/cancel` | 取消 run；幂等 | 200 `RunDetail` |
@@ -190,9 +190,14 @@ updated: 2026-11-12
 | `API-52` | GET | `/runs/{id}/nodes/{nodeId}/session/events/stream` | 代理 client O-11 富事件 SSE | 200 `text/event-stream` |
 | `API-53` | GET | `/runs/{id}/nodes/{nodeId}/session/raw` | 代理 client raw（zstd） | 200 `application/zstd` |
 | `API-54` | POST | `/runs/{id}/nodes/{nodeId}/resume` | `waiting_resume` 节点继续跑：同一 task 重开 attempt，写 `resumeSessionId` | 200 `RunDetail` |
+| `API-55` | GET | `/runs/{id}/inputs` | 列出 run 的图片初始资料 | 200 `{items: RunInputView[]}` |
+| `API-56` | GET | `/runs/{id}/inputs/{inputId}/content` | 读取初始资料原图 | 200 二进制 |
+| `API-57` | POST | `/run-inputs` | 暂存单张图片（multipart，字段 `file`） | 201 `RunInputView` |
+| `API-58` | DELETE | `/run-inputs/{inputId}` | 删除未绑定的暂存项 | 204 |
 
 - 错误映射：工作流/harness/run/节点不存在 → `404`；图含 `split`/`fanout`、字段非法 → `400`（`unsupported_node_type` / `validation_error`）；同工作区已有活跃 run → `409 run_conflict`；实例登记冲突 → `409 binding_conflict`；决策时节点不在 `waiting_confirm`、续跑时节点不在 `waiting_resume` → `409 invalid_state`；会话日志不存在 → `404 not_found`。
-- `API-42` 的 `intentMarkdown` 上限 256 KiB，超出 `400 validation_error`（`details.field=intent`）。
+- `API-42` 的 `intentMarkdown` 上限 256 KiB，超出 `400 validation_error`（`details.field=intent`）；`inputs` 0–8 项，引用 `staged` 且未过期的 `inputId`。
+- `API-57` 只接受 multipart 单文件，按魔数校验 PNG/JPEG/WebP/GIF；暂存不设 TTL，`API-58` 或启动绑定才消失。`API-58` 对已绑定项返回 `409 invalid_state`。`API-55/56` 只返回 `state=bound` 的项。
 - `API-47` 的 `visit`、`attempt` 为可选查询参数，缺省分别取该节点最大 `visit` 与该行最大 `attempt`；响应头带 `Content-Length` 与 `X-Checksum-Sha256`。
 - `API-48`–`API-53` 是 client 观测面的产品代理：消费 `client-observability-v1` 的 `O-06`–`O-11`，内部用 `O-02` 按 taskId 反查运行中 sessionId（不代理 attempt）；session/事件/SSE 响应不包含 client `sessionId`/`attemptId`。文件沿用 client 2000 条 / 1 MiB 截断并以 `truncated` 表达。
 
@@ -213,10 +218,13 @@ updated: 2026-11-12
 | `EXE-03` | GET | `/api/v1/executor/skill-packages/{packageId}` | 取技能包 | 200 zip / 304 |
 | `EXE-04` | POST | `/api/v1/executor/tasks/{taskId}/session-log?attempt=n` | 上传会话日志（gzip JSONL） | 200 `{taskId,attempt,bytes,sha256}` |
 | `EXE-05` | POST | `/api/v1/executor/runs/{runId}/archive` | 上传运行归档（tar.gz） | 200 `{runId,bytes,sha256}` |
+| `EXE-06` | GET | `/api/v1/executor/runs/{runId}/inputs` | 列出 run 已绑定初始资料 | 200 `{items}` |
+| `EXE-07` | GET | `/api/v1/executor/runs/{runId}/inputs/{inputId}` | 下载单张初始资料 | 200 二进制 |
 
-- `EXE-01`–`EXE-05` 均已实现，按 [`executor-http-v3`](../../contracts/executor-http-v3.md) 运行；client 侧 v3 实现与联调另立工序（`T-RUN-09`）。
-- 五个端点都不计入产品业务端点计数，也不写入 `openapi.yaml` 的产品 `paths`；它们由 `CMP-http-gateway` 的 `executor` 路由实现：`poll` 调 `CMP-scheduler`，`result` 先经 `CMP-run`（有 run 归属时）再调调度器，`skill-packages` 调 `SkillPackageSource`，`session-log`/`archive` 调 `CMP-run`。
+- `EXE-01`–`EXE-07` 均已实现，按 [`executor-http-v3`](../../contracts/executor-http-v3.md) 运行；client 侧 v3 实现与联调见 client 仓库。
+- 七个端点都不计入产品业务端点计数，也不写入 `openapi.yaml` 的产品 `paths`；它们由 `CMP-http-gateway` 的 `executor` 路由实现：`poll` 调 `CMP-scheduler`，`result` 先经 `CMP-run`（有 run 归属时）再调调度器，`skill-packages` 调 `SkillPackageSource`，`session-log`/`archive`/`inputs` 调 `CMP-run`。
 - 鉴权：`Authorization: Bearer <token>`，token → `clientId` 由 `CMP-harness` 的 `ExecutorAuthenticator` 在 `harness.client_token` 上解析；**产品端点不受影响**，仍无鉴权。
+- poll 可选头 `X-Executor-Capabilities: <逗号分隔 token>`；当前唯一 token 为 `run-inputs`，服务端只读 poll 并记入 presence。旧 client 不发、旧服务端忽略。
 - **开发期身份旁路**（`EXECUTOR_AUTH=off`，2026-11-12）：允许 `X-Client-Id: <1–64 个非空白字符>` 直接声明 `clientId`，可选 `X-Client-Address: <1–200 字符>`。解析顺序：能命中的 Bearer 优先，其次身份头，都没有 → `401 unauthorized`。身份来自头且节点不存在时调 `CMP-harness.ensureNode` 自动登记（详见 [`harness/spec.md`](../harness/spec.md) §3.4）；自动登记失败按 §3.3 映射（形状非法 `400`，库不可用 `503`）。`EXECUTOR_AUTH=on` 时身份头被忽略，行为与本节原语义一致。
 - 版本闸门：契约现行版本为 `3`，`X-Executor-Protocol` 必须精确等于 `3`；缺失或不等 → `400 unsupported_protocol`，不进入调度；不保留 v2 兼容窗口。
 - 常量（代码常量，不通过配置协商）：`maxResultBytes=262144`、`maxPromptBytes=1048576`、`maxSkillPackageBytes=67108864`、`maxTasksPerPoll=10`、`pollHoldMs=30000`、`clientPollTimeoutMs=40000`、`clientSilentMs=120000`、`resultGraceMs=60000`；v3 新增 `maxSessionLogBytes=67108864`、`maxArchiveBytes=536870912`、`maxArchiveEntries=100000`、`maxArchiveUncompressedBytes=2147483648`（`API-42` 的 intent 上限仍是产品面 256 KiB，不是执行面常量）。
@@ -234,6 +242,7 @@ updated: 2026-11-12
 |---:|---|---|
 | 400 | `unsupported_protocol` | `X-Executor-Protocol` 缺失或不等于 `3` |
 | 400 | `validation_error` | 请求体未知字段、字段类型/范围非法、`status`/`error.class` 不在闭集 |
+| 404 | `input_not_found` | `EXE-07` 的 inputId 不存在/不属于该 run/未绑定 |
 | 400 | `invalid_archive` | `P-05` 的 gzip/tar 损坏、含绝对路径/`..`/越界链接 |
 | 401 | `unauthorized` | Bearer 缺失或 token 未映射到 `clientId`，且（`EXECUTOR_AUTH=off` 时）没有可用的 `X-Client-Id` |
 | 404 | `task_not_found` | `P-02`/`P-04` 的 `taskId` 不存在或不属于该 client 的实例 |
@@ -730,6 +739,9 @@ type PollRequest = {
 | `workspacePath` | string | 是 | 绝对路径；同 `clientId+workspacePath` 已有实例时复用 |
 | `intentMarkdown` | string | 是 | ≤ 256 KiB；编排侧写入首节点 `prompt`，由 start 节点模型落盘 |
 | `autoConfirm` | boolean | 否 | 默认 `false`；`true` 时 `confirm` 节点自动通过 |
+| `inputs` | `{inputId}[]` | 否 | 0–8 个暂存初始资料；顺序即 task-space 内 position |
+
+**`RunInputView`**（`API-55`/`API-57`）：`{inputId, name, mediaType, sizeBytes, sha256, createdAt}`；`API-56` 返回二进制原图。
 
 **`RunSummary`**（`API-44` 列表项）：`{runId, workflowId, workflowName, workflowRevision, harnessId, harnessName, clientId, instanceId, state, outcome, currentNodeId, archiveState, createdAt, startedAt, finishedAt}`；`workflowId`/`harnessId` 是启动时历史 ID，资产删除后仍保留，`workflowName`/`harnessName` 是启动时冻结名。
 
@@ -748,7 +760,7 @@ type PollRequest = {
 **执行面 poll 头**：client 可选带 `X-Observability-Url`；网关只登记到内存目录，不改变派发。`TaskRequest.runId?` 由网关从 `run_node.task_id` 反查补齐。
 
 - `API-47` 响应：`application/x-ndjson` + `Content-Encoding: gzip` + `Content-Length` + `X-Checksum-Sha256`；`visit`/`attempt` 缺省取最新。
-- 运行编排 DTO 在实现时进入 `openapi.yaml`（`API-42`–`API-54`），`x-api-count` 同步为 61。
+- 运行编排 DTO 在实现时进入 `openapi.yaml`（`API-42`–`API-58`），`x-api-count` 同步为 65。
 
 ## 6 外部 UI 页面映射（参考，不属于本仓库交付与验收）
 
@@ -808,11 +820,11 @@ B1/B3 不提供的页面动作：Harness 连接测试/心跳刷新、工具调�
 
 - 预算上限：源码 + 规格 + 测试 ≤120k token；当前规格约 36 KB；OpenAPI 运行时资产约 85 KB、Swagger UI 静态资源约 2.14 MB，均单独计量，不计入组件预算。
 - 单独验证命令：`bun test tests/components/http-gateway`。
-- 文档入口：启动后访问 `/docs`；机器可读契约：`/openapi.yaml`。OpenAPI 资产随组件发布，当前覆盖 48 个产品业务 operation 与 `/healthz`（共 49 个 operation）；运行编排实现后为 54 个产品业务 operation（65 个 operation 含 `/healthz`），`x-api-count` 同批更新。
+- 文档入口：启动后访问 `/docs`；机器可读契约：`/openapi.yaml`。OpenAPI 资产随组件发布，当前覆盖 65 个产品业务 operation 与 `/healthz`（共 66 个 operation、49 个 path），`x-api-count=65`。
 - `API-41`（Harness 节点登记）、`clientId`/`clientToken` 字段已实现，直接改基线表结构、未做数据迁移（演示数据可丢弃）。
-- 执行面 3 个端点（`EXE-01`–`EXE-03`，§4.3）已实现（2026-11-11，`src/components/http-gateway/routes/executor.ts`）。
+- 执行面 7 个端点（`EXE-01`–`EXE-07`，§4.3）已实现（2026-11-11/2026-11-19，`src/components/http-gateway/routes/executor.ts`）。
 - Harness 派生态 `health`/`lastHeartbeatAt` 已实现：`catalog` 组合 `CMP-scheduler` 的 `presence` 读（`harness` §3.3），未绑定或未被观测时返回 `unknown`，观测不可用时降级 `unknown`，不伪造 `offline`。
-- 当前状态：`current`；B1 资产端点与 B3 工作流定义端点均已实现，运行时 OpenAPI 为 32 个 path、49 个 operation（含 `/healthz`）；B3 验证记录见 [工作流工序 result.md](../../../history/works/2026-10-28-workflow-definition/result.md)。
+- 当前状态：`current`；B1/B3 与运行编排端点均已实现，运行时 OpenAPI 为 49 个 path、66 个 operation（含 `/healthz`）；B3 验证记录见 [工作流工序 result.md](../../../history/works/2026-10-28-workflow-definition/result.md)。
 - 运行编排（`API-42`–`API-47`）与执行面 v3（`EXE-04`/`EXE-05`）设计冻结于 2026-11-11，尚未实现；实现后需重启 `3100` 服务并验证 `/openapi.yaml` 已含新 operation。
 
 ## 10 B1/B3 实现口径与剩余问题

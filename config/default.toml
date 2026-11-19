@@ -18,6 +18,9 @@ retry_delay_ms = 5000
 [run]
 default_timeout_ms = 1800000
 max_node_visits = 5
+max_input_files = 8
+max_input_file_bytes = 8388608
+max_input_bytes = 20971520
 
 [archive]
 root = ".local/archive"

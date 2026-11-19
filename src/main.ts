@@ -101,6 +101,9 @@ const runService = createRunService({
   clientSessions: clientObservability,
   defaultTimeoutMs: config.runDefaultTimeoutMs,
   maxNodeVisits: config.runMaxNodeVisits,
+  maxInputFiles: config.runMaxInputFiles,
+  maxInputFileBytes: config.runMaxInputFileBytes,
+  maxInputBytes: config.runMaxInputBytes,
 });
 await runService.resumePending();
 const executorAuthenticator = createHarnessAuthenticator({ db });

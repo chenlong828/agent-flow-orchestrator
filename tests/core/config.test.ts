@@ -53,6 +53,9 @@ describe("CMP-config 默认值与文件覆盖", () => {
       archiveRoot: ".local/archive",
       runDefaultTimeoutMs: 1800000,
       runMaxNodeVisits: 5,
+      runMaxInputFiles: 8,
+      runMaxInputFileBytes: 8388608,
+      runMaxInputBytes: 20971520,
     });
   });
 
@@ -86,6 +89,9 @@ describe("CMP-config 默认值与文件覆盖", () => {
       archiveRoot: ".local/archive",
       runDefaultTimeoutMs: 1800000,
       runMaxNodeVisits: 5,
+      runMaxInputFiles: 8,
+      runMaxInputFileBytes: 8388608,
+      runMaxInputBytes: 20971520,
     });
   });
 
@@ -120,6 +126,9 @@ describe("CMP-config 默认值与文件覆盖", () => {
       archiveRoot: ".local/archive",
       runDefaultTimeoutMs: 1800000,
       runMaxNodeVisits: 5,
+      runMaxInputFiles: 8,
+      runMaxInputFileBytes: 8388608,
+      runMaxInputBytes: 20971520,
     });
 
     expect(
@@ -147,6 +156,9 @@ describe("CMP-config 默认值与文件覆盖", () => {
       archiveRoot: ".local/archive",
       runDefaultTimeoutMs: 1800000,
       runMaxNodeVisits: 5,
+      runMaxInputFiles: 8,
+      runMaxInputFileBytes: 8388608,
+      runMaxInputBytes: 20971520,
     });
   });
 
@@ -328,6 +340,9 @@ describe("CMP-config 运行编排参数", () => {
     ).toMatchObject({
       runDefaultTimeoutMs: 1800000,
       runMaxNodeVisits: 5,
+      runMaxInputFiles: 8,
+      runMaxInputFileBytes: 8388608,
+      runMaxInputBytes: 20971520,
       archiveRoot: ".local/archive",
     });
   });

@@ -73,8 +73,8 @@ externalRefs: []
 1. 调用方提交 `{harnessId, workspacePath, intent, autoConfirm?}`；网关校验字段形状与长度（`intent` 走 `maxPromptBytes` 口径）。
 2. `CMP-run.start` 校验可运行性：工作流存在；图恰好一个 `start` 与一个 `end`；每个节点 ≤1 条 seq 入边/出边；`review`/`confirm` 的回退边目标为祖先；节点专家存在且启用；**不含 `split`/`fanout`**（第二期支持）。
 3. 解析 `harnessId → clientId`；`instance.enroll({instanceId, clientId, workspacePath})`（重复登记同绑定幂等）；冻结 `revision`、`graphSnapshot`、`workflowName`、`harnessName`、启动诉求原文；创建 `run(created)` 与首节点 `run_node(pending)`。运行详情返回 `graph` 与快照名；终态时活跃外键脱钩，历史读快照。
-4. `advance`：取 `start` 节点 → 按 §4.1 组装 prompt（含 `taskSpacePath`；首节点额外含启动诉求原文）→ 按专家解析 `skillIds` → `scheduler.enqueue({instanceId, nodeId, prompt, timeoutMs, skillIds})` → `run_node(dispatched)`、`run(running)`。
-5. client 取任务后 `mkdir -p <taskSpacePath>`（`<workspace>/task-spaces/<YYYYMMDD-HHmmss>`），写 `intent.md`，建 session 执行；结束后先上传 session-log，再上报结果（`SCN-0302`）。
+4. `advance`：取 `start` 节点 → 按 §4.1 组装 prompt（含 `taskSpacePath`；首节点额外含启动诉求原文；run 有绑定初始资料时追加 `[初始资料]` 清单）→ 按专家解析 `skillIds` → `scheduler.enqueue({instanceId, nodeId, prompt, timeoutMs, skillIds})` → `run_node(dispatched)`、`run(running)`。
+5. client 取任务后 `mkdir -p <taskSpacePath>`（`<workspace>/task-spaces/<YYYYMMDD-HHmmss>`）；带 `runId` 且声明 `run-inputs` 时先拉取 `EXE-06/07` 写入 `<taskSpacePath>/inputs/`，再写 `intent.md`、建 session 执行；结束后先上传 session-log，再上报结果（`SCN-0302`）。
 6. `CMP-run.handleTaskResult`：用 `taskId` 找到 `run_node` → 校验日志存在 → `scheduler.acceptResult` → `run_node(succeeded)` → 取该节点唯一 seq 出边 → 入队下一节点；循环直到 `end`。
 7. `end` 节点成功后：`run.done(succeeded)`，保存最终消息与产物清单；进入归档流程（`SCN-0304`）。
 8. 服务重启：扫描 `running` 的 run，`dispatched` 的节点用 `scheduler.inspect(taskId)` 对账，已结算则补结算再推进；未结算保持等待（`S-02` 会重派）。
@@ -86,6 +86,7 @@ externalRefs: []
 - 实例登记冲突（同 `instanceId` 不同绑定）→ `409`，不建 run。
 - 同一工作区已有 `running`/`waiting_confirm` 的 run → `409 run_conflict`，不建 run；等前一个 run 结束后再启动。
 - 入队后实例 `retired` / 节点停用 → 任务留在 `queued`，run 保持 `running`，不报错（派发门禁在调度器，`S-04`/`§4.8`）。
+- 启动带初始资料但 client 未声明 `run-inputs` → `409 client_unsupported`，不建 run、暂存项保留（`SCN-0307`）。
 - 节点失败/超时 → `run.failed`，停在当前节点，不再推进（默认语义，见 `OQ-28`）。
 
 ## 4 不可变引用
@@ -112,5 +113,6 @@ externalRefs: []
 
 - 不覆盖审核判定与回退（`SCN-0302`）、确认与取消（`SCN-0303`）、归档（`SCN-0304`）。
 - 不覆盖 `split`/`fanout` 的展开（第二期）。
+- 不覆盖初始资料的上传、绑定与读取细节（`SCN-0307`）。
 - 不覆盖多 client 选择与队列排序：本期一个 run 只绑一个实例，节点任务顺序由调度器 FIFO 决定。
 - 不覆盖管理面鉴权：产品端点当前无鉴权，沿用现状。

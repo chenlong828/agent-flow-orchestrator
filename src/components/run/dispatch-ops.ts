@@ -35,6 +35,7 @@ async function dispatchNode(
   const expert = await deps.expertRead.get(node.expertId);
   const start = startNode(graphFor(run));
   const entry = await resolveEntry(store, deps.db, graphFor(run), run, row);
+  const initialInputs = await store.listBoundInputs(deps.db, run.id);
   const prompt = composeNodePrompt({
     node,
     expert: {
@@ -46,6 +47,15 @@ async function dispatchNode(
       notes: expert.notes,
     },
     taskSpacePath: run.task_space_path,
+    ...(initialInputs.length === 0
+      ? {}
+      : {
+          inputs: initialInputs.map((item) => ({
+            name: item.name,
+            mediaType: item.media_type,
+            sizeBytes: Number(item.size_bytes),
+          })),
+        }),
     ...(entry === undefined ? {} : { entry }),
     ...(start?.id === node.id ? { intentMarkdown: run.intent_markdown } : {}),
     ...(options.confirmation === undefined ? {} : { confirmation: options.confirmation }),

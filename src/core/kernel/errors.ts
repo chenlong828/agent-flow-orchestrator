@@ -21,6 +21,8 @@ export type ErrorCode =
   | "unauthorized"
   | "run_not_found"
   | "run_conflict"
+  | "client_unsupported"
+  | "input_not_found"
   | "session_log_missing"
   | "invalid_state"
   | "invalid_archive"
@@ -156,7 +158,10 @@ export class PayloadTooLargeError extends AppError {
       | "result_bytes"
       | "prompt_bytes"
       | "session_log_bytes"
-      | "archive_bytes",
+      | "archive_bytes"
+      | "run_input_file_bytes"
+      | "run_input_bytes"
+      | "run_input_count",
     limitValue: number,
     actualValue: number,
   ) {

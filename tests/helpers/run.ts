@@ -97,6 +97,7 @@ export function startRun(
     workspacePath: string;
     intentMarkdown?: string;
     autoConfirm?: boolean;
+    inputs?: { inputId: string }[];
   },
 ) {
   return call(ctx.app, "POST", `/api/v1/workflows/${fixture.workflowId}/runs`, {
@@ -105,6 +106,7 @@ export function startRun(
       workspacePath: input.workspacePath,
       intentMarkdown: input.intentMarkdown ?? "完成这次运行",
       ...(input.autoConfirm === undefined ? {} : { autoConfirm: input.autoConfirm }),
+      ...(input.inputs === undefined ? {} : { inputs: input.inputs }),
     },
   });
 }
@@ -303,4 +305,32 @@ export async function overwriteWorkflowGraph(
     JSON.stringify(graph),
     workflowId,
   ]);
+}
+
+/** 产品面暂存上传（multipart）；供 UI/网关联调用例。 */
+export async function uploadRunInput(
+  ctx: TestContext,
+  bytes: Uint8Array,
+  name = "input.png",
+): Promise<{ status: number; body: any }> {
+  const form = new FormData();
+  form.append("file", new File([bytes as unknown as BlobPart], name, { type: "image/png" }));
+  const response = await ctx.app(
+    new Request("http://127.0.0.1:3000/api/v1/run-inputs", { method: "POST", body: form }),
+  );
+  const text = await response.text();
+  return { status: response.status, body: text === "" ? null : JSON.parse(text) };
+}
+
+/** 带能力头 poll 一次，登记 presence；启动带图前必须先调用。 */
+export async function pollWithCapabilities(
+  ctx: TestContext,
+  token: string,
+  capabilities: string[] = ["run-inputs"],
+): Promise<void> {
+  const polled = await call(ctx.app, "POST", "/api/v1/executor/poll", {
+    headers: { ...execHeaders(token), "x-executor-capabilities": capabilities.join(",") },
+    body: { capacity: { free: 1 }, running: [], finished: [] },
+  });
+  expect(polled.status).toBe(200);
 }

@@ -19,7 +19,7 @@ updated: 2026-11-19
 
 **不负责**：
 
-- 不派发任务、不重派、不判定容量与节点门禁（`CMP-scheduler` 的 `S-01`–`S-08`；run 只调 `enqueue`/`cancelInstances`/`inspect`）；
+- 不派发任务、不重派、不判定容量与节点门禁（`CMP-scheduler` 的 `S-01`–`S-08`；run 只调 `enqueue`/`cancelInstances`/`inspect`/`presence`）；
 - 不保存、不校验工作流图（启动时读 `CMP-workflow` 的当前定义并冻结快照；定义后续变更不影响本 run）；
 - 不创建、不校验工作区目录；不拥有实例状态（`CMP-instance` 的 `enroll`/`get`/`isDispatchable`）；
 - 不执行任务、不管理 session、不采集日志（client）；
@@ -49,6 +49,7 @@ updated: 2026-11-19
 | `workflow_run` | `id`、`workflow_id`、`workflow_ref_id`、`workflow_name`、`workflow_revision`、`graph_snapshot`、`intent_markdown`、`harness_id`、`harness_ref_id`、`harness_name`、`client_id`、`instance_id`、`workspace_path`、`task_space_path`、`auto_confirm`、`state`、`outcome`、`current_node_id`、`result`（`finalMessage`/`error`）、`archive_state`、`finished_at`、`created_at`/`updated_at`/`created_by` | 运行聚合根；`graph_snapshot` 是启动时冻结的 `WorkflowGraph`；`workflow_id`/`harness_id` 是活跃引用，只在 run 未终态时非空；`workflow_ref_id`/`harness_ref_id`/`*_name` 是历史快照，启动时写入、永不改变；运行创建即开始，`startedAt` 对外取 `created_at`（`0005` 迁移收敛表宽） |
 | `run_node` | `run_id`、`node_id`、`visit`、`node_type`、`expert_id`、`expert_name`、`state`、`task_id`、`session_id`、`verdict`、`message`、`error`、`enter_reason`、`dispatched_at`、`finished_at` | 追加写为主：同一节点每次重访新增一行，旧行保留；`attempt` 归调度器，不在本表留第二真相；`expert_id` 是活跃引用，run 终态时置空；`expert_name` 是建行时冻结的历史名；`session_id` 是 client 在结果里回传的会话标识，可空且当前不对外暴露；确认点等待时 `verdict` 暂存 question/context/options，`session_id` 用于 `resumeSessionId` 续跑 |
 | `run_artifact` | `run_id`、`node_id`（归档为 null）、`visit`、`attempt`（归档为 null）、`kind`（`session_log` / `archive`）、`store_key`、`size_bytes`、`sha256`、`created_at` | 制品元数据；一次尝试一份日志，字节在 `FileStore`，本组件不持有字节 |
+| `run_input` | `id`、`run_id`（staged 为 null）、`position`（staged 为 null）、`name`、`media_type`、`size_bytes`、`sha256`、`store_key`、`state`（`staged` / `bound`）、`created_at`、`bound_at` | run 的图片初始资料；字节在 `FileStore`（`inputs/<inputId>`），本组件只持有元数据；`staged` 不设 TTL，绑定或 DELETE 才消失 |
 
 不变量：
 
@@ -79,12 +80,30 @@ type RunNodeState = "queued" | "dispatched" | "waiting_confirm" | "waiting_resum
 type ArchiveState = "none" | "pending" | "stored" | "failed";
 type RunArtifactKind = "session_log" | "archive";
 
+type RunInputMediaType = "image/png" | "image/jpeg" | "image/webp" | "image/gif";
+
+type RunInputView = {
+  inputId: string;
+  name: string;
+  mediaType: RunInputMediaType;
+  sizeBytes: number;
+  sha256: string;
+  createdAt: string;
+};
+
+type RunInputStaged = RunInputView;
+
+type ExecutorRunInputRef = RunInputView & {
+  downloadPath: string;      // 相对 /api/v1/executor：/runs/{runId}/inputs/{inputId}
+};
+
 type StartRun = {
   workflowId: string;
   harnessId: string;
   workspacePath: string;     // 绝对路径；存在性由 client 校验
   intentMarkdown: string;    // 诉求原文；写进首节点 prompt，不在 TaskRequest 下发
   autoConfirm?: boolean;     // 默认 false
+  inputs?: { inputId: string }[]; // 0–8；顺序即 position
   actor?: string;
 };
 
@@ -144,8 +163,34 @@ type ArchiveRequest = {
 };
 
 type RunService = {
-  /** 启动：校验可运行性 → 登记/复用实例 → 冻结快照 → 建首节点 → 推进。 */
+  /** 启动：校验可运行性 → 校验 client 能力 → 绑定暂存资料 → 登记/复用实例 → 冻结快照 → 建首节点 → 推进。 */
   start(input: StartRun): Promise<RunDetail>;
+
+  /** API-57：校验并落盘一张暂存图片，返回 inputId。 */
+  stageInput(input: { name: string; mediaType?: string; bytes: Uint8Array }): Promise<RunInputStaged>;
+
+  /** API-58：删除尚未绑定的暂存项；已绑定抛 InvalidStateError。 */
+  deleteStagedInput(inputId: string): Promise<void>;
+
+  /** API-55/56：只读已绑定到该 run 的初始资料。 */
+  listInputs(runId: string): Promise<RunInputView[]>;
+  readInput(runId: string, inputId: string): Promise<{
+    stream: ReadableStream<Uint8Array>;
+    sizeBytes: number;
+    mediaType: RunInputMediaType;
+    sha256: string;
+    name: string;
+  }>;
+
+  /** EXE-06/07：校验 run 属于该 client 后读取。 */
+  listExecutorInputs(clientId: string, runId: string): Promise<ExecutorRunInputRef[]>;
+  readExecutorInput(clientId: string, runId: string, inputId: string): Promise<{
+    stream: ReadableStream<Uint8Array>;
+    sizeBytes: number;
+    mediaType: RunInputMediaType;
+    sha256: string;
+    name: string;
+  }>;
 
   /** 推进（幂等）：选下一个节点并按需入队；终态调用直接返回。 */
   advance(runId: string): Promise<void>;
@@ -216,7 +261,11 @@ type RunService = {
 
 | 方法 | 目的 | 输入 | 输出 | 错误 | 并发/事务 |
 |---|---|---|---|---|---|
-| `start` | 建 run 并推进首节点 | `StartRun` | `RunDetail` | `ValidationError`（图/专家/字段）、`NotFoundError`（工作流/Harness/节点；含启动窗口并发删除）、`BindingConflictError`（实例登记）、`RunConflictError`（同工作区已有活跃 run）、`PayloadTooLargeError`（intent 或 prompt 超限） | 校验只读；建 run + 首节点单事务；派发把 `enqueue({ tx })`、`run_node.task_id` 与 `workflow_run` 游标放在同一事务，提交后唤醒 client |
+| `start` | 建 run 并推进首节点 | `StartRun` | `RunDetail` | `ValidationError`（图/专家/字段/暂存项）、`NotFoundError`（工作流/Harness/节点；含启动窗口并发删除）、`BindingConflictError`（实例登记）、`RunConflictError`（同工作区已有活跃 run）、`ClientUnsupportedError`（client 未声明 `run-inputs`）、`PayloadTooLargeError`（intent/prompt/初始资料） | 校验只读；建 run + 首节点 + 暂存绑定单事务；派发把 `enqueue({ tx })`、`run_node.task_id` 与 `workflow_run` 游标放在同一事务，提交后唤醒 client |
+| `stageInput` | 暂存图片 | `name`/`mediaType?`/`bytes` | `RunInputStaged` | `ValidationError`（类型/空文件）、`PayloadTooLargeError`（单张超限） | 先写 `FileStore` 再插行，行失败补偿删除对象 |
+| `deleteStagedInput` | 删除暂存项 | `inputId` | `void` | `InputNotFoundError`、`InvalidStateError`（已绑定） | 先删行再删对象；对象删除失败只留孤儿 |
+| `listInputs`/`readInput` | 产品面读 | `runId`/`inputId` | 列表 / 字节流 | `RunNotFoundError`、`InputNotFoundError` | 只读，只返回 `state='bound'` |
+| `listExecutorInputs`/`readExecutorInput` | 执行面读 | `clientId`/`runId`/`inputId` | 列表 / 字节流 | `RunNotFoundError`（run 不属于 client）、`InputNotFoundError` | 只读；`downloadPath` 相对 executor base |
 | `advance` | 推进一个节点 | `runId` | `void` | `NotFoundError` | 同一 run 进程内单飞；状态迁移单事务 |
 | `handleTaskResult` | 结算并推进 | `clientId`、`TaskResult` | `ResultAck` | `TaskNotFoundError`、`ValidationError` | 同一 run 单飞；`acceptResult` 与 `run_node` 结算分属两个事务，先调度器后编排 |
 | `attachSessionLog` | 登记日志 | `clientId`、`taskId`、`attempt`、`bytes`、`sha256` | `{stored}` | `TaskNotFoundError`、`PayloadTooLargeError` | 先写临时键、校验后原子改名；同键后到覆盖，`stored` 为 `created`/`replaced`/`unchanged` |
@@ -314,6 +363,10 @@ waiting_resume ──cancel / 无 sessionId──▶ failed(cancelled / timeout)
 本次任务执行相关记录的 task-space：<taskSpacePath>
 读取 <task-space>/intent.md 作为本系列任务运行的目标与约束，方便后续其他任务了解情况。
 [输出要求] 无特别要求，跟随Skill执行。
+[初始资料] 本次启动带 <N> 个图片文件，位于 <task-space>/inputs/：
+- <name>（<mediaType>，<sizeBytes> 字节）
+需要查看时用 read_image 读取上面的绝对路径；同一张图只读一次，不要凭文件名猜测内容。
+（首节点追加：把这份清单写入 intent.md 的「初始资料」一节。）
 [确认通道] ...（仅 agent / review 节点；文案见下方说明）
 [本次进入] 节点「<被驳回节点名>」判定 fail，本节点被回退重跑。
 驳回理由：<被驳回行的 verdict.reason，截断 300 字符>
@@ -328,6 +381,7 @@ waiting_resume ──cancel / 无 sessionId──▶ failed(cancelled / timeout)
 ```
 
 - start 节点把中间那句换成「把下面的诉求原文写入 `<taskSpacePath>/intent.md`，再开始执行」，并追加 `[启动诉求原文]`（受 `maxPromptBytes` 约束）。
+- `[初始资料]` 只在 run 有绑定图片时出现；所有节点都带同一份清单，首节点额外要求写入 `intent.md`。
 - 不写工作流名、节点名、工作目录与目录规范：工作目录由 DSH 的运行上下文提供，产物归属与判定标准由技能承载。
 - `[确认通道]` 按节点类型输出，两段文案互斥：
   - `agent`：`仅严重场景调用 mcp__agentflow__confirm：契约变更、规则突破、不可逆/外部副作用、P0/P1、用户意图冲突、关键信息缺失；普通决策按 auto-confirm §2 默认确认，不打断人。`
@@ -404,7 +458,7 @@ waiting_resume ──cancel / 无 sessionId──▶ failed(cancelled / timeout)
 - `CMP-expert` 的 `ExpertRead.get`（取 `skillIds` 与 `enabled`）；
 - `CMP-harness` 的 `HarnessRead.get`（`harnessId → clientId` 与 `enabled`）；
 - `CMP-instance` 的 `InstanceService.enroll` / `get`（登记与读工作区）；
-- `CMP-scheduler` 的 `SchedulerService.enqueue` / `cancelInstances` / `inspect`；
+- `CMP-scheduler` 的 `SchedulerService.enqueue` / `cancelInstances` / `inspect`，以及 `SchedulerPresenceRead.presence`（只读能力）；
 - `CMP-kernel` 的 `FileStore` 端口、`ClientRunFiles`/`ClientSessionObservability` 端口、`Clock`、`IdGenerator`、错误类型、分页；
 - `CMP-platform` 的 `Db`（事务与查询）。
 
@@ -454,4 +508,5 @@ waiting_resume ──cancel / 无 sessionId──▶ failed(cancelled / timeout)
 - 失败后「从当前节点原地重试」（`OQ-28`）。
 - `split`/`fanout` 的执行语义（第二期；`OQ-26`）。
 - 会话日志与归档的保留期与清理（`OQ-27`）。
+- 暂存初始资料的孤儿清理：当前不设 TTL，未 DELETE 的 `staged` 行/对象由运维处理；是否加手动清理端点或配额待定。
 - 并发 run 的工作区冲突策略：当前不互斥，是否需要按工作区加软锁由真实使用反馈决定。

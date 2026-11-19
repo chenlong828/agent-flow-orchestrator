@@ -134,6 +134,7 @@ describe("platform 迁移执行", () => {
       "0011_task_signal_continuation.sql",
       "0012_run_timeout_resume.sql",
       "0013_run_asset_snapshot.sql",
+      "0014_run_input.sql",
     ]);
     const after = await db.query("select version, checksum from schema_migrations order by version");
     expect(after).toEqual(before);

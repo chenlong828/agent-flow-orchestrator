@@ -14,6 +14,8 @@ export type RunNodeState =
   | "failed";
 export type ArchiveState = "none" | "pending" | "stored" | "failed";
 export type RunArtifactKind = "session_log" | "archive";
+export type RunInputMediaType = "image/png" | "image/jpeg" | "image/webp" | "image/gif";
+export type RunInputState = "staged" | "bound";
 
 /** 回退进入原因指针：只记「哪一行的驳回」，理由正文仍以被驳回行的 verdict 为准。 */
 export type EnterReason =
@@ -26,7 +28,38 @@ export type StartRun = {
   workspacePath: string;
   intentMarkdown: string;
   autoConfirm?: boolean;
+  /** 暂存初始资料；缺省/空数组等价于不带图片。顺序即 position。 */
+  inputs?: { inputId: string }[];
   actor: string | null;
+};
+
+export type RunInputUpload = {
+  name: string;
+  mediaType?: string;
+  bytes: Uint8Array;
+};
+
+export type RunInputView = {
+  inputId: string;
+  name: string;
+  mediaType: RunInputMediaType;
+  sizeBytes: number;
+  sha256: string;
+  createdAt: string;
+};
+
+export type RunInputStaged = RunInputView;
+
+export type ExecutorRunInputRef = RunInputView & {
+  downloadPath: string;
+};
+
+export type RunInputContent = {
+  stream: ReadableStream<Uint8Array>;
+  sizeBytes: number;
+  mediaType: RunInputMediaType;
+  sha256: string;
+  name: string;
 };
 
 export type RunNodeView = {
@@ -184,6 +217,15 @@ export type RunSessionEventPage = {
 
 export type RunService = {
   start(input: StartRun): Promise<RunDetail>;
+  /** 暂存一张图片；返回 inputId。 */
+  stageInput(input: RunInputUpload): Promise<RunInputStaged>;
+  /** 删除尚未绑定的暂存项；已绑定抛 InvalidStateError。 */
+  deleteStagedInput(inputId: string): Promise<void>;
+  listInputs(runId: string): Promise<RunInputView[]>;
+  readInput(runId: string, inputId: string): Promise<RunInputContent>;
+  /** 执行面：校验 run 属于该 client。 */
+  listExecutorInputs(clientId: string, runId: string): Promise<ExecutorRunInputRef[]>;
+  readExecutorInput(clientId: string, runId: string, inputId: string): Promise<RunInputContent>;
   advance(runId: string): Promise<void>;
   handleTaskResult(clientId: string, result: TaskResult): Promise<{ taskId: string; accepted: boolean }>;
   attachSessionLog(input: SessionLogInput): Promise<{ stored: StoredState }>;

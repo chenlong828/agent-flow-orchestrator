@@ -9,18 +9,22 @@ level: P1
 
 # 设计提案：启动运行支持图片初始资料
 
-> 状态：**P1 调研提案，未冻结**。本轮不改代码、不建迁移、不改 OpenAPI/组件规格/场景卡。按 `arch-design-spec` 预判为 P1（启动契约、新表、数据所有权、执行面契约、跨项目协议），最终级别与是否实施由用户裁决。
+> 状态：**P1 设计已冻结并实现（编排侧 2026-11-19）**。本文保留设计与取舍；实现结果见 [`result.md`](result.md)。client 侧已实现，UI 侧待按 [`ui-proposal.md`](ui-proposal.md) 立项。
 >
-> 一句话：**UI 粘贴图片 → 立即上传为暂存初始资料 → 启动请求引用 `inputId` → 编排把暂存资料绑定到 run → client 拉取图片写入 `<task-space>/inputs/` → 各节点用 `read_image` 查看。**
+> 一句话：**UI 粘贴图片并在本地暂存 → 点「发起运行」时逐张上传为暂存初始资料 → 启动请求引用 `inputId` → 编排把暂存资料绑定到 run → client 拉取图片写入 `<task-space>/inputs/` → 各节点用 `read_image` 查看。**
 >
-> **2026-11-19 用户裁决**：client 确认支持图片，必须补模型 `input` 声明；上传采用「粘贴即上传」的暂存模式；首期只支持图片。本版已按此改写 `D-01`，并新增 [`ui-proposal.md`](ui-proposal.md) 给 UI 项目。
+> **2026-11-19 用户裁决**：client 确认支持图片，必须补模型 `input` 声明；首期只支持图片。
+>
+> **2026-11-19 UI 实施修订**：上传时机由「粘贴即上传」改为「提交时上传」（点「发起运行」后逐张上传，全部成功再启动）；后端契约不变，服务端只认 `inputId`。见 [UI result](../../../../agent-flow-ui/docs/history/works/2026-11-19-run-start-images/result.md)。
+>
+> **2026-11-19 client 已实现**：`T-CLI-IMG-01`–`07` 落地，`read_image` 实测通过；真实联调待编排侧 `EXE-06/07`。见 [client result](../../../../agent-flow-client/docs/works/2026-11-19-run-start-inputs/result.md)。
 
 ## 0 结论
 
 ### 0.1 推荐链路
 
-1. **UI**：发起运行弹窗的编辑器支持 `paste` / 拖放图片。每张图在粘贴时**立即上传**到 `POST /api/v1/run-inputs`（multipart，单文件），本地显示缩略图、上传进度、重试/删除；提交启动时只把已上传的 `inputId` 列表放进原 `POST /api/v1/workflows/{id}/runs` JSON。
-2. **编排**：`POST /run-inputs` 校验图片类型/体积/文件名，把字节写入 `archive.root/inputs/<inputId>`，元数据写 `run_input`（`state=staged`，带 `expires_at`）；启动时把选中的暂存行在事务里绑定到 run（`state=bound`），prompt 增加 `[初始资料]` 块，列出文件名、类型、大小与 `<task-space>/inputs/` 绝对路径。
+1. **UI**：发起运行弹窗支持 `paste` / 拖放/选择图片；提交前只在浏览器本地暂存（缩略图、校验、删除），不产生服务端状态。点「发起运行」后按列表顺序逐张上传到 `POST /api/v1/run-inputs`（multipart，单文件，并发 3），全部成功后把 `inputId` 列表放进原 `POST /api/v1/workflows/{id}/runs` JSON；上传或启动失败时回滚删除已上传项。
+2. **编排**：`POST /run-inputs` 校验图片类型/体积/文件名，把字节写入 `archive.root/inputs/<inputId>`，元数据写 `run_input`（`state=staged`）；启动时把选中的暂存行在事务里绑定到 run（`state=bound`），prompt 增加 `[初始资料]` 块，列出文件名、类型、大小与 `<task-space>/inputs/` 绝对路径。
 3. **client**：poll 时声明 `X-Executor-Capabilities: run-inputs`；拿到任务后按 `runId` 调新执行面端点列出并下载初始资料，校验 SHA-256，写入 `<task-space>/inputs/`，再建 session。
 4. **模型**：首节点按 prompt 把清单写入 `intent.md` 的「初始资料」一节；需要看图时调用 `read_image` 读取对应绝对路径。后续节点共享同一个 task-space。
 5. **旧 client**：启动带图片的 run 时，若 client 未声明能力，返回 `409 client_unsupported`，不建 run、不绑定暂存项（已上传的图仍在暂存区，升级 client 后可重试启动），避免「图片静默丢失、模型凭空猜测」。
@@ -35,15 +39,15 @@ level: P1
 
 | # | 决策 | 结论 | 理由摘要 |
 |---|---|---|---|
-| `D-01` | 上传形态 | **粘贴即上传（暂存 `run_input`，启动引用 `inputId`）** | 用户已定；图片到达即校验/落盘/反馈，启动失败可复用、不重传；代价是暂存行 TTL 与清理 |
+| `D-01` | 上传形态 | **提交时上传（暂存 `run_input`，启动引用 `inputId`）** | UI 实施裁决；提交前零服务端状态，上传/启动失败回滚重传；暂存行不设 TTL，未删除的孤儿需运维清理 |
 | `D-02` | 编排 → client 传输 | **client 主动拉取新执行面端点** | 不把 base64 塞进 poll/TaskRequest；可重试、可校验、可幂等 |
 | `D-03` | 旧 client 处理 | **`X-Executor-Capabilities` 头 + 启动闸门** | 加法变更、与现有 `X-Observability-Url` 风格一致；不静默丢图；不升协议版本 |
 | `D-04` | 模型如何看到图 | **prompt 列清单 + `read_image` 读文件** | ACP 当前不收图；文件对所有节点稳定可见；不复制字节进上下文 |
 | `D-05` | 视觉能力 | **client 模型条目声明 `input: ["text","image"]` 并实测（已裁决）** | 本机同模型已能读图；项目既有技能已依赖 `read_image` |
-| `D-06` | 运行详情预览 | **`GET /runs/{id}/inputs` + `/content`（建议首期带）** | 用户可确认图片确实进入 task-space；BFF 现有二进制转发可复用 |
+| `D-06` | 运行详情预览 | **`GET /runs/{id}/inputs` + `/content`（已定，首期带）** | 用户可确认图片确实进入 task-space；BFF 现有二进制转发可复用 |
 | `D-07` | 首期范围 | **只支持图片（PNG/JPEG/WebP/GIF）** | 校验、预览、模型读图路径都明确；PDF/文本等通用文件另立需求 |
-| `D-08` | 上限 | **待确认；建议 ≤8 张、单张 ≤8 MiB、合计 ≤20 MiB** | 单请求只传一张，BFF 25 MiB 足够；图片会被 DSH 归一化到像素预算 |
-| `D-09` | 存储与保留 | `archive.root/inputs/<inputId>`；`staged` 按 TTL 清理，`bound` 随 run 保留 | 与现有 `FileStore`、归档根一致；绑定不搬字节；清理沿用 `OQ-27` |
+| `D-08` | 上限 | **已定：≤8 张、单张 ≤8 MiB、合计 ≤20 MiB** | 单请求只传一张，BFF 25 MiB 足够；图片会被 DSH 归一化到像素预算 |
+| `D-09` | 存储与保留 | `archive.root/inputs/<inputId>`；`staged` 不设 TTL，绑定前可删除；`bound` 随 run 保留 | 与现有 `FileStore`、归档根一致；绑定不搬字节；清理沿用 `OQ-27` |
 | `D-10` | task-space 内位置 | **`<task-space>/inputs/`** | 与 `intent.md` 并列、语义明确；归档 tar 自动包含 |
 
 ## 1 现状与证据
@@ -103,7 +107,7 @@ level: P1
 
 **非目标（本期）**：
 
-- 不做断点续传、多图打包上传或上传队列持久化；每张图独立暂存，页面刷新后未提交的暂存项靠 TTL 过期。
+- 不做断点续传、多图打包上传或上传队列持久化；每张图独立暂存，已上传但未绑定的暂存项不会自动过期，需 UI DELETE 或运维清理。
 - 不做通用文件（PDF、docx、代码文件）上传；只做图片。
 - 不做图片编辑、裁剪、旋转、OCR、缩略图服务；原图存储，展示由 UI 缩放。
 - 不做运行结束后从归档浏览图片（沿用 `OQ-34` 的结论）。
@@ -116,17 +120,17 @@ level: P1
 ```text
 agent-flow-ui              agent-flow-orchaster                 agent-flow-client
 ─────────────              ────────────────────                 ─────────────────
-粘贴/拖放图片
-  │ 缩略图 + 本地校验
+粘贴/拖放/选择图片
+  │ 缩略图 + 本地校验（提交前零服务端状态）
   │
-  ├─ POST /run-inputs（逐张，multipart）
+  ├─ 点「发起运行」→ 逐张 POST /run-inputs（并发 3）
   │     ├─ 校验图片（魔数/体积/文件名）
   │     ├─ 写 FileStore：inputs/<inputId>
-  │     └─ 写 run_input（state=staged, expires_at）
-  │  返回 inputId
+  │     └─ 写 run_input（state=staged）
+  │  返回 inputId；全部成功才继续
   │
   └─ POST /workflows/{id}/runs（JSON，inputs:[{inputId}…]）
-        ├─ 校验暂存行：存在/未过期/未绑定/数量
+        ├─ 校验暂存行：存在/未绑定/数量
         ├─ 事务绑定：state=bound、run_id、position、name 去重
         ├─ 建 run + 首节点 + prompt [初始资料]
         └─ 启动闸门：client 是否声明 run-inputs
@@ -153,22 +157,24 @@ agent-flow-ui              agent-flow-orchaster                 agent-flow-clien
 
 ## 4 关键决策与备选
 
-### `D-01` 上传形态（用户已定：粘贴即上传）
+### `D-01` 上传形态（UI 实施裁决：提交时上传）
 
 | 方案 | 做法 | 结论 |
 |---|---|---|
-| **A. 粘贴即上传（选定）** | 每张图 `POST /run-inputs` 暂存并返回 `inputId`；启动 JSON 引用 `inputId`；启动事务把暂存行绑定到 run | 粘贴即校验/落盘/进度/重试；启动失败保留暂存、不重传；代价是 TTL 与清理 |
-| B. 启动请求 multipart | 图片随启动请求一次性上传 | **不采用**：要等到点「发起运行」才上传，失败要重传全部；用户已明确选粘贴即上传 |
-| C. JSON 内 base64 | `images:[{name,dataBase64}]` | **否决**：33% 膨胀，20 MiB 原图变 ~27 MiB JSON，内存与解析都更差 |
-| D. 服务端直接写工作区 | 按 `workspacePath` 写 | **否决**：违反 `REQ-0001` §4；远端部署不可用 |
+| **A. 提交时上传（选定，UI 已实现）** | 点「发起运行」后 UI 按列表顺序逐张 `POST /run-inputs`（并发 3），全部成功后才提交启动 JSON；上传失败/启动失败回滚删除已上传项 | 提交前不产生服务端状态；本地可自由增删预览；失败重传；暂存不设 TTL |
+| B. 粘贴即上传（旧提案） | 每张图粘贴时立即上传并保留暂存 | **被 UI 实施裁决取代**：后端契约相同，但 UI 在提交前不产生暂存项；旧提案保留作对照 |
+| C. 启动请求 multipart | 图片随启动请求一次性上传 | **不采用**：契约已按独立暂存端点实现，且 multipart 不适合逐张进度/重试 |
+| D. JSON 内 base64 | `images:[{name,dataBase64}]` | **否决**：33% 膨胀，20 MiB 原图变 ~27 MiB JSON，内存与解析都更差 |
+| E. 服务端直接写工作区 | 按 `workspacePath` 写 | **否决**：违反 `REQ-0001` §4；远端部署不可用 |
 
 **选 A** 的实现要点：
 
-- 上传即校验：类型（魔数）、单张 ≤8 MiB、文件名清洗；通过后写 `inputs/<inputId>` 和 `run_input(state=staged)`。
-- 暂存 TTL 默认 24 h；过期行由上传/启动/进程启动时的惰性清理删除，不引入常驻清扫任务。
-- 提交启动只传 `inputs:[{inputId}]`；绑定失败（未知/过期/已绑定/超过 8 张）整体回滚，暂存行保持原状，UI 可重试。
-- 弹窗关闭时 UI 对已上传但未绑定的项调 `DELETE /run-inputs/{inputId}`；失败也不影响 TTL 兜底。
-- 逐张上传让 UI 能做进度、单张重试、删除，和 DSH 的草稿附件体验一致；代价是暂存表的生命周期比「启动时一把传」多一套状态。
+- 上传在**点「发起运行」时**触发，不在粘贴时触发；UI 先做本地校验（类型/单张/数量/合计），再逐张上传。
+- 服务端 `POST /run-inputs` 仍逐张校验（魔数、单张 ≤8 MiB、文件名清洗），写 `inputs/<inputId>` 与 `run_input(state=staged)`；对上传时机不感知。
+- 全部上传成功后才提交 `inputs:[{inputId}]`；绑定失败（未知/已绑定/超 8 张/合计超限）整体回滚，暂存行保持 `staged`。
+- UI 在部分上传失败或启动失败时回滚：`DELETE` 已上传项，本地保留 File 供重试；服务端仍保留未删除的 staged 孤儿。
+- **暂存不设 TTL**：`staged` 行与对象一直保留，直到被启动绑定或被 `DELETE /run-inputs/{inputId}` 删除。
+- 弹窗关闭时 UI 对已上传但未绑定的项调 `DELETE`；失败则暂存项留存，需运维清理。
 
 ### `D-02` 编排 → client 的传输
 
@@ -195,7 +201,7 @@ agent-flow-ui              agent-flow-orchaster                 agent-flow-clien
 2. 无 presence（服务重启后 client 还没 poll）或能力列表不含 `run-inputs` → `409 client_unsupported`，`details.capability="run-inputs"`、`details.reason="client_not_seen" | "capability_missing"`；
 3. 通过后才把暂存行绑定到 run、建 run。
 
-**启动失败（能力缺失、run 冲突、图非法等）不消耗暂存行**：它们保持 `staged`，用户升级 client 或处理冲突后可直接重试启动，不必重新上传；TTL 到点由清理删除。
+**启动失败（能力缺失、run 冲突、图非法等）不消耗暂存行**：它们保持 `staged`，用户升级 client 或处理冲突后可直接重试启动，不必重新上传；暂存项不会自动过期。
 
 > 已知边界：client 在「启动通过」与「任务派发」之间被换回旧版本，属于极端情况；本期接受，不做派发时二次校验。若要求绝对严格，可在 `task` 表加 `inputs_required` 并在派发时复查，代价是一次 schema 变更。
 
@@ -243,7 +249,7 @@ agent-flow-ui              agent-flow-orchaster                 agent-flow-clien
 ### `D-09` 存储与保留
 
 - 服务端副本：`<archive.root>/inputs/<inputId>`（无扩展名，类型在 `run_input.media_type`）。暂存与已绑定共用一个 key 空间，绑定只改库里的 `run_id/state`，不搬文件，避免「移动成功、事务失败」的二段不一致。
-- 未绑定（`staged`）的行超过 `expires_at`：删除对象 + 删除行；已绑定（`bound`）的随 run 保留。
+- 未绑定（`staged`）的行不设过期：由 UI `DELETE` 或运维清理；已绑定（`bound`）的随 run 保留。
 - 归档包里已包含 `<task-space>/inputs/`，服务端副本是「下载源 + 详情预览源」；run 结束后是否删除，沿用 `OQ-27` 的保留期结论，本期不新增清理策略。删除副本不影响归档内的文件。
 - `run_input.store_key` 唯一；`run_id` 外键 `on delete cascade`（当前没有删除 run 的端点，保留级联语义）。
 
@@ -275,8 +281,7 @@ agent-flow-ui              agent-flow-orchaster                 agent-flow-clien
   "mediaType": "image/png",
   "sizeBytes": 123456,
   "sha256": "…64 位…",
-  "createdAt": "2026-11-19T09:00:00.000Z",
-  "expiresAt": "2026-11-20T09:00:00.000Z"
+  "createdAt": "2026-11-19T09:00:00.000Z"
 }
 ```
 
@@ -304,9 +309,9 @@ agent-flow-ui              agent-flow-orchaster                 agent-flow-clien
 ```
 
 - `inputs` 缺省/空数组 = 不带图片，行为与现状完全一致。
-- 数量 ≤8；`inputId` 不得重复；每个必须是 `staged`、未过期、属于当前服务端的行。
+- 数量 ≤8；`inputId` 不得重复；每个必须是 `staged`、属于当前服务端的行。
 - 启动事务内按数组顺序绑定：`state=bound`、`run_id`、`position=1..N`、`bound_at=now`；同一 run 内重名按 `-2`/`-3` 去重后写最终 `name`。
-- 任一 `inputId` 未知/已过期/已绑定 → `400 validation_error`（`details.field=inputs[i]`，`reason=unknown_input|expired|already_bound|too_many`），事务回滚，**所有暂存行保持 staged**。
+- 任一 `inputId` 未知/已绑定 → `400 validation_error`（`details.field=inputs[i]`，`reason=unknown_input|already_bound|too_many`），事务回滚，**所有暂存行保持 staged**。
 - 启动成功后响应不变：`201 { runId }` + `Location`；暂存行已绑定，UI 不再持有删除权。
 - 能力检查（`D-03`）在绑定前：`409 client_unsupported` 时同样保留 staged 行。
 
@@ -347,11 +352,14 @@ type RunInputView = {
 
 ```ts
 type ExecutorRunInputRef = RunInputView & {
-  downloadPath: string; // 相对路径：/api/v1/executor/runs/{runId}/inputs/{inputId}
+  /** 相对 executor base（`/api/v1/executor`）的路径：`/runs/{runId}/inputs/{inputId}`。 */
+  downloadPath: string;
 };
 ```
 
 - 鉴权同 `EXE-01`–`EXE-05`：Bearer 或 `X-Client-Id`；run 不属于该 client → `404 run_not_found`。
+- `EXE-06` 的 404 语义必须区分：**run 不存在/不属于该 client** → `404 run_not_found`；**未知路由（旧服务端）** → `404 not_found`。client 只把后者当「无初始资料」继续；前者会让任务失败。
+- `downloadPath` 必须精确为 `/runs/{runId}/inputs/{inputId}`（相对 executor base）；client 会校验路径里的 runId/inputId 与列表一致。
 - `X-Executor-Protocol` 仍要求 `3`；两个端点都是加法，不升版本。
 - 旧 client 不会调用；新 client 在 `runId` 缺失或端点 404（旧服务端）时按「无初始资料」继续，不阻塞普通 run。
 
@@ -378,18 +386,15 @@ type StartRun = {
 };
 
 type RunInputView = { /* 见 5.1.3 */ };
-type RunInputStaged = RunInputView & { expiresAt: string };
+type RunInputStaged = RunInputView;
 
 type RunService = {
   // ...现有方法
-  /** API-57：校验并落盘一张暂存图片；返回 inputId 与过期时间。 */
+  /** API-57：校验并落盘一张暂存图片；返回 inputId。 */
   stageInput(input: StageRunInput): Promise<RunInputStaged>;
 
   /** API-58：删除尚未绑定的暂存项；已绑定抛 InvalidStateError。 */
   deleteStagedInput(inputId: string): Promise<void>;
-
-  /** 惰性清理：删除 expires_at < now 的 staged 行与对象；上传/启动/进程启动时调用。 */
-  sweepExpiredInputs(now?: Date): Promise<{ removed: number }>;
 
   /** API-55/56：只读已绑定到该 run 的初始资料。 */
   listInputs(runId: string): Promise<RunInputView[]>;
@@ -415,14 +420,14 @@ type RunService = {
 
 不变式：
 
-- **暂存阶段**：`stageInput` 先校验类型/体积/文件名，再写对象与 `run_input(state=staged, expires_at)`；行插入失败要删除已写对象。返回的 `inputId` 是后续启动的唯一凭据。
-- **绑定阶段**：`start.inputs` 的每一项都必须是 `staged`、未过期、未被其他 run 绑定；全部校验通过才在同一事务里改成 `state=bound`、写 `run_id/position/bound_at`。任一失败整体回滚，**所有暂存行保持 staged**。
+- **暂存阶段**：`stageInput` 先校验类型/体积/文件名，再写对象与 `run_input(state=staged)`；行插入失败要删除已写对象。返回的 `inputId` 是后续启动的唯一凭据。
+- **绑定阶段**：`start.inputs` 的每一项都必须是 `staged`、未被其他 run 绑定；全部校验通过才在同一事务里改成 `state=bound`、写 `run_id/position/bound_at`。任一失败整体回滚，**所有暂存行保持 staged**。
 - **不搬字节**：绑定只改库，`store_key` 始终是 `inputs/<inputId>`；避免「移动成功、事务失败」的二段不一致。
 - `inputs.length > 0` 时，`start` 必须先通过 client 能力检查（`D-03`）；失败不绑行、不建 run。
 - 每个 input 的 `sha256` 与存储字节一致；`size_bytes` 与对象长度一致；对象缺失/损坏按 `500` 处理，不返回半份字节。
 - 同一 run 内 `name` 唯一、`position` 从 1 递增且唯一，均只在 `state=bound` 上成立（部分唯一索引）。
 - 读取（产品/执行面）只允许 `state=bound` 且属于该 run 的 input；`staged` 不能通过 run 端点读，跨 run 的 `inputId` 一律 404。
-- `sweepExpiredInputs` 只删 `staged`；已绑定行不因过期被删。
+- `staged` 行没有过期时间；只能被 `deleteStagedInput` 或运维清理删除。
 
 依赖变化：`CMP-run` 的允许依赖增加 `CMP-scheduler.presence`（当前 [`run/spec.md`](../../design/components/run/spec.md) §5 只列 `enqueue`/`cancelInstances`/`inspect`）。这是只读调用，但属于组件契约变更，需在 P1 评审时一起确认。
 
@@ -441,7 +446,6 @@ create table run_input (
   sha256 text not null check (sha256 ~ '^[0-9a-f]{64}$'),
   store_key text not null unique,
   state text not null check (state in ('staged','bound')),
-  expires_at timestamptz not null,
   created_at timestamptz not null default now(),
   bound_at timestamptz,
   check (
@@ -453,12 +457,12 @@ create table run_input (
 
 create unique index run_input_run_name on run_input (run_id, name) where state = 'bound';
 create unique index run_input_run_position on run_input (run_id, position) where state = 'bound';
-create index run_input_staged_expiry on run_input (expires_at) where state = 'staged';
+create index run_input_staged_idx on run_input (created_at) where state = 'staged';
 ```
 
 - 数据所有者：`CMP-run`（唯一写入口）。
 - `store_key` 形如 `inputs/<inputId>`，由服务端拼接，不接受调用方路径；暂存与绑定共用。
-- `expires_at` 对 `staged` 生效；对 `bound` 只作历史值，清理任务只扫 `staged`。
+- `staged` 无过期字段；未删除的暂存项会一直保留，孤儿由运维清理。
 - 不新增 `workflow_run` 列；run 详情是否带 `inputs` 由 `API-55` 单独读，避免把大对象元数据塞进列表/详情。
 
 ### 5.5 prompt
@@ -508,9 +512,9 @@ create index run_input_staged_expiry on run_input (expires_at) where state = 'st
 | 上传：`content-length` 预拒（防无界内存） | 网关 | `413 payload_too_large`（`run_input_file_bytes`） |
 | 上传：单张 ≤8 MiB | `CMP-run.stageInput` | `413 payload_too_large` |
 | 上传：魔数 ∈ PNG/JPEG/WebP/GIF，且与声明类型一致 | `CMP-run.stageInput` | `400`，`reason=unsupported_media_type` |
-| 上传：文件名清洗（去路径分隔符/控制字符/NUL，去首尾点与空格，Windows 保留名加前缀，长度 ≤120，空名回退 `image-<n>.<ext>`） | `CMP-run.stageInput` | 自动修正，不报错 |
+| 上传：文件名清洗（去路径分隔符/控制字符/NUL，去首尾点与空格，**不得以点开头**，Windows 保留名加前缀，长度 ≤120，空名回退 `image-<n>.<ext>`） | `CMP-run.stageInput` | 自动修正，不报错 |
 | 上传：扩展名与魔数一致（缺失或不符时补/改） | `CMP-run.stageInput` | 自动修正 |
-| 启动：`inputs` ≤8、ID 不重复、全部 `staged`、未过期 | `CMP-run.start` | `400 validation_error`（`details.field=inputs[i]`） |
+| 启动：`inputs` ≤8、ID 不重复、全部 `staged` | `CMP-run.start` | `400 validation_error`（`details.field=inputs[i]`） |
 | 启动：合计 ≤20 MiB | `CMP-run.start` | `413 payload_too_large`（`run_input_bytes`） |
 | 启动：同一 run 内重名追加 `-2`/`-3` | `CMP-run.start` | 自动修正 |
 | 绑定：`state=bound`、`run_id`、`position`、`bound_at` 一致 | 数据库 check | `500`（实现缺陷） |
@@ -534,14 +538,14 @@ create index run_input_staged_expiry on run_input (expires_at) where state = 'st
 |---|---|
 | 上传时类型/体积/文件名非法 | `400`/`413`，不建 `run_input` 行、不留对象 |
 | 上传时对象写入成功、行插入失败 | 删除对象；返回 500；不留半份 |
-| 上传后网络断开、UI 未拿到 `inputId` | 行保留为 `staged`，TTL 到期清理；UI 重试会新建一项，旧项成为孤儿直到 TTL |
-| 启动时某个 `inputId` 未知/已过期/已绑定/重复 | `400 validation_error`，事务回滚，**所有暂存行保持 staged**，不建 run |
+| 上传后网络断开、UI 未拿到 `inputId` | 行保留为 `staged`；UI 重试会新建一项，旧项成为孤儿，需运维清理 |
+| 启动时某个 `inputId` 未知/已绑定/重复 | `400 validation_error`，事务回滚，**所有暂存行保持 staged**，不建 run |
 | 启动时合计体积超限 | `413 payload_too_large`，暂存行保持 staged，不建 run |
 | 启动时 client 未声明 `run-inputs` | `409 client_unsupported`，暂存行保持 staged，不建 run |
 | 同工作区已有活跃 run | `409 run_conflict`，暂存行保持 staged，不建 run |
 | 绑定事务失败 | 回滚绑定，暂存行保持 staged；返回原错误（外键/冲突映射同现状） |
 | 绑定时服务端崩溃 | 事务保证要么全 bound、要么全 staged；不会出现半绑定 |
-| 暂存 TTL 到期 | 惰性清理删除行与对象；UI 再启动会得到 `expired`，需重新上传 |
+| 暂存项长期未绑定 | 不自动清理；需 UI DELETE 或运维清理，否则占用存储 |
 | 删除已绑定项 | `409 invalid_state`；UI 不应再显示删除按钮 |
 | client 拉列表 5xx/超时 | 任务 `failed(asset/input_fetch_failed)`，不建 session；run 失败在当前节点 |
 | 下载摘要不符 | `failed(asset/input_checksum_mismatch)`；不重试到死，最多 3 次网络重试 |
@@ -557,10 +561,10 @@ create index run_input_staged_expiry on run_input (expires_at) where state = 'st
 | 落点 | 改动 |
 |---|---|
 | `db/migrations/0014_run_input.sql` | 新表 + 部分唯一索引（§5.4） |
-| `src/core/config/run-config.ts`、`config/default.toml` | `[run]` 的 `max_input_files`、`max_input_file_bytes`、`max_input_bytes`、`input_staged_ttl_ms` |
+| `src/core/config/run-config.ts`、`config/default.toml` | `[run]` 的 `max_input_files`、`max_input_file_bytes`、`max_input_bytes` |
 | `src/core/kernel/errors-run.ts`、`errors.ts` | `ClientUnsupportedError`（409）、`InputNotFoundError`（404）、`PayloadTooLargeError` 新增 limit 口径 |
 | `src/components/scheduler/{presence,poll,types}.ts` | presence 记 `capabilities`；poll 读头；`ClientPresenceView.capabilities` |
-| `src/components/run/{types,commands,store,store-types,prompt,service,index}.ts` | `stageInput`/`deleteStagedInput`/`sweepExpiredInputs`、`start.inputs` 绑定、`run_input` 读写、prompt 块、`list/read` 方法 |
+| `src/components/run/{types,commands,store,store-types,prompt,service,index}.ts` | `stageInput`/`deleteStagedInput`、`start.inputs` 绑定、`run_input` 读写、prompt 块、`list/read` 方法 |
 | `src/components/run/commands.ts` | 启动顺序：现有校验 → 能力检查 → 绑定暂存行 → 建 run |
 | `src/components/http-gateway/routes/run-inputs.ts`（新） | `API-57`/`API-58`，multipart 单文件解析 |
 | `src/components/http-gateway/routes/{run,executor}.ts` | `start` 读 `inputs`；`API-55/56`；`EXE-06/07` |
@@ -597,7 +601,7 @@ create index run_input_staged_expiry on run_input (expires_at) where state = 'st
 1. **前置验证**（client）：补模型 `input` 声明，跑一次真实 `read_image`；不通过就停。
 2. **编排**：迁移 + `stageInput`/绑定 + 网关上传/删除 + prompt + 测试（无 client 参与也能测）。
 3. **client**：能力头 + 拉取/落盘 + 测试。
-4. **UI**：粘贴即上传 + 进度/重试/删除 + 详情预览（按 `ui-proposal.md` 立工序）。
+4. **UI**：提交时上传 + 进度/重试/删除 + 详情预览（UI 已实现，见 [result](../../../../agent-flow-ui/docs/history/works/2026-11-19-run-start-images/result.md)）。
 5. **端到端**：真实截图粘贴 → 上传 → 启动 → 检查 task-space 文件 → 首节点 `read_image` 描述 → 归档包含 `inputs/`。
 
 ## 9 测试与验收
@@ -609,7 +613,7 @@ create index run_input_staged_expiry on run_input (expires_at) where state = 'st
   - R2：不带图片启动 → 行为与现状完全一致（prompt 无 `[初始资料]`）。
   - R3：暂存后删除其中一张再启动 → 被删项 404/不参与绑定；另一项正常绑定；重复文件名的两张图绑定时得到 `x.png`/`x-2.png`。
   - N1：旧 client（无 `run-inputs`）带图启动 → `409 client_unsupported`，不建 run、暂存行保持 staged。
-  - 补充反例（矩阵覆盖，不单独占场景位）：过期 `inputId` → 400 且回滚；`DELETE` 已绑定点 → 409。
+  - 补充反例（矩阵覆盖，不单独占场景位）：未知 `inputId` → 400 且回滚；`DELETE` 已绑定点 → 409。
 - 更新 `SCN-0301` 第 4/5 步：带图启动时 prompt 与 client 写入 `inputs/` 的断言。
 - `REQ`：[`REQ-0003`](../../requirements/REQ-0003-run-start-image-inputs.md) 已建（2026-11-19），记录三项裁决；设计冻结后进入实现工序。
 
@@ -617,12 +621,12 @@ create index run_input_staged_expiry on run_input (expires_at) where state = 'st
 
 | 层 | 用例 |
 |---|---|
-| 网关 | `POST /run-inputs` 单张成功/非图片/超限/非 multipart；`DELETE` staged/bound/未知；启动 `inputs` 0/1/8/9 张、重复 ID、过期、已绑定；`client_unsupported`；`API-55/56` 头与 404 |
-| 领域 | 上传魔数/文件名清洗（CJK、空格、`..`、Windows 保留名、超长）；staged→bound 同事务；失败回滚保持 staged；合计体积；TTL 清理只删 staged；对象/行补偿；`list/read` 跨 run 404 |
+| 网关 | `POST /run-inputs` 单张成功/非图片/超限/非 multipart；`DELETE` staged/bound/未知；启动 `inputs` 0/1/8/9 张、重复 ID、已绑定；`client_unsupported`；`API-55/56` 头与 404 |
+| 领域 | 上传魔数/文件名清洗（CJK、空格、`..`、Windows 保留名、超长）；staged→bound 同事务；失败回滚保持 staged；合计体积；DELETE/运维清理；对象/行补偿；`list/read` 跨 run 404 |
 | prompt | 无图不变；有图块顺序、字节上限；首节点额外 `intent.md` 指令 |
 | 执行面 | `EXE-06/07` 鉴权、跨 client 404、`X-Checksum-Sha256`、旧协议 400 |
 | client | 拉取/落盘、幂等重派、摘要不符、路径越界、列表 404 兼容、能力头 |
-| UI | 粘贴/拖放即上传、进度、失败重试、删除、关闭清理、提交只传 `inputId`、详情缩略图 |
+| UI | 粘贴/拖放本地暂存、提交时上传、进度、失败回滚/重试、关闭清理、启动只传 `inputId`、详情缩略图 |
 | 视觉 | `read_image` 真实读图（人工/探针）；ACP `image=true`（可选） |
 | 端到端 | 真实粘贴 + 上传 + 启动 + client + 模型；归档 tar 含 `inputs/` |
 
@@ -652,10 +656,10 @@ cd ../agent-flow-ui && npm test
 | `R-IMG-06` | 服务端副本与归档重复存储 | 存储增长 | `bound` 随 run 保留；`OQ-27` 统一清理；归档已含 `inputs/` |
 | `R-IMG-07` | 产品端点无鉴权，图片可能含敏感信息 | 信息暴露 | 生产前补鉴权（`OQ-36`）；本期与 run 详情同边界 |
 | `R-IMG-08` | 启动窗口内 client 能力变化 | 极端情况下图片未落盘 | 本期接受；需要绝对严格时加派发时二次校验 |
-| `R-IMG-09` | 暂存行与对象非同一事务，崩溃/写失败留下孤儿 | 存储泄漏 | 行插入失败补偿删除对象；孤儿由 TTL 清理兜底 |
+| `R-IMG-09` | 暂存行与对象非同一事务，崩溃/写失败留下孤儿 | 存储泄漏 | 行插入失败补偿删除对象；无 TTL，孤儿由运维清理 |
 | `R-IMG-10` | 暂存项无归属、无全局配额，可被刷盘 | 磁盘耗尽 | 首期只靠单张/单次上限；生产前按 actor/IP 加配额与鉴权 |
 | `R-IMG-11` | BFF 缓冲转发，上传进度到 100% 后仍要等服务端响应 | 进度条短暂“卡住” | UI 区分「上传中/处理中」；不承诺逐字节端到端进度 |
-| `R-IMG-12` | 24 h 暂存 TTL 过长/过短 | 长 TTL 占空间，短 TTL 让用户重传 | 默认 24 h，配置 `input_staged_ttl_ms`；按反馈调整 |
+| `R-IMG-12` | 暂存不设 TTL，长期未绑定的孤儿会累积 | 磁盘占用 | 用户关闭弹窗时 DELETE；运维按 `staged` 行/对象做人工清理；后续可加手动清理端点或策略 |
 | `R-IMG-13` | 启动成功但响应丢失，重试时 `inputId` 已绑定 | 用户看到 `already_bound`，困惑 | UI 提示「图片已被某次运行使用，请到运行列表确认」；启动接口暂不做幂等键（沿用现状） |
 
 ## 11 裁决记录与待定
@@ -665,17 +669,16 @@ cd ../agent-flow-ui && npm test
 | # | 问题 | 结论 |
 |---|---|---|
 | `Q-IMG-01` | client 是否支持图片 | **支持**；必须补 pi-ai 模型条目的 `input: ["text","image"]`，并用真实 `read_image` 复验 |
-| `Q-IMG-02` | 上传形态 | **粘贴即上传**：`POST /run-inputs` 暂存，启动引用 `inputId`；不采用启动 multipart |
+| `Q-IMG-02` | 上传形态 | **提交时上传**：点「发起运行」后逐张 `POST /run-inputs`，全部成功再启动；后端契约不变。2026-11-19 UI 实施修订，取代旧「粘贴即上传」 |
 | `Q-IMG-03` | 首期范围 | **只支持图片**（PNG/JPEG/WebP/GIF），不做 PDF/文本等通用文件 |
-| `Q-IMG-06` | 跨项目分工 | 本仓库出编排契约与实现；UI 按 [`ui-proposal.md`](ui-proposal.md) 在 `agent-flow-ui` 立项；client 在其仓库实现 |
+| `Q-IMG-04` | 首期上限 | **8 张 / 单张 8 MiB / 合计 20 MiB** |
+| `Q-IMG-05` | 运行详情预览 | **要**：`API-55/56` + UI 缩略图 |
+| `Q-IMG-06` | 跨项目分工 | 本仓库出编排契约与实现；UI 已在 `agent-flow-ui` 实现（提交时上传）；client 已在其仓库实现 |
+| `Q-IMG-07` | 暂存 TTL | **不设 TTL**；`staged` 一直保留到绑定或 DELETE，孤儿由运维清理 |
 
 ### 11.2 待定
 
-| # | 问题 | 选项 | 建议 |
-|---|---|---|---|
-| `Q-IMG-04` | **上限** | A. 8 张 / 8 MiB / 20 MiB；B. 4 张 / 5 MiB / 10 MiB；C. 其他 | **A**；B 更保守，适合 token/内存敏感场景 |
-| `Q-IMG-05` | **运行详情是否要缩略图预览？** | A. 要（`API-55/56` + UI 展示）；B. 只显示文件名/大小 | **A**；用户能确认图片真的进了 task-space |
-| `Q-IMG-07` | **暂存 TTL** | A. 24 h（推荐）；B. 1 h；C. 7 天 | **A**；覆盖“填完意图再启动”的常见停顿，同时限制无归属暂存的空间占用 |
+无。设计已冻结（2026-11-19）；实现按 `T-IMG-08` 推进。
 
 ## 12 证据索引
 

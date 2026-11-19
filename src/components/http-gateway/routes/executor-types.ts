@@ -76,6 +76,23 @@ export type ExecutorArchiveRequest = {
 
 export type ExecutorStored = "created" | "replaced" | "unchanged";
 
+export type ExecutorRunInput = {
+  inputId: string;
+  name: string;
+  mediaType: "image/png" | "image/jpeg" | "image/webp" | "image/gif";
+  sizeBytes: number;
+  sha256: string;
+  downloadPath: string;
+};
+
+export type ExecutorRunInputContent = {
+  stream: ReadableStream<Uint8Array>;
+  sizeBytes: number;
+  mediaType: ExecutorRunInput["mediaType"];
+  sha256: string;
+  name: string;
+};
+
 export type ExecutorResult = {
   taskId: string;
   attempt: number;
@@ -98,7 +115,7 @@ export type ExecutorResult = {
 
 export type ExecutorBackend = {
   resolveClientId(token: string): Promise<string | null>;
-  poll(clientId: string, report: ExecutorReport, options: { holdMs: number }): Promise<ExecutorDecision>;
+  poll(clientId: string, report: ExecutorReport, options: { holdMs: number; capabilities?: string[] }): Promise<ExecutorDecision>;
   acceptResult(clientId: string, result: ExecutorResult): Promise<{ taskId: string; accepted: boolean }>;
   describePackage(packageId: string): Promise<ExecutorPackageRef | null>;
   openPackage(packageId: string): Promise<{ ref: ExecutorPackageRef; data: Uint8Array }>;
@@ -119,6 +136,8 @@ export type ExecutorBackend = {
     bytes: Uint8Array;
     sha256: string;
   }): Promise<{ stored: ExecutorStored }>;
+  listRunInputs?(clientId: string, runId: string): Promise<ExecutorRunInput[]>;
+  openRunInput?(clientId: string, runId: string, inputId: string): Promise<ExecutorRunInputContent>;
 };
 
 export type ExecutorDeps = {

@@ -16,6 +16,29 @@ export function json(
   });
 }
 
+export type ImageContent = {
+  stream: ReadableStream<Uint8Array>;
+  sizeBytes: number;
+  mediaType: string;
+  sha256: string;
+  name: string;
+};
+
+/** 图片二进制响应：类型/长度/摘要/no-store/nosniff 一次写全。 */
+export function image(content: ImageContent): Response {
+  return new Response(content.stream as unknown as BodyInit, {
+    status: 200,
+    headers: {
+      "content-type": content.mediaType,
+      "content-length": String(content.sizeBytes),
+      "content-disposition": `inline; filename*=UTF-8''${encodeURIComponent(content.name)}`,
+      "x-checksum-sha256": content.sha256,
+      "cache-control": "no-store",
+      "x-content-type-options": "nosniff",
+    },
+  });
+}
+
 export function noContent(): Response {
   return new Response(null, { status: 204 });
 }
@@ -61,6 +84,8 @@ const STATUS_BY_CODE: Record<AppError["code"], number> = {
   unauthorized: 401,
   run_not_found: 404,
   run_conflict: 409,
+  client_unsupported: 409,
+  input_not_found: 404,
   session_log_missing: 409,
   invalid_state: 409,
   invalid_archive: 400,

@@ -30,6 +30,8 @@ export {
 } from "./errors-executor.ts";
 export * from "./executor.ts";
 export {
+  ClientUnsupportedError,
+  InputNotFoundError,
   InvalidArchiveError,
   InvalidStateError,
   RunConflictError,

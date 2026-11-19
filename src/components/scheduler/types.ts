@@ -74,7 +74,11 @@ export type ClientReport = {
   finished: FinishedRef[];
 };
 
-export type PollOptions = { holdMs: number };
+export type PollOptions = {
+  holdMs: number;
+  /** client 自报能力（poll 头）；旧 client 缺省为空。 */
+  capabilities?: string[];
+};
 
 export type TaskEnvelope = {
   taskId: string;
@@ -141,6 +145,8 @@ export type ClientPresenceView = {
   lastPollAt: string | null;
   free: number | null;
   running: number;
+  /** 最近一次 poll 声明的能力；无声明为 []。 */
+  capabilities?: string[];
 };
 
 export type SchedulerPresenceRead = {

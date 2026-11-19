@@ -2,8 +2,8 @@ import { NotFoundError, ValidationError } from "../../../core/kernel/index.ts";
 import type { RunFileRoot, RunService, RunState } from "../../run/index.ts";
 import { RUN_START_FIELDS, RUN_DECISION_FIELDS } from "../fields.ts";
 import { pagePayload } from "../queries.ts";
-import { json } from "../respond.ts";
-import { actorFrom, assertNodeId, assertUuid, parsePageQuery, queryValue, readJsonObject } from "../validation.ts";
+import { image, json } from "../respond.ts";
+import { actorFrom, assertAllowedFields, assertNodeId, assertUuid, parsePageQuery, queryValue, readJsonObject } from "../validation.ts";
 import type { RouteContext } from "./types.ts";
 
 const RUN_STATES: RunState[] = ["created", "running", "waiting_confirm", "waiting_resume", "done"];
@@ -18,6 +18,10 @@ export async function handleRun(ctx: RouteContext): Promise<Response> {
     return json(await runService.get(id));
   }
   if (segments.length === 3 && segments[2] === "cancel") return cancelRun(ctx, runService, id);
+  if (segments.length === 3 && segments[2] === "inputs") return listRunInputs(ctx, runService, id);
+  if (segments.length === 5 && segments[2] === "inputs" && segments[4] === "content") {
+    return readRunInput(ctx, runService, id, assertUuid(segments[3], "inputId"));
+  }
   if (segments.length >= 3 && segments[2] === "nodes") return routeNodeResource(ctx, runService, id, segments);
   if (segments.length >= 3 && segments[2] === "files") return routeFileResource(ctx, runService, id, segments);
   throw new NotFoundError("路径", ctx.path);
@@ -88,15 +92,46 @@ export async function startRun(ctx: RouteContext, workflowId: string): Promise<R
     }
     autoConfirm = body.autoConfirm;
   }
+  const inputs = parseStartInputs(body.inputs);
   const detail = await runService.start({
     workflowId,
     harnessId,
     workspacePath,
     intentMarkdown,
     ...(autoConfirm === undefined ? {} : { autoConfirm }),
+    ...(inputs === undefined ? {} : { inputs }),
     actor: actorFrom(ctx.request, ctx.deps.actor),
   });
   return json({ runId: detail.runId }, 201, { Location: `/api/v1/runs/${detail.runId}` });
+}
+
+function parseStartInputs(value: unknown): { inputId: string }[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) throw new ValidationError("inputs", "必须是数组");
+  return value.map((item, index) => {
+    if (item === null || typeof item !== "object" || Array.isArray(item)) {
+      throw new ValidationError(`inputs[${index}]`, "必须是对象");
+    }
+    assertAllowedFields(item as Record<string, unknown>, ["inputId"], `inputs[${index}]`);
+    const inputId = (item as Record<string, unknown>).inputId;
+    return { inputId: assertUuid(typeof inputId === "string" ? inputId : undefined, `inputs[${index}].inputId`) };
+  });
+}
+
+function listRunInputs(ctx: RouteContext, runService: RunService, runId: string): Promise<Response> {
+  if (ctx.request.method !== "GET") throw new NotFoundError("路径", ctx.path);
+  return runService.listInputs(runId).then((items) => json({ items }));
+}
+
+async function readRunInput(
+  ctx: RouteContext,
+  runService: RunService,
+  runId: string,
+  inputId: string,
+): Promise<Response> {
+  if (ctx.request.method !== "GET") throw new NotFoundError("路径", ctx.path);
+  const content = await runService.readInput(runId, inputId);
+  return image(content);
 }
 
 function requireRun(ctx: RouteContext): RunService {
