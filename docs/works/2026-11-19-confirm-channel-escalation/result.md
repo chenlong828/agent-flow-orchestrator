@@ -79,4 +79,4 @@ $ ./.local/bun/bun run quality:report
 
 ## 7 裁决摘要
 
-blocker 0 / decision 2（持久化形态、确认优先，均已落文档与测试）/ hold 2（client 实现、真实联调，已转后续任务）。详见 [`review.md`](review.md)。
+blocker 0 / decision 2（持久化形态、确认优先，均已落文档与测试）/ hold 5（client 实现、真实联调、服务端计数与超时、旧行兼容、`arch-reviewer` 文本，均已写明不阻塞理由）。详见 [`review.md`](review.md)。
