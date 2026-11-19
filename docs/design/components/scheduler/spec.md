@@ -31,7 +31,7 @@ updated: 2026-11-11
 
 | 实体 | 说明 |
 |---|---|
-| `Task` | 任务列表条目：`taskId`、`instanceId`、`nodeId`、`attempt`、`state`、不可变快照（`prompt`/`workspacePath`/`taskSpacePath`/`timeoutMs`/`skillSet`/`resultSignal`）、`resumeSessionId`、`outcome`、`error`、`notBefore`、`dispatchedAt`、`cancelRequestedAt`、`finishedAt`、审计字段 |
+| `Task` | 任务列表条目：`taskId`、`instanceId`、`nodeId`、`attempt`、`state`、不可变快照（`prompt`/`workspacePath`/`taskSpacePath`/`timeoutMs`/`skillSet`/`resultSignal`/`confirmation`）、`resumeSessionId`、`outcome`、`error`、`notBefore`、`dispatchedAt`、`cancelRequestedAt`、`finishedAt`、审计字段 |
 | `TaskAttempt` | 每次下发与结算的事实流水（追加写）：`taskId`、`attempt`、`clientId`、`dispatchedAt`、`settledAt`、`result` 摘要。用于对账、排障与「未确认重发」判定，不作为第二真相 |
 | `ClientPresence` | 判活与电平控制：`clientId`、`lastPollAt`、`stopRequested`、`cancelRequestedAt`（按实例去重）。进程内状态可重建，落库仅为重启后对账 |
 
@@ -43,7 +43,7 @@ updated: 2026-11-11
 - `cancelRequestedAt` 是取消请求的标记，不是第四个状态：置位后任务仍按 `dispatched → done` 收敛，由 `poll` 的 `cancelInstances` 与 client 的 `cancelled` 结果兑现。
 - 任务归属的 `clientId` 来自实例绑定，任务表不单独存「可改派给谁」的字段；跨 client 改派不是本组件的隐式行为（见 §4.7）。
 - v3 起 `task` 增加 `task_space_path`：由上游编排在入队时传入并冻结，重派不变（`S-05`）；入队必填、非空绝对路径，历史行可能仍为空串。
-- `task.result_signal` 为 opaque JSON（由 `CMP-run` 定义 schema，本组件只持久化与透传），纳入 `S-05` 稳定内容；上限 8 KiB。
+- `task.result_signal` 为 opaque JSON（由 `CMP-run` 定义 schema，本组件只持久化与透传），存 `{ resultSignal?, confirmation? }` 复合对象，两者一起冻结并纳入 `S-05` 稳定内容；单契约上限 8 KiB。
 - `task.resume_session_id` 为可选 session 标识；存在时 client 续跑该 session，只透传，不解释。
 - 技能集 digest 由本组件在入队时计算并冻结；规范见 §4.4。
 
@@ -63,6 +63,7 @@ type TaskDraft = {
   skillIds: string[];      // 由上游给出；解析为不可变 skillSet
   taskSpacePath: string;   // v3：run 的 task-space 绝对路径；入队必填、非空
   resultSignal?: ResultSignalContract; // v3 加法：opaque JSON；≤ 8 KiB
+  confirmation?: ResultSignalContract; // v3 加法：review 额外确认工具；kind=confirmation_request、required=false
   resumeSessionId?: string;            // v3 加法：确认点续跑 session
 };
 
@@ -105,6 +106,7 @@ type TaskEnvelope = {
   timeoutMs: number;
   skillSet: SkillSet;
   resultSignal?: ResultSignalContract;
+  confirmation?: ResultSignalContract;
   resumeSessionId?: string;
 };
 

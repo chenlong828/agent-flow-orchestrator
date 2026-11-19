@@ -9,7 +9,7 @@ level: P2
 
 # 提案：确认通道补强（prompt 收敛 + 评审应急呼人）
 
-> 状态：**P2 提案，未冻结**。本提案只定义契约、prompt 文案、review confirm 语义与任务拆分；实现由后续任务承接。
+> 状态：**P2 提案，已确认（2026-11-19）**。orchestrator 侧已实现；client 侧按 [`client-implementation-proposal.md`](client-implementation-proposal.md) 另行实现，完成后联调。
 > 结论：**review 节点在现有 `review_verdict` 之外，增加一个可选的 `confirmation` 契约；client 同时挂 `signal` + `confirm` 两个工具；prompt 分 agent/review 两套确认文案。** 复用现有 `waiting_confirm` + `resumeSessionId` 续跑，不新增 MCP 工具、不改 `decide` API/UI、不做通用聊天。
 
 ## 0 一句话
@@ -138,11 +138,18 @@ review 调 mcp__agentflow__confirm(question, context, options?)
 | 人答复与证据冲突 | 评审自行判断；人答复只作输入，不作 verdict |
 | 无答复长期挂起 | 现有 `waiting_confirm` 语义；UI 可见；不自动通过 |
 
-## 8 待确认
+## 8 决策记录（2026-11-19）
 
-1. 级别 P2 / P1。
-2. 契约形状：可选 `confirmation`（推荐）/ `resultSignals[]` / `allowConfirm`。
-3. 评审范围：全部 review 节点 / 仅架构评审。
-4. 次数上限：v1 prompt 约束 / 服务端计数。
-5. 无答复：一直等待（推荐）/ 超时失败。
-6. 旧 client：同版本发布（推荐）/ 能力协商。
+| 项 | 决定 | 说明 |
+|---|---|---|
+| 级别 | **P2** | 加法契约、prompt 文案、跨组件实现；不改核心 schema/数据所有权/模块边界 |
+| 契约形状 | **可选 `confirmation` 字段** | 不选 `resultSignals[]`（改动面大）与 `allowConfirm`（语义隐式） |
+| 评审范围 | **全部 review 节点** | 同一严格判据；不按架构评审特例 |
+| 次数上限 | **v1 prompt 约束「每个 review 访问最多 1 问」** | 观察到滥用再加服务端计数 |
+| 无答复 | **一直等待** | 复用 `waiting_confirm`；不自动 pass、不超时失败 |
+| 旧 client | **同版本发布** | v1 不混跑旧 client；client 侧先按提案实现，再由 orchestrator 联调 |
+| 持久化 | **复用 `task.result_signal` 列存 `{resultSignal?, confirmation?}`** | 开发期快速演进，不加迁移、不保留旧行兼容 |
+
+## 9 待确认
+
+无。后续只剩 `T-CCE-04`（client 实现）与 `T-CCE-06`（真实 client 联调）。

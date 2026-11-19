@@ -65,6 +65,7 @@ externalRefs: []
 4. client 上报结果 → `CMP-run.handleTaskResult`：找 `run_node` → **日志不存在 → `409 session_log_missing`，不调 `acceptResult`、不结算**；存在 → `scheduler.acceptResult`。结果被接受后，节点结算的同一事务把结果里的可选 `sessionId` 写入 `run_node.session_id`；未带则保持 `null`，不补写、不推导。
 5. 结算 `succeeded`：
    - 普通节点：`run_node(succeeded)`，推进 seq 后继。
+   - `review` 的确认优先：`review` 同时挂 `mcp__agentflow__signal` 与 `mcp__agentflow__confirm`；结果含 `confirmation_request`（即使同时带 verdict）→ 节点与 run 置 `waiting_confirm`，不结算 verdict；人 `decide(pass|reject)` 后用同一 `sessionId` 续跑，评审仍须自行提交 `review_verdict`。
    - `review`：只取结果 `signals` 中最后一个合法 `review_verdict`；`pass` → `succeeded` + 推进；`fail` → `run_node(rejected)`，取该节点唯一 `rollback` 边的 `to` 作为回退目标。`message` 不参与判定。
 6. 回退：目标节点起重新执行，`run_node` 写 `visit+1` 新行；目标到 review 之间的节点依次重跑；旧行保留为历史。
 7. 轮次上限：任一节点 `visit+1 > run.max_node_visits`（默认 5）→ `run.failed(visit_limit_exceeded)`，不再入队。
@@ -72,6 +73,7 @@ externalRefs: []
 失败路径：
 
 - verdict 缺失/非法：没有合法 `review_verdict` 信号 → `run_node(failed, verdict_invalid)`，`run.failed`，**不猜测、不默认 pass、不解析 message JSON**。
+- review 确认无答复：run 保持 `waiting_confirm`，不产生 verdict；取消后 run `cancelled`、节点 `failed(cancelled)`，评审不写「已通过」。
 - `review` 判定 fail 但没有 `rollback` 出边 → `run_node(failed, missing_rollback_edge)`，`run.failed`（保存校验应已拦截，运行期兜底）。
 - 日志超限 → `413`，不落存储、不结算；client 需以明确错误上报。
 - 结果先到、日志未到 → `409`；client 补传后重试结果成功，任务不重跑（同一 `taskId`）。
@@ -89,9 +91,9 @@ externalRefs: []
 | 角色 | 测试 ID | 断言 |
 |---|---|---|
 | R1 | `TC-RUN-005` | 上传日志 → `200` 且可按 `taskId+attempt` 回读；重复上传按后到覆盖返回 `200` 与 `stored` |
-| R2 | `TC-RUN-006` | `review` 返回 `pass` → 节点 `succeeded`、继续 seq；返回 `fail` → 节点 `rejected`、回退边目标以 `visit+1` 重新执行；结果里的 `sessionId` 落对应 `run_node.session_id`，但不出现在产品 API |
+| R2 | `TC-RUN-006` | `review` 返回 `pass` → 节点 `succeeded`、继续 seq；返回 `fail` → 节点 `rejected`、回退边目标以 `visit+1` 重新执行；结果里的 `sessionId` 落对应 `run_node.session_id`，但不出现在产品 API；review 只报 `confirmation_request` 时先进入 `waiting_confirm`，人工答复后续跑同一 session，评审仍须提交 `review_verdict` |
 | R3 | `TC-RUN-007` | 回退轮次用尽（`visit > max_node_visits`）→ `run.failed(visit_limit_exceeded)`，不再入队 |
-| N1 | `TC-RUN-008` | 未上传日志直接报结果 → `409 session_log_missing`，任务不结算；补传后重试成功；没有 `review_verdict` 信号（即使 message 里有合法 verdict JSON）→ 节点 `failed(verdict_invalid)`，run 失败；结果未带 `sessionId` 时 `run_node.session_id` 保持 `null` |
+| N1 | `TC-RUN-008` | 未上传日志直接报结果 → `409 session_log_missing`，任务不结算；补传后重试成功；没有 `review_verdict` 信号（即使 message 里有合法 verdict JSON）→ 节点 `failed(verdict_invalid)`，run 失败；结果未带 `sessionId` 时 `run_node.session_id` 保持 `null`；review 确认无答复保持 `waiting_confirm`、不自动 pass，取消后不产生 verdict |
 
 测试已落盘（`tests/components/http-gateway/`），frontmatter `tests` 已补齐并转 `verified`。
 
@@ -99,5 +101,6 @@ externalRefs: []
 
 - 不覆盖 confirm 的人工决策与取消（`SCN-0303`）、归档（`SCN-0304`）。
 - 不覆盖 client 侧日志采集与压缩实现（属 client 仓库 v3 改造，另立工序）。
+- 不覆盖 client 侧双契约 prepare/mount/collect 的实现（见 [确认通道补强 client 提案](../../../../../works/2026-11-19-confirm-channel-escalation/client-implementation-proposal.md)）。
 - 不覆盖日志保留期与容量淘汰（`OQ-27`）。
 - 不覆盖 `split` 节点的 task.db 上传（第二期）。

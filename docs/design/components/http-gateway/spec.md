@@ -709,7 +709,7 @@ type PollRequest = {
 
 **`PollResponse`**（`EXE-01` 响应）：`{tasks: TaskRequest[]; stop: boolean; cancelInstances: string[]; nextPollAfterMs: number; archiveRequests?: ArchiveRequest[]}`；`tasks.length ≤ min(free, 10)`；`free=0` 时为空数组；`archiveRequests` 为 v3 电平字段。
 
-**`TaskRequest`**（下发项）：`{taskId, instanceId, nodeId, attempt, prompt, workspacePath, timeoutMs, skillSet, taskSpacePath, resultSignal?, resumeSessionId?}`；`skillSet` 为 `{digest, packages: SkillPackage[]}`；`downloadUrl` 由服务端拼为 `/api/v1/executor/skill-packages/{packageId}`；启动诉求已并入 `prompt`（v3）；`resultSignal` 为 opaque JSON，`resumeSessionId` 用于确认点续跑。
+**`TaskRequest`**（下发项）：`{taskId, instanceId, nodeId, attempt, prompt, workspacePath, timeoutMs, skillSet, taskSpacePath, resultSignal?, confirmation?, resumeSessionId?}`；`skillSet` 为 `{digest, packages: SkillPackage[]}`；`downloadUrl` 由服务端拼为 `/api/v1/executor/skill-packages/{packageId}`；启动诉求已并入 `prompt`（v3）；`resultSignal` 与 `confirmation` 为 opaque JSON（review 同时带两者，后者 `required=false`），`resumeSessionId` 用于确认点续跑。
 
 **`TaskResult`**（`EXE-02` 请求）：`{taskId, attempt, status, sessionId?, message, truncated, stopReason, usage, error, startedAt?, finishedAt?}`；`status` 闭集 `succeeded/failed/cancelled/timeout`；`error.class` 闭集见契约 §5。
 

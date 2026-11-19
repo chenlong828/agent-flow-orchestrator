@@ -314,6 +314,7 @@ waiting_resume ──cancel / 无 sessionId──▶ failed(cancelled / timeout)
 本次任务执行相关记录的 task-space：<taskSpacePath>
 读取 <task-space>/intent.md 作为本系列任务运行的目标与约束，方便后续其他任务了解情况。
 [输出要求] 无特别要求，跟随Skill执行。
+[确认通道] ...（仅 agent / review 节点；文案见下方说明）
 [本次进入] 节点「<被驳回节点名>」判定 fail，本节点被回退重跑。
 驳回理由：<被驳回行的 verdict.reason，截断 300 字符>
 
@@ -328,6 +329,9 @@ waiting_resume ──cancel / 无 sessionId──▶ failed(cancelled / timeout)
 
 - start 节点把中间那句换成「把下面的诉求原文写入 `<taskSpacePath>/intent.md`，再开始执行」，并追加 `[启动诉求原文]`（受 `maxPromptBytes` 约束）。
 - 不写工作流名、节点名、工作目录与目录规范：工作目录由 DSH 的运行上下文提供，产物归属与判定标准由技能承载。
+- `[确认通道]` 按节点类型输出，两段文案互斥：
+  - `agent`：`仅严重场景调用 mcp__agentflow__confirm：契约变更、规则突破、不可逆/外部副作用、P0/P1、用户意图冲突、关键信息缺失；普通决策按 auto-confirm §2 默认确认，不打断人。`
+  - `review`：`评审节点仅在「必须澄清已 accepted 需求/契约口径，且该口径直接决定 verdict」时调用 mcp__agentflow__confirm；不得把评审判断本身交给人，不得用 confirm 代替 review_verdict；一次一个问题；回答后仍须自行提交 verdict。`
 - 专家块空字段整行省略；技能清单与使用顺序不进 prompt（清单由 DSH 技能目录注入，顺序只作人工查看）。
 - `[本次进入]` 块只在回退重跑时出现：`run_node.enter_reason` 只存指针 `{kind, from, fromVisit}`，理由正文按指针回查被驳回行的 `verdict`，不复制第二份；confirm 驳回渲染成「人工在「<节点>」节点驳回」+「驳回意见」。
 
@@ -344,7 +348,7 @@ waiting_resume ──cancel / 无 sessionId──▶ failed(cancelled / timeout)
 4. 回退：`current_node_id = 目标节点`，目标节点下次执行时 `visit = 该节点历史最大 visit + 1`；目标到 `review` 之间的节点依次重跑，各自 `visit+1`，新行写入同一个 `enter_reason` 指针（指向被驳回行），派发时渲染成 prompt 的 `[本次进入]` 块。
 5. 轮次上限：任一节点本次 `visit > run.max_node_visits`（默认 5）→ `run.failed(visit_limit_exceeded)`，不再入队。
 6. `confirm` 决策：`pass` → `succeeded` → 推进；`reject` → `rejected` → 按第 3–5 条回退。
-7. `review` 派发时 `TaskRequest.resultSignal.kind = "review_verdict"`；schema 见 §4.9。
+7. `review` 派发时 `TaskRequest.resultSignal.kind = "review_verdict"`，并额外下发 `TaskRequest.confirmation`（`kind=confirmation_request`、`required=false`）；schema 见 §4.9。
 
 ### 4.6 失败与取消
 
@@ -382,11 +386,12 @@ waiting_resume ──cancel / 无 sessionId──▶ failed(cancelled / timeout)
 
 ### 4.9 结果信号与临时确认点
 
-- `agent` 节点派发时 `TaskRequest.resultSignal.kind = "confirmation_request"`；`review` 节点为 `review_verdict`。契约由 `signals.ts` 的 `REVIEW_VERDICT_SIGNAL` / `CONFIRMATION_SIGNAL` 定义，调度器视为 opaque JSON 持久化。
-- `TaskResult.signals` 只在 `succeeded` 时应用：
-  - `review_verdict` → §4.5；
-  - `confirmation_request` → 当前 `run_node` 与 run 置 `waiting_confirm`，保存 question/context/options 与 `session_id`；不推进、不结束。
-- 人工 `decide(pass|reject, comment)` 对确认点都**不结算节点、不推进/回退**：用 `row.session_id` 作为 `TaskRequest.resumeSessionId`，创建同一节点的新任务；`task_id` 替换、`visit` 不变；prompt 追加 `[人工确认]`（问题、决定、comment）。model 在同一 session 继续，最终结果再走正常结算。
+- `agent` 节点派发时 `TaskRequest.resultSignal.kind = "confirmation_request"`；`review` 节点 `resultSignal.kind = "review_verdict"`，并额外下发 `TaskRequest.confirmation`（同一 schema，`required=false`）。契约由 `signals.ts` 的 `REVIEW_VERDICT_SIGNAL` / `CONFIRMATION_SIGNAL` / `REVIEW_CONFIRMATION_SIGNAL` 定义，调度器把两个契约一起冻结到 `task.result_signal`，视为 opaque JSON 持久化。
+- `TaskResult.signals` 只在 `succeeded` 时应用，且**确认优先**：
+  - `confirmation_request` → 当前 `run_node` 与 run 置 `waiting_confirm`，保存 question/context/options 与 `session_id`；不推进、不结束。该分支对 `agent` 与 `review` 相同；`review` 的确认发生时不结算 verdict、不产生 verdict。
+  - `review_verdict` → §4.5。`review` 同样可以只回 verdict；没有确认信号时行为与之前一致。
+- 人工 `decide(pass|reject, comment)` 对确认点都**不结算节点、不推进/回退**：用 `row.session_id` 作为 `TaskRequest.resumeSessionId`，创建同一节点的新任务；`task_id` 替换、`visit` 不变；prompt 追加 `[人工确认]`（问题、决定、comment），契约仍按节点类型重新下发（review 仍带 `review_verdict` + `confirmation`）。model 在同一 session 继续，最终结果再走正常结算。
+- 确认的 `pass`/`reject` 都只是评审/agent 的输入，不是 verdict；`review` 回答后仍须自行提交 `review_verdict`。无答复时保持 `waiting_confirm`，不自动 pass；取消按 §4.6 收敛，不写「已通过」。
 - `decide` 的 `reject` 对确认点表示“拒绝意见”，不是节点失败；只有 `confirm` 节点的 reject 走回退。
 - 确认点等待期间没有在跑任务，调度器任务已 `done`；`CMP-scheduler` 不需要新增状态或语义。
 - 若 `row.session_id` 为空，`decide` 返回 `InvalidStateError`（无法续跑），不偷偷新建 session。
@@ -422,7 +427,7 @@ waiting_resume ──cancel / 无 sessionId──▶ failed(cancelled / timeout)
 | 推进 | 首节点成功→后继入队；`end` 成功→`done(succeeded)`；无出边→`failed` |
 | 判定 | `review_verdict` 信号 pass 推进；fail 回退到祖先且 `visit+1`；信号缺失/非法→`failed(verdict_invalid)`，message JSON 不参与判定；无回边→`failed` |
 | 轮次 | `visit > max_node_visits` → `failed(visit_limit_exceeded)`，不再入队 |
-| 确认 | `waiting_confirm` 无任务；pass 推进、reject 回退；`auto_confirm` 不等待；非 `waiting_confirm` 决策 409 |
+| 确认 | `waiting_confirm` 无任务；pass 推进、reject 回退；`auto_confirm` 不等待；非 `waiting_confirm` 决策 409；review 确认 → `waiting_confirm`，pass/reject 续跑同一 session 后仍由评审提交 verdict |
 | 日志 | 缺日志报结果 409 且不结算；补传后接受；同内容重复 200 `unchanged`、异内容后到覆盖 200 `replaced`；超限 413 |
 | 会话绑定 | 结果带 `sessionId` 时落 `run_node.session_id`（成功与失败路径）；未带、历史行与重启补结算保持 `null`；产品 API 不出现该字段 |
 | 超时续跑 | timeout + `sessionId` 进入 `waiting_resume`；`resumeNode` 调 scheduler 重开同一 task，节点回 `dispatched`、run 回 `running`；无 session 仍失败；等待期可取消 |
@@ -434,7 +439,7 @@ waiting_resume ──cancel / 无 sessionId──▶ failed(cancelled / timeout)
 | 边界 | 不依赖 `http-gateway`/`catalog`/`skill` 写服务；无跨组件 store 导入；无 Bun 文件 API；文件/session 只经 client 端口 |
 | 契约 | `RunSummary.workflowName`/`harnessName`、`RunDetail.graph`、`RunNodeView.expertName` 在 HTTP 响应中可读；`workflowId` 过滤按 `workflow_ref_id` 命中已删除工作流的历史 run |
 | client 观测 | 文件列表/内容映射 `truncated`；session 详情/事件剥 ID；`session_not_linked`；`runIdForTask` |
-| prompt | 组成顺序固定；超 `maxPromptBytes` 不截断直接失败；`confirm` 不组装 |
+| prompt | 组成顺序固定；超 `maxPromptBytes` 不截断直接失败；`confirm` 不组装；agent/review 两段确认通道文案互斥 |
 
 ## 7 预算与运行
 

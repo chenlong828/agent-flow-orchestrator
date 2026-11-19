@@ -41,7 +41,7 @@ level: P2
 
 ## 3 定级
 
-**P2（建议）**：执行面契约加法（可选 `confirmation` 字段）、prompt 文案、review 能力；无 schema/迁移，旧 client 行为不变。若团队把「执行面信号契约」视为核心契约，按 **P1** 处理；在 `T-CCE-02` 确认。
+**P2（已确认 2026-11-19）**：执行面契约加法（可选 `confirmation` 字段）、prompt 文案、review 能力；不改核心 schema/数据所有权，旧 client 契约不变。
 
 ## 4 验收标准
 
@@ -63,12 +63,12 @@ level: P2
 | ID | 类型 | 组件 | 内容 | 状态 |
 |---|---|---|---|---|
 | `T-CCE-01` | design | global | 本提案与契约/语义/测试/发布设计 | 完成 |
-| `T-CCE-02` | design | global | 确认级别、契约形状（`confirmation` vs `resultSignals[]`）、评审范围 | 待确认 |
-| `T-CCE-03` | change | run/scheduler/http-gateway | prompt 文案、review 确认契约、调度校验/透传、run 测试 | 待排 |
-| `T-CCE-04` | change | client（跨项目） | 多契约 prepare/mount/collect、review 工具暴露、测试 | 待排 |
-| `T-CCE-05` | change | scripts/seed | `auto-confirm` §5、`review-verdict`、`arch-reviewer` 文本同步 | 待排 |
-| `T-CCE-06` | verify | global | review confirm pass/reject/无答复；agent confirm 回归；真实 client 联调 | 待排 |
-| `T-CCE-07` | docs | global | 执行面契约、组件规格、发布记录 | 待排 |
+| `T-CCE-02` | design | global | 确认级别、契约形状（`confirmation` vs `resultSignals[]`）、评审范围 | 完成（[`proposal.md`](proposal.md) §8） |
+| `T-CCE-03` | change | run/scheduler/http-gateway | prompt 文案、review 确认契约、调度校验/透传、run 测试 | 完成 |
+| `T-CCE-04` | change | client（跨项目） | 多契约 prepare/mount/collect、review 工具暴露、测试 | 提案完成；实现待 client 仓库 |
+| `T-CCE-05` | change | scripts/seed | `auto-confirm` §5、`review-verdict` 文本同步 | 完成 |
+| `T-CCE-06` | verify | global | review confirm pass/reject/无答复；agent confirm 回归；真实 client 联调 | 本仓库用桩覆盖；真实 client 联调待 `T-CCE-04` |
+| `T-CCE-07` | docs | global | 执行面契约、组件规格、发布记录 | 完成 |
 
 ## 6 装载清单
 
@@ -78,14 +78,8 @@ level: P2
 - client：[`contract.ts`](../../../../agent-flow-client/src/components/signal/contract.ts)、[`signal-runner.ts`](../../../../agent-flow-client/src/components/executor/signal-runner.ts)
 - 技能：[`auto-confirm`](../../../scripts/seed-skills/auto-confirm/SKILL.md)、[`review-verdict`](../../../scripts/seed-skills/review-verdict/SKILL.md)、[`arch-design-spec`](../../../scripts/seed-skills/arch-design-spec/SKILL.md)
 - 本工序提案：[`proposal.md`](proposal.md)
+- client 侧实施提案：[`client-implementation-proposal.md`](client-implementation-proposal.md)
 
 ## 7 待定
 
-| 项 | 选项 | 默认 |
-|---|---|---|
-| 级别 | P2 / P1 | P2；契约视为核心则 P1 |
-| 契约形状 | 可选 `confirmation` 字段 / `resultSignals[]` / `allowConfirm` 标志 | 可选 `confirmation`（加法、显式、改动最小） |
-| 评审范围 | 全部 review 节点 / 仅架构评审 | 全部 review，按同一严格判据 |
-| 次数上限 | prompt 约束 / 服务端计数 | v1 prompt 约束「每个 review 访问最多 1 次」，观察到滥用再加服务端计数 |
-| 无答复 | 一直等待 / 超时失败 | 一直等待（现有 `waiting_confirm` 行为）；不自动 pass |
-| 旧 client | 同版本发布 / 能力协商 | v1 同版本发布；需要混跑时另立能力协商任务 |
+全部已定，见 [`proposal.md`](proposal.md) §8。剩余未完成项是 `T-CCE-04`（client 实现）与 `T-CCE-06`（真实 client 联调）。
