@@ -36,13 +36,13 @@ afterAll(async () => {
 });
 
 describe("演示种子", () => {
-  test("首轮写入 15 个 Skill / 13 个专家 / 3 条流程与 52 条技能装配边，不预置 Harness 与工具", async () => {
+  test("首轮写入 15 个 Skill / 13 个专家 / 3 条流程与 53 条技能装配边，不预置 Harness 与工具", async () => {
     const result = await seedAll(db, store);
     expect(result).toEqual({
       skills: 15,
       experts: 13,
       workflows: 3,
-      expertSkills: 52,
+      expertSkills: 53,
     });
     const counts = await db.one<{
       harnesses: number;
@@ -107,7 +107,7 @@ describe("演示种子", () => {
         (select count(*)::int from workflow) as workflows,
         (select count(*)::int from expert_skill) as "skillEdges"`,
     );
-    expect(counts).toEqual({ skills: 15, experts: 13, workflows: 3, skillEdges: 52 });
+    expect(counts).toEqual({ skills: 15, experts: 13, workflows: 3, skillEdges: 53 });
     expect(await store.list("packages/")).toHaveLength(15);
 
     const requirements = await db.one<{ version: string; tags: number }>(
