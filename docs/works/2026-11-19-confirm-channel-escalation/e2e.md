@@ -84,9 +84,10 @@ task.reported  {"status":"succeeded","sessionId":"0b21d93a-…","signals":{"coun
 
 1. **非阻塞**：e2e client 启动时观测面端口 `17890` 被正在运行的旧 client 占用，日志出现 `observability_disabled` 警告；不影响任务执行与信号。联调使用独立 state root，未抢占旧 client。
 2. **未验证**：client 侧完整测试套件由 client 自己声明 255 pass；本工序未在 client 仓库重跑 `bun run check`（跨仓库执行与写入边界不在本工序范围）。本次用真实执行路径验证了双工具、采集与续跑。
-3. **未提交**：client 改动仍在工作区；联调通过的是该工作区版本。client 提交/发布另行处理。
-4. **夹具残留**：`e2e-review-confirm` harness、`E2E-REVIEW-CONFIRM` workflow 与三次 run 留在本机 dev DB；`.local/e2e/2026-11-19-confirm/` 为本地证据目录（已 ignore）。
-5. **次数上限**：模型每次访问只问了一个问题，未观察到重复问；服务端计数仍未实现（proposal 的 v1 约束）。
+3. **未重跑 agent confirm**：本轮真实 DSH 链路只跑 review 节点；agent confirm 回归由本仓库既有 `run-signals.test.ts` 用例与 client 的 `confirm-flow` 测试覆盖，未在真实 DSH 重跑。
+4. **未提交**：client 改动仍在工作区；联调通过的是该工作区版本。client 提交/发布另行处理。
+5. **夹具残留**：`e2e-review-confirm` harness、`E2E-REVIEW-CONFIRM` workflow 与三次 run 留在本机 dev DB；`.local/e2e/2026-11-19-confirm/` 为本地证据目录（已 ignore）。
+6. **次数上限**：模型每次访问只问了一个问题，未观察到重复问；服务端计数仍未实现（proposal 的 v1 约束）。
 
 ## 6 复跑方式
 
