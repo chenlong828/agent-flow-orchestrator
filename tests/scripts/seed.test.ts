@@ -87,7 +87,7 @@ describe("演示种子", () => {
     const skillMd = new TextDecoder().decode(entries[0]!.data);
     expect(parseSkillMarkdown(skillMd)).toMatchObject({
       name: "arch-design-spec",
-      version: "v1.3",
+      version: "v1.4",
     });
     expect(new TextEncoder().encode(skillMd).byteLength).toBeLessThanOrEqual(16 * 1024);
   });
@@ -115,7 +115,7 @@ describe("演示种子", () => {
         (select count(*)::int from skill_tag t where t.skill_id = s.id) as tags
        from skill s where s.name = '需求到场景'`,
     );
-    expect(requirements).toEqual({ version: "v2.4", tags: 3 });
+    expect(requirements).toEqual({ version: "v2.6", tags: 3 });
   });
 
   test("已存在的流程不被种子覆盖，保留界面上的改名与改图", async () => {

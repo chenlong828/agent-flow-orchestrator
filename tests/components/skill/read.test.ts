@@ -85,7 +85,7 @@ describe("Skill 读路径", () => {
     expect(document.markdown.endsWith("\n")).toBe(true);
 
     const pkg = await reader.getPackage(row!.id);
-    expect(pkg.fileName).toBe("arch-design-spec-v1.3.zip");
+    expect(pkg.fileName).toBe("arch-design-spec-v1.4.zip");
     expect(readSkillPackage(pkg.data)[0]!.path).toBe("SKILL.md");
   });
 
