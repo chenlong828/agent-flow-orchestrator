@@ -1,7 +1,7 @@
 import { normalizePageQuery } from "../../core/kernel/index.ts";
 import type { Page } from "../../core/kernel/index.ts";
 import { advanceLocked } from "./advance.ts";
-import { nodeById } from "./graph-checks.ts";
+import { graphOf, nodeById } from "./graph-checks.ts";
 import type { ErrorView } from "./internal.ts";
 import type { RunDetail, RunQuery, RunRow, RunSummary } from "./types.ts";
 import type { RunRuntime } from "./runtime.ts";
@@ -20,9 +20,14 @@ function errorView(value: unknown): ErrorView {
   };
 }
 
+function needsAdvance(state: RunRow["state"]): boolean {
+  return state !== "done" && state !== "waiting_resume";
+}
+
 function detailOf(run: RunRow, nodes: Parameters<typeof toNodeView>[0][]): RunDetail {
   return {
     ...toRunSummary(run),
+    graph: graphOf(run.graph_snapshot),
     workspacePath: run.workspace_path,
     taskSpacePath: run.task_space_path,
     autoConfirm: run.auto_confirm,
@@ -62,7 +67,8 @@ async function resumePending(runtime: RunRuntime): Promise<{ resumed: number }> 
             ? null
             : { code: "recovered", message: "重启对账补结算" },
       });
-      if ((await runtime.loadRun(run.id)).state !== "done") await advanceLocked(runtime, run.id);
+      const latest = await runtime.loadRun(run.id);
+      if (needsAdvance(latest.state)) await advanceLocked(runtime, run.id);
       resumed += 1;
       continue;
     }

@@ -63,14 +63,20 @@ function graphConfirm(expertId: string): WorkflowGraph {
   };
 }
 
-function fakeScheduler(): SchedulerService & { cancelled: string[]; enqueued: EnqueueInput[] } {
+function fakeScheduler(): SchedulerService & {
+  cancelled: string[];
+  enqueued: EnqueueInput[];
+  resumed: { taskId: string; sessionId: string }[];
+} {
   let counter = 0;
   const tasks = new Map<string, { state: string }>();
   const cancelled: string[] = [];
   const enqueued: EnqueueInput[] = [];
+  const resumed: { taskId: string; sessionId: string }[] = [];
   return {
     cancelled,
     enqueued,
+    resumed,
     enqueue: async (input: EnqueueInput) => {
       enqueued.push(input);
       return {
@@ -87,6 +93,21 @@ function fakeScheduler(): SchedulerService & { cancelled: string[]; enqueued: En
       const task = tasks.get(result.taskId);
       if (task !== undefined) task.state = "done";
       return { taskId: result.taskId, accepted: true };
+    },
+    resumeTask: async (_clientId: string, taskId: string, sessionId: string) => {
+      resumed.push({ taskId, sessionId });
+      tasks.set(taskId, { state: "queued" });
+      return {
+        taskId,
+        instanceId: "",
+        clientId: "",
+        nodeId: "",
+        attempt: 2,
+        state: "queued" as const,
+        skillSetDigest: "",
+        createdAt: "",
+        updatedAt: "",
+      };
     },
     inspect: async (taskId: string) => ({
       taskId,
@@ -105,7 +126,11 @@ function fakeScheduler(): SchedulerService & { cancelled: string[]; enqueued: En
     },
     poll: async () => ({ tasks: [], stop: false, cancelInstances: [], nextPollAfterMs: 0 }),
     requestStop: async () => {},
-  } as unknown as SchedulerService & { cancelled: string[]; enqueued: EnqueueInput[] };
+  } as unknown as SchedulerService & {
+    cancelled: string[];
+    enqueued: EnqueueInput[];
+    resumed: { taskId: string; sessionId: string }[];
+  };
 }
 
 function sha256(bytes: Uint8Array): string {
@@ -113,13 +138,15 @@ function sha256(bytes: Uint8Array): string {
 }
 
 async function makeHarness(graphOf: (expertId: string) => WorkflowGraph, workspacePath = "/work/run") {
+  const expertName = `流程专家-${Math.random().toString(16).slice(2, 8)}`;
   const expert = await ctx.expertService.create({
-    name: `流程专家-${Math.random().toString(16).slice(2, 8)}`,
+    name: expertName,
     color: "#336699",
     role: "执行",
   });
+  const harnessName = `节点-${Math.random().toString(16).slice(2, 8)}`;
   const harness = await ctx.harnessService.create({
-    name: `节点-${Math.random().toString(16).slice(2, 8)}`,
+    name: harnessName,
     kind: "container",
     address: "127.0.0.1:7800",
     accessMode: "agent",
@@ -131,8 +158,9 @@ async function makeHarness(graphOf: (expertId: string) => WorkflowGraph, workspa
     clientId,
     token: `token-${clientId}`,
   });
+  const workflowName = `流程-${Math.random().toString(16).slice(2, 8)}`;
   const workflow = await ctx.workflowService.create({
-    name: `流程-${Math.random().toString(16).slice(2, 8)}`,
+    name: workflowName,
     type: "研发",
     description: "",
     graph: graphOf(expert.id),
@@ -158,8 +186,11 @@ async function makeHarness(graphOf: (expertId: string) => WorkflowGraph, workspa
     scheduler,
     clientId,
     expertId: expert.id,
+    expertName,
     workflowId: workflow.id,
+    workflowName,
     harnessId: harness.id,
+    harnessName,
   };
 }
 
@@ -167,12 +198,13 @@ async function attachLog(
   runService: ReturnType<typeof createRunService>,
   taskId: string,
   bytes?: Uint8Array,
+  attempt = 1,
 ) {
   const data = bytes ?? Bun.gzipSync(new Uint8Array());
   await runService.attachSessionLog({
     clientId: "unused",
     taskId,
-    attempt: 1,
+    attempt,
     bytes: data,
     sha256: sha256(data),
   });
@@ -185,15 +217,19 @@ async function report(
   taskId: string,
   status: "succeeded" | "failed" | "cancelled" | "timeout",
   message: string,
+  sessionId?: string,
+  signals?: NonNullable<TaskResult["signals"]>,
 ) {
   return runService.handleTaskResult(clientId, {
     taskId,
     attempt: 1,
     status,
+    ...(sessionId === undefined ? {} : { sessionId }),
     message,
     truncated: false,
     stopReason: null,
     usage: null,
+    ...(signals === undefined ? {} : { signals }),
     error: status === "succeeded" ? null : { class: "runtime", code: "failed", message: "失败" },
   });
 }
@@ -278,6 +314,28 @@ describe("CMP-run 启动与推进", () => {
     expect(detail.nodes[0]!.state).toBe("dispatched");
   });
 
+  test("结果里的 sessionId 落到 run_node；失败结果同样记录", async () => {
+    const h = await makeHarness(graphLinear, "/work/session");
+    const run = await h.runService.start({
+      workflowId: h.workflowId,
+      harnessId: h.harnessId,
+      workspacePath: "/work/session",
+      intentMarkdown: "x",
+      actor: null,
+    });
+    const taskId = await dispatchedTaskId(h.runService, run.runId);
+    await attachLog(h.runService, taskId);
+    await report(h.runService, h.clientId, taskId, "failed", "执行失败", "session-failed");
+
+    const rows = await ctx.db.query<{ state: string; session_id: string | null }>(
+      "select state, session_id from run_node where run_id = $1 and node_id = $2 and visit = 1",
+      [run.runId, "n1"],
+    );
+    expect(rows[0]?.state).toBe("failed");
+    expect(rows[0]?.session_id).toBe("session-failed");
+    expect((await h.runService.get(run.runId)).outcome).toBe("failed");
+  });
+
   test("同一工作区第二次启动返回 run_conflict", async () => {
     const h = await makeHarness(graphLinear, "/work/conflict");
     await h.runService.start({
@@ -317,7 +375,14 @@ describe("CMP-run 判定与回退", () => {
       h.clientId,
       reviewTask,
       "succeeded",
-      '```json\n{"verdict":"fail","reason":"再改"}\n```',
+      "审核意见：再改",
+      undefined,
+      [{
+        seq: 1,
+        at: "2026-11-18T00:00:00.000Z",
+        kind: "review_verdict",
+        data: { verdict: "fail", reason: "再改" },
+      }],
     );
 
     const detail = await h.runService.get(run.runId);
@@ -345,7 +410,7 @@ describe("CMP-run 判定与回退", () => {
     expect(retry.prompt).not.toContain("第 1 轮");
   });
 
-  test("verdict 非法时节点与 run 失败", async () => {
+  test("没有 review_verdict 信号时节点与 run 失败", async () => {
     const h = await makeHarness(graphReview);
     const run = await h.runService.start({
       workflowId: h.workflowId,
@@ -357,7 +422,7 @@ describe("CMP-run 判定与回退", () => {
     await driveSucceeded(h, run.runId, 2);
     const reviewTask = await dispatchedTaskId(h.runService, run.runId);
     await attachLog(h.runService, reviewTask);
-    await report(h.runService, h.clientId, reviewTask, "succeeded", "没有 JSON");
+    await report(h.runService, h.clientId, reviewTask, "succeeded", '{"verdict":"pass","reason":"message 里的旧出口"}');
 
     const detail = await h.runService.get(run.runId);
     expect(detail.state).toBe("done");
@@ -426,6 +491,99 @@ describe("CMP-run 人工确认与取消", () => {
     expect(detail.state).toBe("done");
     expect(detail.outcome).toBe("cancelled");
     expect(h.scheduler.cancelled).toHaveLength(1);
+  });
+});
+
+describe("CMP-run 超时续跑", () => {
+  test("TC-RUN-017 timeout 带 session 进入 waiting_resume；resumeNode 重开同一 task 并继续", async () => {
+    const h = await makeHarness(graphLinear);
+    const started = await h.runService.start({
+      workflowId: h.workflowId,
+      harnessId: h.harnessId,
+      workspacePath: "/work/run-resume",
+      intentMarkdown: "继续执行",
+      actor: null,
+    });
+    const runId = started.runId;
+
+    const n1Task = await dispatchedTaskId(h.runService, runId);
+    await attachLog(h.runService, n1Task);
+    await report(h.runService, h.clientId, n1Task, "succeeded", "开始完成");
+
+    const n2Task = await dispatchedTaskId(h.runService, runId);
+    await attachLog(h.runService, n2Task);
+    const waited = await report(h.runService, h.clientId, n2Task, "timeout", "超时", "session-timeout");
+    expect(waited.accepted).toBe(true);
+
+    const waiting = await h.runService.get(runId);
+    expect(waiting.state).toBe("waiting_resume");
+    const waitingNode = waiting.nodes.find((node) => node.nodeId === "n2");
+    expect(waitingNode?.state).toBe("waiting_resume");
+    expect(waitingNode?.finishedAt).toBeNull();
+    expect(waiting.outcome).toBeNull();
+    expect(h.scheduler.resumed).toEqual([]);
+
+    const resumed = await h.runService.resumeNode({ runId, nodeId: "n2", actor: null });
+    expect(resumed.state).toBe("running");
+    expect(resumed.nodes.find((node) => node.nodeId === "n2")?.state).toBe("dispatched");
+    expect(h.scheduler.resumed).toEqual([{ taskId: n2Task, sessionId: "session-timeout" }]);
+
+    await attachLog(h.runService, n2Task, undefined, 2);
+    const ack = await h.runService.handleTaskResult(h.clientId, {
+      taskId: n2Task,
+      attempt: 2,
+      status: "succeeded",
+      message: "继续完成",
+      truncated: false,
+      stopReason: "end_turn",
+      usage: null,
+      error: null,
+    });
+    expect(ack.accepted).toBe(true);
+
+    const after = await h.runService.get(runId);
+    expect(after.nodes.find((node) => node.nodeId === "n2")?.state).toBe("succeeded");
+    expect(after.nodes.find((node) => node.nodeId === "n3")?.state).toBe("dispatched");
+  });
+
+  test("TC-RUN-020 timeout 无 session 仍按现状失败", async () => {
+    const h = await makeHarness(graphLinear);
+    const started = await h.runService.start({
+      workflowId: h.workflowId,
+      harnessId: h.harnessId,
+      workspacePath: "/work/run-timeout-no-session",
+      intentMarkdown: "超时",
+      actor: null,
+    });
+    const runId = started.runId;
+    const n1Task = await dispatchedTaskId(h.runService, runId);
+    await attachLog(h.runService, n1Task);
+    await report(h.runService, h.clientId, n1Task, "timeout", "超时");
+    const detail = await h.runService.get(runId);
+    expect(detail.state).toBe("done");
+    expect(detail.outcome).toBe("failed");
+    expect(detail.nodes.find((node) => node.nodeId === "n1")?.state).toBe("failed");
+  });
+
+  test("TC-RUN-019 waiting_resume 可取消", async () => {
+    const h = await makeHarness(graphLinear);
+    const started = await h.runService.start({
+      workflowId: h.workflowId,
+      harnessId: h.harnessId,
+      workspacePath: "/work/run-cancel-resume",
+      intentMarkdown: "取消",
+      actor: null,
+    });
+    const runId = started.runId;
+    const n1Task = await dispatchedTaskId(h.runService, runId);
+    await attachLog(h.runService, n1Task);
+    await report(h.runService, h.clientId, n1Task, "timeout", "超时", "session-cancel");
+    expect((await h.runService.get(runId)).state).toBe("waiting_resume");
+
+    const cancelled = await h.runService.cancel(runId, "tester");
+    expect(cancelled.state).toBe("done");
+    expect(cancelled.outcome).toBe("cancelled");
+    expect(cancelled.nodes.find((node) => node.nodeId === "n1")?.state).toBe("failed");
   });
 });
 

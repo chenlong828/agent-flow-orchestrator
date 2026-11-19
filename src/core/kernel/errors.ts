@@ -25,7 +25,12 @@ export type ErrorCode =
   | "invalid_state"
   | "invalid_archive"
   | "unsupported_node_type"
-  | "database_unavailable";
+  | "database_unavailable"
+  | "client_observability_unavailable"
+  | "client_observability_unauthorized"
+  | "client_observability_invalid"
+  | "client_observability_http"
+  | "session_not_linked";
 
 export type ErrorDetails = Record<string, unknown>;
 
@@ -193,5 +198,47 @@ export class PreconditionRequiredError extends AppError {
 export class DatabaseUnavailableError extends AppError {
   constructor(message = "数据库不可用", cause?: unknown) {
     super("database_unavailable", message, { retryable: true, cause });
+  }
+}
+
+/** client 观测面不可达/超时/5xx；调用方可重试。 */
+export class ClientObservabilityUnavailableError extends AppError {
+  constructor(message = "client 观测面不可用", cause?: unknown) {
+    super("client_observability_unavailable", message, { retryable: true, cause });
+  }
+}
+
+/** client 观测面要求 Bearer，但凭据缺失/错误。 */
+export class ClientObservabilityUnauthorizedError extends AppError {
+  constructor(message = "client 观测面凭据无效") {
+    super("client_observability_unauthorized", message);
+  }
+}
+
+/** client 观测面响应/URL 非法。 */
+export class ClientObservabilityInvalidError extends AppError {
+  constructor(message = "client 观测面响应非法", cause?: unknown) {
+    super("client_observability_invalid", message, { cause });
+  }
+}
+
+/** client 观测面其它 4xx；保留原始状态码与错误码供网关映射。 */
+export class ClientObservabilityHttpError extends AppError {
+  readonly status: number;
+  readonly clientCode: string;
+
+  constructor(status: number, clientCode: string, message: string) {
+    super("client_observability_http", message, { details: { status, code: clientCode } });
+    this.status = status;
+    this.clientCode = clientCode;
+  }
+}
+
+/** 节点已结算但结果未带 sessionId（历史行/重启补结算），无法代理会话观测。 */
+export class SessionNotLinkedError extends AppError {
+  constructor(runId: string, nodeId: string) {
+    super("session_not_linked", `节点尚未关联会话：${runId}/${nodeId}`, {
+      details: { runId, nodeId },
+    });
   }
 }

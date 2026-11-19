@@ -1,7 +1,7 @@
 ---
 name: "implementation-accept"
 description: "实现鉴定：按场景 3 正 1 反的测试证据判断实现是否真正走完；证据不足、例子失败或有未覆盖项则判 fail，并在 reason 写明回退到哪个实现节点、改什么、怎么复现。触发：测试之后、收口之前、实现鉴定、准出"
-version: "v1.6"
+version: "v1.8"
 ---
 
 # 用途
@@ -9,7 +9,7 @@ version: "v1.6"
 测试节点之后、收口之前使用。回答一个问题：**这次实现是否真正走完**——不是「代码写完没有」，而是「场景卡里的每条例子都有可复核的通过证据」。
 
 输入：场景卡 3 正 1 反、`test.md` 与 `evidence/`、`dev.md`（实现 commit 与测试记录）、实现提交本身。
-输出：`task-space/review.md`（逐项核验证据）+ 最终消息最后一行裸 JSON verdict。
+输出：`task-space/review.md`（逐项核验证据）+ 通过 `mcp__agentflow__signal` 提交的 verdict。
 
 ## 核验步骤
 
@@ -23,13 +23,12 @@ version: "v1.6"
    - 全部满足 → `pass`；
    - 任一不满足 → `fail`，`reason` 必须写清：回退到哪个实现节点、改什么、怎么复现（命令/输入/实际输出）。
 
-## verdict 输出
+## 结论提交
 
-最后一行一个裸 JSON 对象，不加代码围栏，其后不再写内容：
+提交方式与字段以 `review-verdict` 为准：调用 `mcp__agentflow__signal`，`kind=review_verdict`，`verdict` 为 `pass`/`fail`，`reason` 按上述判定要求写；不再用最终消息 JSON。`reason` 示例：
 
-{"verdict":"pass","reason":"3 正 1 反逐条有证据，依赖场景无回归，提交干净"}
-
-{"verdict":"fail","reason":"回实现节点：T-SCN-0007-04 的畸形地址用例未补，test.md 标未覆盖；复现：<项目测试命令> --filter <用例>"}
+- pass：3 正 1 反逐条有证据，依赖场景无回归，提交干净
+- fail：回实现节点，T-SCN-0007-04 的畸形地址用例未补，test.md 标未覆盖；复现：<项目测试命令> --filter <用例>
 
 ## 不该做的
 

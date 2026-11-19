@@ -95,4 +95,6 @@ export type HarnessRead = {
   getByClientId(clientId: string): Promise<HarnessSummary | null>;
   /** 已绑定且启用的 clientId；节点目录用。 */
   listClientIds(): Promise<string[]>;
+  /** 该执行节点的 Bearer 凭据；未绑定/清空返回 null。仅供观测面适配器内部使用。 */
+  clientToken(clientId: string): Promise<string | null>;
 };

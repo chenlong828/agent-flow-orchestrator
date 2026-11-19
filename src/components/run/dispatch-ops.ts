@@ -3,11 +3,17 @@ import type { WorkflowNode } from "../workflow/index.ts";
 import type { RunCore } from "./core.ts";
 import { startNode } from "./graph-checks.ts";
 import { resolveEntry } from "./entry.ts";
-import { composeNodePrompt } from "./prompt.ts";
+import { composeNodePrompt, type PromptConfirmation } from "./prompt.ts";
+import { signalForNode } from "./signals.ts";
 import type { RunNodeRow, RunRow } from "./types.ts";
 
+export type DispatchOptions = {
+  resumeSessionId?: string;
+  confirmation?: PromptConfirmation;
+};
+
 export type DispatchOps = {
-  dispatch(run: RunRow, node: WorkflowNode, row: RunNodeRow): Promise<void>;
+  dispatch(run: RunRow, node: WorkflowNode, row: RunNodeRow, options?: DispatchOptions): Promise<void>;
   readExpertOrInvalid(
     nodeId: string,
     expertId: string,
@@ -18,7 +24,12 @@ export type DispatchOps = {
 export function createDispatchOps(core: RunCore): DispatchOps {
   const { deps, store, graphFor } = core;
 
-  async function dispatch(run: RunRow, node: WorkflowNode, row: RunNodeRow): Promise<void> {
+  async function dispatch(
+    run: RunRow,
+    node: WorkflowNode,
+    row: RunNodeRow,
+    options: DispatchOptions = {},
+  ): Promise<void> {
     if (node.expertId === null) {
       throw new ValidationError(`graph.nodes.${node.id}.expertId`, "执行节点必须绑定专家");
     }
@@ -38,7 +49,9 @@ export function createDispatchOps(core: RunCore): DispatchOps {
       taskSpacePath: run.task_space_path,
       ...(entry === undefined ? {} : { entry }),
       ...(start?.id === node.id ? { intentMarkdown: run.intent_markdown } : {}),
+      ...(options.confirmation === undefined ? {} : { confirmation: options.confirmation }),
     });
+    const resultSignal = signalForNode(node.type);
     const enqueued = await deps.scheduler.enqueue({
       tasks: [
         {
@@ -48,6 +61,8 @@ export function createDispatchOps(core: RunCore): DispatchOps {
           taskSpacePath: run.task_space_path,
           timeoutMs: deps.defaultTimeoutMs,
           skillIds: expert.skillIds,
+          ...(resultSignal === undefined ? {} : { resultSignal }),
+          ...(options.resumeSessionId === undefined ? {} : { resumeSessionId: options.resumeSessionId }),
         },
       ],
     });

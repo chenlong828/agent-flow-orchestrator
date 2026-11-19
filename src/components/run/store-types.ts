@@ -1,23 +1,26 @@
 import type { EnterReason, RunArtifactKind, RunNodeState, RunRow, RunState } from "./types.ts";
 
 export const RUN_COLUMNS = `
-  id, workflow_id, workflow_revision, graph_snapshot, intent_markdown, harness_id,
+  id, workflow_id, workflow_ref_id, workflow_name, workflow_revision, graph_snapshot,
+  intent_markdown, harness_id, harness_ref_id, harness_name,
   client_id, instance_id, workspace_path, task_space_path, auto_confirm, state,
   outcome, current_node_id, result->>'finalMessage' as final_message,
   result->'error' as error, archive_state, created_at as started_at,
   finished_at, created_at, updated_at`;
 
 export const NODE_COLUMNS = `
-  run_id, node_id, visit, node_type, expert_id, state, task_id, verdict,
+  run_id, node_id, visit, node_type, expert_id, expert_name, state, task_id, session_id, verdict,
   message, error, enter_reason, dispatched_at, finished_at`;
 
 export type NewRunRow = {
   id: string;
   workflowId: string;
+  workflowName: string;
   workflowRevision: number;
   graphSnapshot: unknown;
   intentMarkdown: string;
   harnessId: string;
+  harnessName: string;
   clientId: string;
   instanceId: string;
   workspacePath: string;
@@ -33,6 +36,7 @@ export type NewNodeRow = {
   visit: number;
   nodeType: string;
   expertId: string | null;
+  expertName: string | null;
   state: RunNodeState;
   /** 回退进入原因指针；首轮为 null。 */
   enterReason?: EnterReason | null;

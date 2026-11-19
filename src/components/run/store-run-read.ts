@@ -12,7 +12,7 @@ export function createRunReads() {
     async findActiveByInstance(db: Db, instanceId: string): Promise<RunRow | null> {
       return db.one<RunRow>(
         `select ${RUN_COLUMNS} from workflow_run
-          where instance_id = $1 and state in ('running', 'waiting_confirm')`,
+          where instance_id = $1 and state in ('running', 'waiting_confirm', 'waiting_resume')`,
         [instanceId],
       );
     },
@@ -22,7 +22,7 @@ export function createRunReads() {
       const params: unknown[] = [];
       if (query.workflowId !== undefined) {
         params.push(query.workflowId);
-        where.push(`workflow_id = $${params.length}`);
+        where.push(`workflow_ref_id = $${params.length}`);
       }
       if (query.state !== undefined) {
         params.push(query.state);

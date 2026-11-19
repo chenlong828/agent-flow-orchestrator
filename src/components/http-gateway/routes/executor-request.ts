@@ -17,6 +17,7 @@ export const RESULT_FIELDS = [
   "stopReason",
   "usage",
   "error",
+  "signals",
   "startedAt",
   "finishedAt",
 ] as const;
@@ -131,6 +132,40 @@ function parseResultHeader(body: Record<string, unknown>, taskId: string): Resul
   return { status, attempt: body.attempt };
 }
 
+const SIGNAL_KINDS = ["review_verdict", "confirmation_request"] as const;
+const MAX_SIGNALS = 8;
+const MAX_SIGNALS_BYTES = 16384;
+
+function parseSignals(value: unknown, status: ExecutorResult["status"]): ExecutorResult["signals"] {
+  if (value === undefined) return undefined;
+  if (status !== "succeeded") throw new ValidationError("signals", "只在 succeeded 时允许");
+  if (!Array.isArray(value)) throw new ValidationError("signals", "必须是数组");
+  if (value.length > MAX_SIGNALS) throw new ValidationError("signals", `最多 ${MAX_SIGNALS} 条`);
+  const signals = value.map((item, index) => {
+    if (!isPlainObject(item)) throw new ValidationError(`signals[${index}]`, "必须是对象");
+    assertAllowedFields(item, ["seq", "at", "kind", "data"], `signals[${index}]`);
+    if (typeof item.seq !== "number" || !Number.isInteger(item.seq) || item.seq < 1) {
+      throw new ValidationError(`signals[${index}].seq`, "必须是 ≥1 的整数");
+    }
+    if (typeof item.at !== "string" || item.at === "") {
+      throw new ValidationError(`signals[${index}].at`, "必须是非空字符串");
+    }
+    if (!SIGNAL_KINDS.includes(item.kind as never)) {
+      throw new ValidationError(`signals[${index}].kind`, "不在闭集内");
+    }
+    if (!isPlainObject(item.data)) throw new ValidationError(`signals[${index}].data`, "必须是对象");
+    return {
+      seq: item.seq,
+      at: item.at,
+      kind: item.kind as "review_verdict" | "confirmation_request",
+      data: item.data,
+    };
+  });
+  const bytes = new TextEncoder().encode(JSON.stringify(signals)).byteLength;
+  if (bytes > MAX_SIGNALS_BYTES) throw new ValidationError("signals", `超过 ${MAX_SIGNALS_BYTES} 字节`);
+  return signals;
+}
+
 function parseResultContent(body: Record<string, unknown>): {
   message: string;
   truncated: boolean;
@@ -163,12 +198,14 @@ export function parseResultBody(
     taskId,
     attempt: header.attempt,
     status: header.status,
-    sessionId: typeof body.sessionId === "string" ? body.sessionId : undefined,
+    sessionId:
+      typeof body.sessionId === "string" && body.sessionId !== "" ? body.sessionId : undefined,
     message: content.message,
     truncated: content.truncated,
     stopReason: content.stopReason,
     usage: content.usage,
     error: parseError(body.error, header.status),
+    signals: parseSignals(body.signals, header.status),
     startedAt: typeof body.startedAt === "string" ? body.startedAt : undefined,
     finishedAt: typeof body.finishedAt === "string" ? body.finishedAt : undefined,
   };

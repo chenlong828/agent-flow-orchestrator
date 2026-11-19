@@ -47,7 +47,7 @@ describe("数据库结构", () => {
     expect(names).toEqual([...BUSINESS_TABLES, "schema_migrations"].sort());
   });
 
-  test("8 个迁移按顺序记录，分类参考数据为 6 条", async () => {
+  test("13 个迁移按顺序记录，分类参考数据为 6 条", async () => {
     const migrations = await db.query<{ version: string }>(
       "select version from schema_migrations order by version",
     );
@@ -61,6 +61,10 @@ describe("数据库结构", () => {
       "0007_drop_instance_blocked.sql",
       "0008_skill_category_flow.sql",
       "0009_run_node_enter_reason.sql",
+      "0010_run_node_session_id.sql",
+      "0011_task_signal_continuation.sql",
+      "0012_run_timeout_resume.sql",
+      "0013_run_asset_snapshot.sql",
     ]);
 
     const categories = await db.query<{ code: string; position: number }>(
@@ -142,6 +146,20 @@ describe("数据库结构", () => {
     expect(draftCascade).toEqual([{ delete_rule: "c" }]);
   });
 
+  test("task 携带结果信号与续跑 session（v3 加法）", async () => {
+    const columns = await db.query<{ column_name: string; data_type: string; is_nullable: string }>(
+      `select column_name, data_type, is_nullable
+         from information_schema.columns
+        where table_schema = 'public' and table_name = 'task'
+          and column_name in ('result_signal', 'resume_session_id')
+        order by column_name`,
+    );
+    expect(columns).toEqual([
+      { column_name: "result_signal", data_type: "jsonb", is_nullable: "YES" },
+      { column_name: "resume_session_id", data_type: "text", is_nullable: "YES" },
+    ]);
+  });
+
   test("运行编排三表与活跃 run 唯一索引落库", async () => {
     const tables = await db.query<{ table_name: string }>(
       `select table_name from information_schema.tables
@@ -169,12 +187,29 @@ describe("数据库结构", () => {
       "task_space_path",
     ]);
 
+    const nodeColumns = await db.query<{ column_name: string; is_nullable: string }>(
+      `select column_name, is_nullable
+       from information_schema.columns
+       where table_schema = 'public' and table_name = 'run_node'
+         and column_name = 'session_id'`,
+    );
+    expect(nodeColumns).toEqual([{ column_name: "session_id", is_nullable: "YES" }]);
+
     const index = await db.query<{ indexdef: string }>(
       `select indexdef from pg_indexes
        where schemaname = 'public' and indexname = 'workflow_run_active_instance_key'`,
     );
     expect(index).toHaveLength(1);
     expect(index[0]?.indexdef).toContain("UNIQUE INDEX");
+    expect(index[0]?.indexdef).toContain("waiting_resume");
+
+    const stateChecks = await db.query<{ def: string }>(
+      `select pg_get_constraintdef(oid) as def
+         from pg_constraint
+        where conname in ('workflow_run_state_check', 'run_node_state_check')
+        order by conname`,
+    );
+    expect(stateChecks.map((row) => row.def).join("\n")).toContain("waiting_resume");
     expect(index[0]?.indexdef).toContain("instance_id");
     expect(index[0]?.indexdef).toContain("waiting_confirm");
   });
@@ -239,6 +274,60 @@ describe("数据库结构", () => {
       { table_name: "skill_draft", column_name: "created_at" },
       { table_name: "skill_draft", column_name: "created_by" },
       { table_name: "skill_draft", column_name: "updated_by" },
+    ]);
+  });
+
+  test("运行快照列与终态脱钩约束落库", async () => {
+    const columns = await db.query<{ column_name: string; is_nullable: string }>(
+      `select column_name, is_nullable
+         from information_schema.columns
+        where table_schema = 'public' and table_name = 'workflow_run'
+          and column_name in (
+            'workflow_id', 'workflow_ref_id', 'workflow_name',
+            'harness_id', 'harness_ref_id', 'harness_name'
+          )
+        order by column_name`,
+    );
+    expect(columns).toEqual([
+      { column_name: "harness_id", is_nullable: "YES" },
+      { column_name: "harness_name", is_nullable: "NO" },
+      { column_name: "harness_ref_id", is_nullable: "NO" },
+      { column_name: "workflow_id", is_nullable: "YES" },
+      { column_name: "workflow_name", is_nullable: "NO" },
+      { column_name: "workflow_ref_id", is_nullable: "NO" },
+    ]);
+
+    const nodeColumn = await db.query<{ column_name: string; is_nullable: string }>(
+      `select column_name, is_nullable
+         from information_schema.columns
+        where table_schema = 'public' and table_name = 'run_node'
+          and column_name = 'expert_name'`,
+    );
+    expect(nodeColumn).toEqual([{ column_name: "expert_name", is_nullable: "YES" }]);
+
+    const check = await db.query<{ def: string }>(
+      `select pg_get_constraintdef(oid) as def
+         from pg_constraint
+        where conname = 'workflow_run_history_detached'`,
+    );
+    expect(check).toHaveLength(1);
+    expect(check[0]?.def).toContain("workflow_id IS NULL");
+    expect(check[0]?.def).toContain("harness_id IS NULL");
+
+    const restrict = await db.query<{ name: string; delete_rule: string }>(
+      `select c.conname as name, c.confdeltype as delete_rule
+         from pg_constraint c
+         join pg_class t on t.oid = c.conrelid
+         join pg_class r on r.oid = c.confrelid
+        where c.contype = 'f'
+          and t.relname in ('workflow_run', 'run_node')
+          and r.relname in ('workflow', 'harness', 'expert')
+        order by c.conname`,
+    );
+    expect(restrict).toEqual([
+      { name: "run_node_expert_id_fkey", delete_rule: "r" },
+      { name: "workflow_run_harness_id_fkey", delete_rule: "r" },
+      { name: "workflow_run_workflow_id_fkey", delete_rule: "r" },
     ]);
   });
 });

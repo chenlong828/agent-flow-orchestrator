@@ -16,3 +16,4 @@ export type { FileStoreFactory } from "./storage.ts";
 export { createFileStore, fileStoreFactory, StorageError } from "./storage.ts";
 export type { Health } from "./health.ts";
 export { createHealth } from "./health.ts";
+export { createObservabilityDirectory } from "./observability-directory.ts";

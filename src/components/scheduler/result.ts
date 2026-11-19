@@ -35,6 +35,10 @@ export function createResultHandler(
     if (row === null || row.client_id !== client) throw new TaskNotFoundError(taskId);
     if (row.state === "done") return { taskId, accepted: false };
 
+    // 同一 attempt 只接受一次：重开 timeout 任务后，旧 attempt 的迟到结果必须被拒绝。
+    const attempt = await store.findAttempt(taskId, result.attempt);
+    if (attempt === null || attempt.settled_at !== null) return { taskId, accepted: false };
+
     const now = deps.clock.now();
     await deps.db.transaction((tx) => store.settle(tx, { id: taskId, outcome, error, now }));
 

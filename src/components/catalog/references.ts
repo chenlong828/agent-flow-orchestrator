@@ -29,6 +29,9 @@ export async function checkReferences(
       return listExpertsUsingSkillReferences(ctx, id);
     case "expert":
       return listWorkflowsByExpertReferences(ctx, id);
+    case "workflow":
+      // 工作流没有定义侧引用页；活跃 run 的引用由组合根合入 ReferenceGuard。
+      return [];
   }
 }
 

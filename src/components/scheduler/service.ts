@@ -9,6 +9,7 @@ import { snapshot } from "./mappers.ts";
 import { createPollHandler } from "./poll.ts";
 import { createPresenceTracker } from "./presence.ts";
 import { createResultHandler } from "./result.ts";
+import { createResumeHandler } from "./resume.ts";
 import { createSchedulerStore } from "./store.ts";
 import { createWaiters } from "./waiters.ts";
 import { ensureClientId, ensureUuid } from "./validate.ts";
@@ -31,6 +32,7 @@ export function createScheduler(deps: SchedulerDeps): SchedulerHandle {
     enqueue: createEnqueueHandler(deps, store, waiters.notifyAll),
     poll: createPollHandler(deps, store, tracker, waiters),
     acceptResult: createResultHandler(deps, store, waiters.notify),
+    resumeTask: createResumeHandler(deps, store, waiters.notify),
     requestStop: async (clientId) => tracker.requestStop(ensureClientId(clientId)),
     cancelInstances: createCancelHandler(deps, store, waiters.notifyAll),
     inspect: async (taskId): Promise<TaskSnapshot> => {

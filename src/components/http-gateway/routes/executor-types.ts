@@ -36,11 +36,20 @@ export type ExecutorTask = {
   instanceId: string;
   nodeId: string;
   attempt: number;
+  /** 所属 workflow run；手工任务可缺。 */
+  runId?: string;
   prompt: string;
   workspacePath: string;
   taskSpacePath: string;
   timeoutMs: number;
   skillSet: { digest: string; packages: ExecutorPackageRef[] };
+  resultSignal?: {
+    version: number;
+    kind: "review_verdict" | "confirmation_request";
+    required: boolean;
+    schema: Record<string, unknown>;
+  };
+  resumeSessionId?: string;
 };
 
 export type ExecutorDecision = {
@@ -70,6 +79,12 @@ export type ExecutorResult = {
   stopReason: string | null;
   usage: { inputTokens?: number; outputTokens?: number } | null;
   error: ExecutorTaskError | null;
+  signals?: Array<{
+    seq: number;
+    at: string;
+    kind: "review_verdict" | "confirmation_request";
+    data: Record<string, unknown>;
+  }>;
   startedAt?: string;
   finishedAt?: string;
 };
@@ -81,6 +96,8 @@ export type ExecutorBackend = {
   describePackage(packageId: string): Promise<ExecutorPackageRef | null>;
   openPackage(packageId: string): Promise<{ ref: ExecutorPackageRef; data: Uint8Array }>;
   archiveRequests?(clientId: string): Promise<ExecutorArchiveRequest[]>;
+  /** 登记 client 自报的观测面 URL；不合法/未装配时静默跳过。 */
+  registerObservability?(clientId: string, url: string): Promise<void> | void;
   uploadSessionLog?(input: {
     clientId: string;
     taskId: string;

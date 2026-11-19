@@ -5,6 +5,20 @@ export type TaskOutcome = "succeeded" | "failed" | "cancelled" | "timeout";
 
 export type SkillSet = { digest: string; packages: SkillPackageRef[] };
 
+export type ResultSignalContract = {
+  version: number;
+  kind: "review_verdict" | "confirmation_request";
+  required: boolean;
+  schema: Record<string, unknown>;
+};
+
+export type TaskSignal = {
+  seq: number;
+  at: string;
+  kind: "review_verdict" | "confirmation_request";
+  data: Record<string, unknown>;
+};
+
 export type TaskDraft = {
   instanceId: string;
   nodeId: string;
@@ -13,6 +27,10 @@ export type TaskDraft = {
   skillIds: string[];
   /** v3：run 的 task-space 绝对路径；必填，由上游编排传入。 */
   taskSpacePath: string;
+  /** v3 加法：结果信号契约；opaque，调度器只持久化与透传。 */
+  resultSignal?: ResultSignalContract;
+  /** v3 加法：确认点续跑同一 session；缺省新建。 */
+  resumeSessionId?: string;
 };
 
 export type EnqueueInput = { tasks: TaskDraft[]; actor?: string };
@@ -49,6 +67,8 @@ export type TaskEnvelope = {
   taskSpacePath: string;
   timeoutMs: number;
   skillSet: SkillSet;
+  resultSignal?: ResultSignalContract;
+  resumeSessionId?: string;
 };
 
 export type DispatchDecision = {
@@ -74,6 +94,7 @@ export type TaskResult = {
   stopReason: string | null;
   usage: { inputTokens?: number; outputTokens?: number } | null;
   error: TaskError | null;
+  signals?: TaskSignal[];
   startedAt?: string;
   finishedAt?: string;
 };
@@ -110,6 +131,8 @@ export type SchedulerService = {
   enqueue(input: EnqueueInput): Promise<EnqueueResult>;
   poll(clientId: string, report: ClientReport, options: PollOptions): Promise<DispatchDecision>;
   acceptResult(clientId: string, result: TaskResult): Promise<ResultAck>;
+  /** 人工续跑：把 done(timeout) 的同一 task 重开为下一 attempt。 */
+  resumeTask(clientId: string, taskId: string, resumeSessionId: string): Promise<TaskSnapshot>;
   requestStop(clientId: string): Promise<void>;
   cancelInstances(instanceIds: string[]): Promise<{ requested: number }>;
   inspect(taskId: string): Promise<TaskSnapshot>;

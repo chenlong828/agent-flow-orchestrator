@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
-import { TaskNotFoundError, ValidationError, type Clock } from "../../../src/core/kernel/index.ts";
+import { InvalidStateError, TaskNotFoundError, ValidationError, type Clock } from "../../../src/core/kernel/index.ts";
 import { createHarnessNodeDirectory } from "../../../src/components/harness/index.ts";
 import { createScheduler } from "../../../src/components/scheduler/index.ts";
 import type { TaskDraft } from "../../../src/components/scheduler/index.ts";
@@ -396,6 +396,90 @@ describe("结果结算（S-08：失败不自动重派）", () => {
     expect(late).toEqual({ taskId, accepted: true });
     expect(await scheduler.inspect(taskId)).toMatchObject({ state: "done", outcome: "succeeded" });
     expect((await poll(scheduler, silentClient, 1)).tasks).toEqual([]);
+  });
+
+  test("TC-EXR-006 done(timeout) 可被 resumeTask 重开；旧 attempt 结果被拒绝", async () => {
+    const clientId = "node-resume";
+    await bindNode(clientId);
+    const instanceId = await enroll(clientId);
+    const skillId = await createSkill("续跑技能");
+    const enqueued = await ctx.scheduler.enqueue({
+      tasks: [{ instanceId, taskSpacePath: taskSpaceOf(instanceId), nodeId: "n1", prompt: "续跑", timeoutMs: 1000, skillIds: [skillId] }],
+    });
+    const taskId = enqueued.taskIds[0]!;
+    expect((await poll(ctx.scheduler, clientId, 1)).tasks[0]).toMatchObject({ taskId, attempt: 1 });
+
+    const timeout = {
+      taskId,
+      attempt: 1,
+      status: "timeout" as const,
+      sessionId: "session-resume-1",
+      message: "超时",
+      truncated: false,
+      stopReason: null,
+      usage: null,
+      error: { class: "timeout" as const, code: "prompt_timeout", message: "prompt 超时" },
+    };
+    expect(await ctx.scheduler.acceptResult(clientId, timeout)).toEqual({ taskId, accepted: true });
+    expect(await ctx.scheduler.inspect(taskId)).toMatchObject({ state: "done", outcome: "failed" });
+
+    expect(await ctx.scheduler.resumeTask(clientId, taskId, "session-resume-1")).toMatchObject({
+      taskId,
+      state: "queued",
+      attempt: 2,
+    });
+    // 幂等：重复调用不再递增 attempt。
+    expect(await ctx.scheduler.resumeTask(clientId, taskId, "session-resume-1")).toMatchObject({
+      taskId,
+      state: "queued",
+      attempt: 2,
+    });
+
+    const reopened = (await poll(ctx.scheduler, clientId, 1)).tasks[0]!;
+    expect(reopened).toMatchObject({ taskId, attempt: 2, resumeSessionId: "session-resume-1" });
+
+    // 旧 attempt 的迟到结果不能结算重开后的任务。
+    expect(await ctx.scheduler.acceptResult(clientId, timeout)).toEqual({ taskId, accepted: false });
+    expect(await ctx.scheduler.inspect(taskId)).toMatchObject({ state: "dispatched", attempt: 2 });
+
+    expect(
+      await ctx.scheduler.acceptResult(clientId, {
+        taskId,
+        attempt: 2,
+        status: "succeeded",
+        message: "继续完成",
+        truncated: false,
+        stopReason: "end_turn",
+        usage: null,
+        error: null,
+      }),
+    ).toEqual({ taskId, accepted: true });
+    expect(await ctx.scheduler.inspect(taskId)).toMatchObject({ state: "done", outcome: "succeeded" });
+  });
+
+  test("TC-EXR-007 非 timeout 的 done 任务不可重开", async () => {
+    const clientId = "node-no-resume";
+    await bindNode(clientId);
+    const instanceId = await enroll(clientId);
+    const skillId = await createSkill("不可续跑技能");
+    const enqueued = await ctx.scheduler.enqueue({
+      tasks: [{ instanceId, taskSpacePath: taskSpaceOf(instanceId), nodeId: "n1", prompt: "不可续跑", timeoutMs: 1000, skillIds: [skillId] }],
+    });
+    const taskId = enqueued.taskIds[0]!;
+    await poll(ctx.scheduler, clientId, 1);
+    await ctx.scheduler.acceptResult(clientId, {
+      taskId,
+      attempt: 1,
+      status: "succeeded",
+      message: "完成",
+      truncated: false,
+      stopReason: "end_turn",
+      usage: null,
+      error: null,
+    });
+    await expect(
+      ctx.scheduler.resumeTask(clientId, taskId, "session-resume-1"),
+    ).rejects.toBeInstanceOf(InvalidStateError);
   });
 
   test("TC-EXR-004 workspace 失败只结算同实例其余任务，实例保持可派发（无 blocked）", async () => {

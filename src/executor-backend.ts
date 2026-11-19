@@ -1,4 +1,4 @@
-import type { ExecutorAuthenticator, SkillPackageSource } from "./core/kernel/index.ts";
+import type { ExecutorAuthenticator, ObservabilityDirectory, SkillPackageSource } from "./core/kernel/index.ts";
 import type { SchedulerHandle } from "./components/scheduler/index.ts";
 import type { RunService } from "./components/run/index.ts";
 
@@ -11,13 +11,21 @@ export function createExecutorBackend(deps: {
   packages: SkillPackageSource;
   authenticator: ExecutorAuthenticator;
   run?: RunService;
+  observabilityDirectory?: ObservabilityDirectory;
 }) {
   return {
     resolveClientId: (token: string) => deps.authenticator.resolveClientId(token),
     poll: async (clientId: string, report: Parameters<SchedulerHandle["poll"]>[1], options: { holdMs: number }) => {
       const decision = await deps.scheduler.poll(clientId, report, options);
-      const archiveRequests = deps.run === undefined ? [] : await deps.run.archiveRequestsFor(clientId);
-      return { ...decision, archiveRequests };
+      const run = deps.run;
+      const archiveRequests = run === undefined ? [] : await run.archiveRequestsFor(clientId);
+      const tasks = run === undefined
+        ? decision.tasks
+        : await Promise.all(decision.tasks.map(async (task) => {
+            const runId = await run.runIdForTask(task.taskId);
+            return runId === null ? task : { ...task, runId };
+          }));
+      return { ...decision, tasks, archiveRequests };
     },
     acceptResult: (clientId: string, result: Parameters<SchedulerHandle["acceptResult"]>[1]) =>
       deps.run === undefined
@@ -25,6 +33,9 @@ export function createExecutorBackend(deps: {
         : deps.run.handleTaskResult(clientId, result),
     describePackage: (packageId: string) => deps.packages.describe(packageId),
     openPackage: (packageId: string) => deps.packages.open(packageId),
+    registerObservability: (clientId: string, url: string) => {
+      if (deps.observabilityDirectory !== undefined) deps.observabilityDirectory.register(clientId, url);
+    },
     archiveRequests: (clientId: string) =>
       deps.run === undefined ? Promise.resolve([]) : deps.run.archiveRequestsFor(clientId),
     uploadSessionLog: async (input: Parameters<RunService["attachSessionLog"]>[0]) => {

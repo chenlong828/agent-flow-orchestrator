@@ -2,15 +2,18 @@ import {
   MultiFieldValidationError,
   NameConflictError,
   NotFoundError,
+  ReferencedError,
   RevisionConflictError,
   ValidationError,
   ensureText,
   type Clock,
   type ExpertStatusReader,
   type IdGenerator,
+  type ReferenceGuard,
 } from "../../core/kernel/index.ts";
 import {
   isForeignKeyViolation,
+  isReferenceViolation,
   isUniqueViolation,
   type Db,
 } from "../../core/platform/index.ts";
@@ -39,6 +42,7 @@ export type WorkflowDeps = {
   ids: IdGenerator;
   actor: string;
   expertStatus: ExpertStatusReader;
+  guard: ReferenceGuard;
 };
 
 function normalizeCreate(input: CreateWorkflow): { name: string; type: string; description: string } {
@@ -236,12 +240,31 @@ async function deleteWorkflow(
   id: string,
   revision: number,
 ): Promise<void> {
-  await ctx.deps.db.transaction(async (tx) => {
-    const current = await ctx.store.findRoot(tx, id, true);
-    if (current === null) throw new NotFoundError("工作流", id);
-    if (current.revision !== revision) throw new RevisionConflictError(current.revision);
-    await ctx.store.deleteRoot(tx, id, revision);
-  });
+  const current = await ctx.store.findRoot(ctx.deps.db, id);
+  if (current === null) throw new NotFoundError("工作流", id);
+  if (current.revision !== revision) throw new RevisionConflictError(current.revision);
+
+  const references = await ctx.deps.guard.check("workflow", id);
+  if (references.length > 0) {
+    throw new ReferencedError({ type: "workflow", id, name: current.name }, references);
+  }
+  try {
+    await ctx.deps.db.transaction(async (tx) => {
+      const locked = await ctx.store.findRoot(tx, id, true);
+      if (locked === null) throw new NotFoundError("工作流", id);
+      if (locked.revision !== revision) throw new RevisionConflictError(locked.revision);
+      await ctx.store.deleteRoot(tx, id, revision);
+    });
+  } catch (error) {
+    if (isReferenceViolation(error)) {
+      const latestReferences = await ctx.deps.guard.check("workflow", id);
+      throw new ReferencedError(
+        { type: "workflow", id, name: current.name },
+        latestReferences,
+      );
+    }
+    throw error;
+  }
 }
 
 async function chooseCopyName(store: WorkflowContext["store"], tx: Db, base: string): Promise<string> {

@@ -3,6 +3,7 @@ import {
   createDb,
   createFileStore,
   createHealth,
+  createObservabilityDirectory,
   createMigrator,
   ensureDatabase,
   systemClock,
@@ -24,7 +25,8 @@ import {
 } from "./components/skill/index.ts";
 import { createInstanceService } from "./components/instance/index.ts";
 import { createScheduler } from "./components/scheduler/index.ts";
-import { createRunService } from "./components/run/index.ts";
+import { createRunReferenceReader, createRunService } from "./components/run/index.ts";
+import { createObservabilityClient } from "./components/observability-client/index.ts";
 import { createExecutorBackend } from "./executor-backend.ts";
 import {
   createExpertRead,
@@ -36,6 +38,7 @@ import {
 } from "./components/workflow/index.ts";
 import { createCatalog } from "./components/catalog/index.ts";
 import { createApiDocs, createHttpApp } from "./components/http-gateway/index.ts";
+import type { ReferenceGuard } from "./core/kernel/index.ts";
 
 const config = await loadConfig();
 if (config.executorAuth === "off") {
@@ -62,6 +65,11 @@ const skillRead = createSkillRead(db, skillStore);
 const skillSlugReader = createSkillSlugReader({ db });
 const expertRead = createExpertRead({ db });
 const workflowRead = createWorkflowRead({ db });
+const observabilityDirectory = createObservabilityDirectory();
+const clientObservability = createObservabilityClient({
+  directory: observabilityDirectory,
+  credentials: harnessRead,
+});
 const instanceService = createInstanceService({
   db,
   clock: systemClock,
@@ -89,11 +97,21 @@ const runService = createRunService({
   harnessRead,
   instance: instanceService,
   scheduler,
+  clientFiles: clientObservability,
+  clientSessions: clientObservability,
   defaultTimeoutMs: config.runDefaultTimeoutMs,
   maxNodeVisits: config.runMaxNodeVisits,
 });
 await runService.resumePending();
 const executorAuthenticator = createHarnessAuthenticator({ db });
+
+const executorBackend = createExecutorBackend({
+  scheduler,
+  packages: skillPackageSource,
+  authenticator: executorAuthenticator,
+  run: runService,
+  observabilityDirectory,
+});
 
 const catalog = createCatalog({
   harnessRead,
@@ -104,18 +122,30 @@ const catalog = createCatalog({
   workflowRead,
 });
 
+// 定义侧引用由 catalog 提供；活跃 run 的历史引用由 CMP-run 提供，二者合成删除前的 guard。
+const runReferences = createRunReferenceReader({ db });
+const guard: ReferenceGuard = {
+  async check(owner, id) {
+    const definitionReferences = await catalog.check(owner, id);
+    if (owner === "workflow" || owner === "harness" || owner === "expert") {
+      return [...definitionReferences, ...(await runReferences.active(owner, id))];
+    }
+    return definitionReferences;
+  },
+};
+
 const harnessService = createHarnessService({
   db,
   clock: systemClock,
   ids: uuidv7Ids,
-  guard: catalog,
+  guard,
   actor: config.actor,
 });
 const toolService = createToolService({
   db,
   clock: systemClock,
   ids: uuidv7Ids,
-  guard: catalog,
+  guard,
   actor: config.actor,
 });
 const skillDraftService = createSkillDraftService({
@@ -123,7 +153,7 @@ const skillDraftService = createSkillDraftService({
   store: skillStore,
   clock: systemClock,
   ids: uuidv7Ids,
-  guard: catalog,
+  guard,
   draftTtlHours: config.skillDraftTtlHours,
   actor: config.actor,
 });
@@ -132,7 +162,7 @@ const expertService = createExpertService({
   clock: systemClock,
   ids: uuidv7Ids,
   actor: config.actor,
-  guard: catalog,
+  guard,
   skillSlugs: skillSlugReader,
 });
 const workflowService = createWorkflowService({
@@ -141,6 +171,7 @@ const workflowService = createWorkflowService({
   ids: uuidv7Ids,
   actor: config.actor,
   expertStatus: expertRead,
+  guard,
 });
 
 const health = createHealth(db);
@@ -157,12 +188,7 @@ const docs = await createApiDocs({
 
 const app = createHttpApp({
   catalog,
-  backend: createExecutorBackend({
-    scheduler,
-    packages: skillPackageSource,
-    authenticator: executorAuthenticator,
-    run: runService,
-  }),
+  backend: executorBackend,
   executorAuth: config.executorAuth,
   executorEnroll: async (clientId, address) => {
     const node = await harnessService.ensureNode(clientId, { address });

@@ -11,6 +11,26 @@ export type NodeOps = {
     state: "queued" | "waiting_confirm",
     enterReason?: EnterReason | null,
   ): Promise<RunNodeRow | null>;
+  setNodeWaitingConfirm(
+    run: RunRow,
+    node: WorkflowNode,
+    row: RunNodeRow,
+    input: {
+      verdict: Record<string, unknown> | null;
+      message: string;
+      sessionId?: string;
+    },
+  ): Promise<void>;
+  setNodeWaitingResume(
+    run: RunRow,
+    node: WorkflowNode,
+    row: RunNodeRow,
+    input: {
+      message: string;
+      error: { code: string; message: string };
+      sessionId?: string;
+    },
+  ): Promise<void>;
   settleNode(
     run: RunRow,
     node: WorkflowNode,
@@ -20,9 +40,97 @@ export type NodeOps = {
       verdict?: Record<string, unknown> | null;
       message: string;
       error?: ErrorView;
+      /** 任务结果里的 sessionId；非任务结算路径不传。 */
+      sessionId?: string;
     },
   ): Promise<void>;
 };
+
+type SettleInput = {
+  state: "succeeded" | "rejected" | "failed";
+  verdict?: Record<string, unknown> | null;
+  message: string;
+  error?: ErrorView;
+  sessionId?: string;
+};
+
+async function writeSettle(
+  core: RunCore,
+  run: RunRow,
+  node: WorkflowNode,
+  row: RunNodeRow,
+  input: SettleInput,
+): Promise<void> {
+  const { deps, store } = core;
+  const now = deps.clock.now();
+  await deps.db.transaction((tx) =>
+    store.settleNode(tx, {
+      runId: run.id,
+      nodeId: node.id,
+      visit: row.visit,
+      state: input.state,
+      verdict: input.verdict ?? null,
+      message: input.message,
+      error: input.error ?? null,
+      sessionId: input.sessionId ?? null,
+      now,
+    }),
+  );
+}
+
+async function writeWaitingConfirm(
+  core: RunCore,
+  run: RunRow,
+  node: WorkflowNode,
+  row: RunNodeRow,
+  input: { verdict: Record<string, unknown> | null; message: string; sessionId?: string },
+): Promise<void> {
+  const { deps, store } = core;
+  const now = deps.clock.now();
+  await deps.db.transaction(async (tx) => {
+    await store.setNodeWaitingConfirm(tx, {
+      runId: run.id,
+      nodeId: node.id,
+      visit: row.visit,
+      verdict: input.verdict,
+      message: input.message,
+      sessionId: input.sessionId ?? null,
+      now,
+    });
+    await store.setRunProgress(tx, run.id, {
+      state: "waiting_confirm",
+      currentNodeId: node.id,
+      now,
+    });
+  });
+}
+
+async function writeWaitingResume(
+  core: RunCore,
+  run: RunRow,
+  node: WorkflowNode,
+  row: RunNodeRow,
+  input: { message: string; error: { code: string; message: string }; sessionId?: string },
+): Promise<void> {
+  const { deps, store } = core;
+  const now = deps.clock.now();
+  await deps.db.transaction(async (tx) => {
+    await store.setNodeWaitingResume(tx, {
+      runId: run.id,
+      nodeId: node.id,
+      visit: row.visit,
+      message: input.message,
+      error: input.error,
+      sessionId: input.sessionId ?? null,
+      now,
+    });
+    await store.setRunProgress(tx, run.id, {
+      state: "waiting_resume",
+      currentNodeId: node.id,
+      now,
+    });
+  });
+}
 
 /** 节点行原语：建行（含重访轮次上限）与结算。 */
 export function createNodeOps(core: RunCore): NodeOps {
@@ -44,6 +152,8 @@ export function createNodeOps(core: RunCore): NodeOps {
       return null;
     }
     const now = deps.clock.now();
+    const expertName =
+      node.expertId === null ? null : (await deps.expertRead.get(node.expertId)).name;
     await deps.db.transaction(async (tx) => {
       await store.insertNode(tx, {
         runId: run.id,
@@ -51,6 +161,7 @@ export function createNodeOps(core: RunCore): NodeOps {
         visit,
         nodeType: node.type,
         expertId: node.expertId,
+        expertName,
         state,
         ...(enterReason === undefined || enterReason === null ? {} : { enterReason }),
         now,
@@ -69,31 +180,36 @@ export function createNodeOps(core: RunCore): NodeOps {
     return row;
   }
 
-  async function settleNode(
+  async function setNodeWaitingConfirm(
     run: RunRow,
     node: WorkflowNode,
     row: RunNodeRow,
     input: {
-      state: "succeeded" | "rejected" | "failed";
-      verdict?: Record<string, unknown> | null;
+      verdict: Record<string, unknown> | null;
       message: string;
-      error?: ErrorView;
+      sessionId?: string;
     },
   ): Promise<void> {
-    const now = deps.clock.now();
-    await deps.db.transaction((tx) =>
-      store.settleNode(tx, {
-        runId: run.id,
-        nodeId: node.id,
-        visit: row.visit,
-        state: input.state,
-        verdict: input.verdict ?? null,
-        message: input.message,
-        error: input.error ?? null,
-        now,
-      }),
-    );
+    await writeWaitingConfirm(core, run, node, row, input);
   }
 
-  return { createNode, settleNode };
+  async function setNodeWaitingResume(
+    run: RunRow,
+    node: WorkflowNode,
+    row: RunNodeRow,
+    input: { message: string; error: { code: string; message: string }; sessionId?: string },
+  ): Promise<void> {
+    await writeWaitingResume(core, run, node, row, input);
+  }
+
+  async function settleNode(
+    run: RunRow,
+    node: WorkflowNode,
+    row: RunNodeRow,
+    input: SettleInput,
+  ): Promise<void> {
+    await writeSettle(core, run, node, row, input);
+  }
+
+  return { createNode, setNodeWaitingConfirm, setNodeWaitingResume, settleNode };
 }

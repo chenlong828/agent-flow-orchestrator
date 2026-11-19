@@ -107,7 +107,7 @@ const EXPERTS: ExpertSeed[] = [
     duty: "按架构规格核验方案的切分、依赖、契约与 P 级，给出 pass/fail 与可执行理由；把评审报告与 verdict 依据写进 task-space 的 review.md",
     skillOrder: "架构设计规格 → 审核判定",
     verifyOrder: "模块地图与依赖矩阵齐全 → 契约不泄漏实现 → 定级与确认门一致 → review.md 与 verdict 一致",
-    notes: "证据不足视为 fail；评审上下文与被评审隔离；只判定，不改仓库状态位、不改设计产物、不代写确认记录；结束前必须在最终消息末尾输出裸 JSON：{\"verdict\":\"pass\"或\"fail\",\"reason\":\"回退理由\"}（不加代码围栏，其后不再出现别的 JSON），缺失或格式不符按判定无效处理",
+    notes: "证据不足视为 fail；评审上下文与被评审隔离；只判定，不改仓库状态位、不改设计产物、不代写确认记录；verdict 按 review-verdict 技能调用 mcp__agentflow__signal 提交，不要只在正文写结论",
     refs: [], enabled: true,
   },
   {
@@ -140,7 +140,7 @@ const EXPERTS: ExpertSeed[] = [
     duty: "先运行 precheck（本次改动），再运行 report 并按 JS 判断清单逐项核对；对照方案与规范审视代码与产物，给出 pass/fail 与可执行意见；把机器报告摘要、判断清单证据、verdict 依据与「状态翻转清单」（哪些场景可转 verified、哪个需求可转 delivered、哪个任务可标完成）写进 task-space 的 review.md",
     skillOrder: "审核判定 → JS 后端检查",
     verifyOrder: "precheck 无 FAIL → report 无 ERROR 与新增 FAIL → 判断清单每项有证据位置 → 验收证据在 task-space 内可复核（缺证据按 fail）→ review.md 与 verdict 一致",
-    notes: "不读执行过程独白，只看产物与方案；机器报告是证据，不替代 review-verdict 裁决，也不为了变绿改阈值；只判定，不改产品代码与测试、不改设计产物、不代写确认记录，状态翻转由收尾在评审通过后执行；结束前必须在最终消息末尾输出裸 JSON：{\"verdict\":\"pass\"或\"fail\",\"reason\":\"回退理由\"}（不加代码围栏，其后不再出现别的 JSON），缺失或格式不符按判定无效处理",
+    notes: "不读执行过程独白，只看产物与方案；机器报告是证据，不替代 review-verdict 裁决，也不为了变绿改阈值；只判定，不改产品代码与测试、不改设计产物、不代写确认记录，状态翻转由收尾在评审通过后执行；verdict 按 review-verdict 技能调用 mcp__agentflow__signal 提交，不要只在正文写结论",
     refs: [], enabled: true,
   },
   {

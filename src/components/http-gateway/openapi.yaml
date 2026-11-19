@@ -2,7 +2,7 @@
 openapi: 3.0.3
 info:
   title: AgentFlow B1+B3+B4 编排服务 API
-  version: 0.1.0
+  version: 0.6.0
   description: |
     AgentFlow B1+B3+B4 控制面的 HTTP JSON 契约，覆盖 Harness、工具、Skill、专家、
     工作流定义、运行编排、引用页与健康检查。业务端点统一以 `/api/v1` 为前缀，`/healthz` 不参与版本。
@@ -12,7 +12,7 @@ info:
     `spec.md` 是契约权威版本；若两者冲突，以 `spec.md` 为准。
 
     通用约定：
-    - `x-api-count` 统计产品业务端点（54 个），不含 `/healthz`；本文件共 55 个 operation、38 个 path。
+    - `x-api-count` 统计产品业务端点（61 个），不含 `/healthz`；本文件共 62 个 operation、45 个 path。
     - 请求/响应为 `application/json; charset=utf-8`；ID 为 UUIDv7；时间为 ISO-8601 UTC。
     - 列表响应为 `{items,total,limit,offset}`；`limit` 默认 50、上限 200。
     - 启停、删除、专家装配、工作流保存定义、已有 Skill 草稿保存需带 `If-Match: "<revision>"`；缺少为 428，旧版本为 409。工作流复制/导入/校验不需要 `If-Match`。
@@ -20,7 +20,7 @@ info:
     - 无登录/鉴权；`X-Actor` 仅用于显示，不是身份。请求可带 `X-Request-Id`，响应可回显。无 CORS 配置。
   x-source-spec: docs/design/components/http-gateway/spec.md
   x-contract-status: current
-  x-api-count: 54
+  x-api-count: 61
   license:
     name: Internal use only
   x-runtime-asset: true
@@ -224,7 +224,7 @@ paths:
       operationId: deleteHarness
       x-api-id: API-06
       x-component-method: harness.delete
-      description: 被工具引用时返回 409 `referenced`；成功后无响应体。
+      description: 被工具或未终态 run 引用时返回 409 `referenced`；终态 run 的历史引用不阻止删除。成功后无响应体。
       parameters:
       - "$ref": "#/components/parameters/IfMatch"
       responses:
@@ -1280,7 +1280,7 @@ paths:
       operationId: deleteExpert
       x-api-id: API-27
       x-component-method: expert.delete
-      description: B1 没有引用专家的资产；成功后无响应体。
+      description: 被当前工作流或未终态 run 引用时返回 409 `referenced`；终态 run 的历史引用不阻止删除。成功后无响应体。
       parameters:
       - "$ref": "#/components/parameters/IfMatch"
       responses:
@@ -1596,7 +1596,7 @@ paths:
       operationId: deleteWorkflow
       x-api-id: API-35
       x-component-method: workflow.delete
-      description: 删除工作流并级联删除当前定义与专家引用投影；需要当前 revision。
+      description: 删除工作流并级联删除当前定义与专家引用投影；被未终态 run 引用时返回 409 `referenced`，终态 run 不阻止删除。需要当前 revision。
       parameters:
       - "$ref": "#/components/parameters/IfMatch"
       responses:
@@ -1921,7 +1921,7 @@ paths:
       operationId: decideRunNode
       x-api-id: API-46
       x-component-method: run.decide
-      description: 仅 `confirm` 节点在 `waiting_confirm` 时可接受；`pass` 继续 seq，`reject` 沿回退边退回祖先；同决策重复提交幂等，非等待状态返回 409 `invalid_state`。
+      description: "`confirm` 节点或 `confirmation_request` 确认点在 `waiting_confirm` 时可接受。`confirm` 节点：`pass` 继续 seq，`reject` 沿回退边退回祖先。确认点：`pass`/`reject` 都不结算、不推进，使用原 `sessionId` 创建 `resumeSessionId` 续跑任务，人工意见写入 prompt；同决策重复提交幂等，非等待状态返回 409 `invalid_state`。"
       requestBody:
         required: true
         content:
@@ -1937,6 +1937,35 @@ paths:
                 "$ref": "#/components/schemas/RunDetail"
         '400':
           "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/runs/{id}/nodes/{nodeId}/resume":
+    parameters:
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    - "$ref": "#/components/parameters/Id"
+    - "$ref": "#/components/parameters/NodeId"
+    post:
+      tags:
+      - Run
+      summary: API-54 继续执行超时节点
+      operationId: resumeRunNode
+      x-api-id: API-54
+      x-component-method: run.resumeNode
+      description: "仅 `waiting_resume` 节点可调用：把同一任务的已超时 attempt 重开为下一 attempt，并写入节点回传的 `sessionId`，client 用 `session/resume` 继续。同一任务、同一节点 visit 不变；重复调用幂等，非等待状态返回 409 `invalid_state`。"
+      responses:
+        '200':
+          description: 续跑后的运行详情。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RunDetail"
         '404':
           "$ref": "#/components/responses/NotFound"
         '409':
@@ -1997,6 +2026,260 @@ paths:
           "$ref": "#/components/responses/NotFound"
         '500':
           "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/runs/{id}/files":
+    parameters:
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    - "$ref": "#/components/parameters/Id"
+    get:
+      tags:
+      - Run
+      summary: API-48 列出运行文件
+      operationId: listRunFiles
+      x-api-id: API-48
+      x-component-method: run.listFiles
+      description: 按 root（task-space/workspace）列出该运行的一层目录；client 侧最多 2000 条、超出以 truncated 标记。
+      parameters:
+      - name: root
+        in: query
+        required: false
+        description: 文件根；缺省 task-space。
+        schema:
+          type: string
+          enum:
+          - task-space
+          - workspace
+          default: task-space
+      - name: path
+        in: query
+        required: false
+        description: 相对 POSIX 路径；空表示根。
+        schema:
+          type: string
+      responses:
+        '200':
+          description: 目录列表。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RunFileListing"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/runs/{id}/files/content":
+    parameters:
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    - "$ref": "#/components/parameters/Id"
+    get:
+      tags:
+      - Run
+      summary: API-49 读取运行文件
+      operationId: getRunFileContent
+      x-api-id: API-49
+      x-component-method: run.readFile
+      description: 读取文本文件；二进制只返回元数据。client 侧最多 1 MiB，超出以 truncated 标记。
+      parameters:
+      - name: root
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - task-space
+          - workspace
+          default: task-space
+      - name: path
+        in: query
+        required: true
+        description: 相对 POSIX 路径，不能为空。
+        schema:
+          type: string
+      responses:
+        '200':
+          description: 文件内容或二进制元数据。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RunFileContent"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '415':
+          "$ref": "#/components/responses/UnsupportedMediaType"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/runs/{id}/nodes/{nodeId}/session":
+    parameters:
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    - "$ref": "#/components/parameters/Id"
+    - "$ref": "#/components/parameters/NodeId"
+    get:
+      tags:
+      - Run
+      summary: API-50 查询节点会话
+      operationId: getRunNodeSession
+      x-api-id: API-50
+      x-component-method: run.getSession
+      description: 通过 run/node 代理 client session 元数据；不返回 sessionId/attemptId。
+      parameters:
+      - name: visit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: 会话视图。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RunSessionView"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/runs/{id}/nodes/{nodeId}/session/events":
+    parameters:
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    - "$ref": "#/components/parameters/Id"
+    - "$ref": "#/components/parameters/NodeId"
+    get:
+      tags:
+      - Run
+      summary: API-51 分页查询节点会话事件
+      operationId: listRunNodeSessionEvents
+      x-api-id: API-51
+      x-component-method: run.listSessionEvents
+      description: 通过 run/node 代理 client session preview 事件；返回分页，不含 sessionId/attemptId。
+      parameters:
+      - name: visit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 1000
+      responses:
+        '200':
+          description: 事件分页。
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RunSessionEventPage"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '500':
+          "$ref": "#/components/responses/InternalError"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/runs/{id}/nodes/{nodeId}/session/events/stream":
+    parameters:
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    - "$ref": "#/components/parameters/Id"
+    - "$ref": "#/components/parameters/NodeId"
+    get:
+      tags:
+      - Run
+      summary: API-52 订阅节点会话富事件
+      operationId: streamRunNodeSessionEvents
+      x-api-id: API-52
+      x-component-method: run.openSessionEvents
+      description: SSE 代理 client O-11；事件 data 不含 sessionId/attemptId。UI BFF 需流式转发。
+      parameters:
+      - name: visit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+      - name: Last-Event-ID
+        in: header
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: SSE 事件流。
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+  "/api/v1/runs/{id}/nodes/{nodeId}/session/raw":
+    parameters:
+    - "$ref": "#/components/parameters/Actor"
+    - "$ref": "#/components/parameters/RequestId"
+    - "$ref": "#/components/parameters/Id"
+    - "$ref": "#/components/parameters/NodeId"
+    get:
+      tags:
+      - Run
+      summary: API-53 下载节点原始会话
+      operationId: downloadRunNodeSessionRaw
+      x-api-id: API-53
+      x-component-method: run.openSessionRaw
+      description: 代理 client O-08；返回 application/zstd。
+      parameters:
+      - name: visit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: 原始 zstd 会话文件。
+          headers:
+            Content-Length:
+              schema:
+                type: integer
+            X-Checksum-Sha256:
+              schema:
+                type: string
+          content:
+            application/zstd:
+              schema:
+                type: string
+                format: binary
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
         '503':
           "$ref": "#/components/responses/ServiceUnavailable"
 components:
@@ -3417,6 +3700,7 @@ components:
           - tool
           - expert
           - workflow
+          - run
           description: 引用方类型
         id:
           type: string
@@ -3425,7 +3709,7 @@ components:
         name:
           type: string
           description: 引用方名称
-      description: 引用页条目；type 为 tool/expert/workflow。
+      description: 引用页条目；type 为 tool/expert/workflow/run。
     ReferencePage:
       type: object
       required:
@@ -3884,6 +4168,7 @@ components:
       - created
       - running
       - waiting_confirm
+      - waiting_resume
       - done
       description: 运行状态闭集。
     RunOutcome:
@@ -3899,6 +4184,7 @@ components:
       - queued
       - dispatched
       - waiting_confirm
+      - waiting_resume
       - succeeded
       - rejected
       - failed
@@ -3967,6 +4253,7 @@ components:
       - verdict
       - message
       - error
+      - expertName
       - dispatchedAt
       - finishedAt
       properties:
@@ -4008,6 +4295,10 @@ components:
           - "$ref": "#/components/schemas/RunError"
           nullable: true
           description: 节点错误。
+        expertName:
+          type: string
+          nullable: true
+          description: 启动时冻结的专家名；confirm 节点为 null，资产删除后仍保留。
         dispatchedAt:
           type: string
           format: date-time
@@ -4024,8 +4315,10 @@ components:
       required:
       - runId
       - workflowId
+      - workflowName
       - workflowRevision
       - harnessId
+      - harnessName
       - clientId
       - instanceId
       - state
@@ -4043,7 +4336,10 @@ components:
         workflowId:
           type: string
           format: uuid
-          description: 所属工作流。
+          description: 所属工作流的历史 ID；工作流可被删除，此 ID 仍保留用于筛选与追溯。
+        workflowName:
+          type: string
+          description: 启动时冻结的工作流名称；工作流删除后仍保留。
         workflowRevision:
           type: integer
           minimum: 1
@@ -4051,7 +4347,10 @@ components:
         harnessId:
           type: string
           format: uuid
-          description: 目标 Harness。
+          description: 目标 Harness 的历史 ID；Harness 可被删除，此 ID 仍保留。
+        harnessName:
+          type: string
+          description: 启动时冻结的 Harness 名称；Harness 删除后仍保留。
         clientId:
           type: string
           description: 派发目标 client。
@@ -4097,6 +4396,7 @@ components:
         - autoConfirm
         - finalMessage
         - error
+        - graph
         - nodes
         properties:
           workspacePath:
@@ -4117,12 +4417,222 @@ components:
             - "$ref": "#/components/schemas/RunError"
             nullable: true
             description: 运行级错误。
+          graph:
+            "$ref": "#/components/schemas/WorkflowGraph"
+            description: 启动时冻结的工作流图；工作流删除后仍可展示。
           nodes:
             type: array
             items:
               "$ref": "#/components/schemas/RunNodeView"
             description: 节点进度，按节点与重访轮次排列。
       description: 运行详情。
+    RunFileEntry:
+      description: 运行文件/目录条目；path 相对 root。
+      type: object
+      required:
+      - name
+      - path
+      - type
+      - sizeBytes
+      - modifiedAt
+      - hidden
+      - previewable
+      - contentType
+      - language
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+          description: 相对 root 的路径。
+        type:
+          type: string
+          enum:
+          - file
+          - dir
+          - symlink
+          - other
+        sizeBytes:
+          type: integer
+          nullable: true
+        modifiedAt:
+          type: string
+        hidden:
+          type: boolean
+        previewable:
+          type: boolean
+        contentType:
+          type: string
+          nullable: true
+        language:
+          type: string
+          nullable: true
+    RunFileListing:
+      description: 运行文件目录列表；truncated 表示 client 侧条目上限截断。
+      type: object
+      required:
+      - runId
+      - root
+      - path
+      - entries
+      - truncated
+      - fetchedAt
+      properties:
+        runId:
+          type: string
+          format: uuid
+        root:
+          type: string
+          enum:
+          - task-space
+          - workspace
+        path:
+          type: string
+        entries:
+          type: array
+          items:
+            "$ref": "#/components/schemas/RunFileEntry"
+        truncated:
+          type: boolean
+        fetchedAt:
+          type: string
+          format: date-time
+    RunFileContent:
+      description: 运行文件内容；二进制或超限时 content=null/truncated 标记。
+      type: object
+      required:
+      - runId
+      - root
+      - path
+      - name
+      - sizeBytes
+      - modifiedAt
+      - contentType
+      - language
+      - content
+      - truncated
+      - reason
+      - fetchedAt
+      properties:
+        runId:
+          type: string
+          format: uuid
+        root:
+          type: string
+          enum:
+          - task-space
+          - workspace
+        path:
+          type: string
+        name:
+          type: string
+        sizeBytes:
+          type: integer
+        modifiedAt:
+          type: string
+        contentType:
+          type: string
+        language:
+          type: string
+          nullable: true
+        content:
+          type: string
+          nullable: true
+        truncated:
+          type: boolean
+        reason:
+          type: string
+          enum:
+          - binary
+          - too_large
+          nullable: true
+        fetchedAt:
+          type: string
+          format: date-time
+    RunSessionView:
+      description: 运行节点会话视图；不包含 client sessionId/attemptId。
+      type: object
+      required:
+      - runId
+      - nodeId
+      - visit
+      - status
+      - cwd
+      - startedAt
+      - finishedAt
+      - eventCount
+      - archive
+      properties:
+        runId:
+          type: string
+          format: uuid
+        nodeId:
+          type: string
+        visit:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+        cwd:
+          type: string
+        startedAt:
+          type: string
+        finishedAt:
+          type: string
+          nullable: true
+        eventCount:
+          type: integer
+        archive:
+          type: object
+          required:
+          - status
+          - sizeBytes
+          - sha256
+          properties:
+            status:
+              type: string
+            sizeBytes:
+              type: integer
+              nullable: true
+            sha256:
+              type: string
+              nullable: true
+    RunSessionEvent:
+      description: 会话 preview 事件；不含 prompt/推理/工具完整 I/O。
+      type: object
+      required:
+      - seq
+      - ts
+      - kind
+      - event
+      properties:
+        seq:
+          type: integer
+        ts:
+          type: string
+        kind:
+          type: string
+        event:
+          type: string
+        message:
+          type: string
+        data:
+          type: object
+          additionalProperties: true
+    RunSessionEventPage:
+      description: 会话事件分页。
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/RunSessionEvent"
+        nextCursor:
+          type: string
+        truncatedBefore:
+          type: integer
     RunList:
       type: object
       required:
@@ -4160,11 +4670,11 @@ components:
           enum:
           - pass
           - reject
-          description: 人工决策；pass 继续，reject 回退。
+          description: 人工决策；confirm 节点 pass 继续、reject 回退；confirmation_request 确认点 pass/reject 都续跑同一 session。
         comment:
           type: string
-          description: 可选决策备注，写入节点消息。
-      description: confirm 节点决策请求。
+          description: 可选决策备注；confirm 节点写入节点消息，确认点作为人工回答/意见注入续跑 prompt。
+      description: confirm 节点或 confirmation_request 确认点决策请求。
   responses:
     BadRequest:
       description: 请求形状/字段/枚举/范围错误，或请求体引用的目标不存在。多字段图校验的 `error.details.issues` 为 `{code,path,message}`，并保留 `fieldErrors` 兼容；路径使用数组下标。

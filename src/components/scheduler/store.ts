@@ -14,6 +14,8 @@ export type TaskRow = {
   timeout_ms: number;
   skill_set: SkillSet | string;
   skill_set_digest: string;
+  result_signal: Record<string, unknown> | string | null;
+  resume_session_id: string | null;
   outcome: TaskOutcome | null;
   error: TaskError | string | null;
   not_before: Date | string;
@@ -34,6 +36,8 @@ export type NewTaskRow = {
   timeoutMs: number;
   skillSet: SkillSet;
   skillSetDigest: string;
+  resultSignal: Record<string, unknown> | null;
+  resumeSessionId: string | null;
   notBefore: Date;
   now: Date;
 };
@@ -48,16 +52,17 @@ export type SettleInput = {
 const SELECT = `
   select t.id, t.instance_id, i.client_id, t.node_id, t.attempt, t.state, t.prompt,
          t.workspace_path, t.task_space_path, t.timeout_ms, t.skill_set, t.skill_set_digest,
-         t.outcome, t.error, t.not_before, t.dispatched_at, t.cancel_requested_at,
-         t.finished_at, t.created_at, t.updated_at
+         t.result_signal, t.resume_session_id, t.outcome, t.error, t.not_before,
+         t.dispatched_at, t.cancel_requested_at, t.finished_at, t.created_at, t.updated_at
     from task t join instance i on i.id = t.instance_id`;
 
 async function insertTask(tx: Db, row: NewTaskRow): Promise<void> {
   await tx.query(
     `insert into task
        (id, instance_id, node_id, attempt, state, prompt, workspace_path, task_space_path,
-        timeout_ms, skill_set, skill_set_digest, not_before, created_at, updated_at)
-     values ($1, $2, $3, 1, 'queued', $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $11)`,
+        timeout_ms, skill_set, skill_set_digest, result_signal, resume_session_id,
+        not_before, created_at, updated_at)
+     values ($1, $2, $3, 1, 'queued', $4, $5, $6, $7, $8::jsonb, $9, $10::jsonb, $11, $12, $13, $13)`,
     [
       row.id,
       row.instanceId,
@@ -68,6 +73,8 @@ async function insertTask(tx: Db, row: NewTaskRow): Promise<void> {
       row.timeoutMs,
       row.skillSet,
       row.skillSetDigest,
+      row.resultSignal,
+      row.resumeSessionId,
       row.notBefore,
       row.now,
     ],
@@ -132,6 +139,12 @@ function createTaskReads(db: Db) {
   return {
     findById: (id: string) => db.one<TaskRow>(`${SELECT} where t.id = $1`, [id]),
 
+    findAttempt: (taskId: string, attempt: number) =>
+      db.one<{ settled_at: Date | string | null }>(
+        `select settled_at from task_attempt where task_id = $1 and attempt = $2`,
+        [taskId, attempt],
+      ),
+
     listDispatched: () =>
       db.query<TaskRow>(`${SELECT} where t.state = 'dispatched' order by t.dispatched_at asc, t.id asc`),
 
@@ -187,6 +200,30 @@ function createTaskWrites(db: Db) {
           where id = $1 and state = 'dispatched'`,
         [id, notBefore, now],
       ),
+
+    /** 人工续跑：只允许把已超时的 done 任务重开为下一 attempt。 */
+    reopen: async (
+      tx: Db,
+      id: string,
+      resumeSessionId: string,
+      now: Date,
+    ): Promise<number | null> => {
+      const row = await tx.one<{ attempt: number }>(
+        `update task
+            set state = 'queued', attempt = attempt + 1, resume_session_id = $2,
+                outcome = null, error = null, finished_at = null,
+                dispatched_at = null, cancel_requested_at = null,
+                not_before = $3, updated_at = $3
+          where id = $1 and state = 'done' and outcome = 'failed'
+            and (
+              error->>'class' = 'timeout'
+              or error->>'code' in ('timeout', 'prompt_timeout', 'idle_timeout')
+            )
+          returning attempt`,
+        [id, resumeSessionId, now],
+      );
+      return row?.attempt ?? null;
+    },
 
     settleQueuedByInstance: async (tx: Db, instanceId: string, now: Date): Promise<number> => {
       const rows = await tx.query<{ id: string }>(

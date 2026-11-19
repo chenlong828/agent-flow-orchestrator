@@ -1,9 +1,39 @@
 import { ValidationError } from "../../core/kernel/index.ts";
 import { MAX_PROMPT_BYTES } from "../../core/kernel/index.ts";
-import type { ClientReport, TaskDraft, TaskError } from "./types.ts";
+import type { ClientReport, ResultSignalContract, TaskDraft, TaskError } from "./types.ts";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const MAX_RESULT_SIGNAL_BYTES = 8192;
+const SIGNAL_KINDS = ["review_verdict", "confirmation_request"] as const;
+
+function validateResultSignal(value: unknown): ResultSignalContract {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new ValidationError("resultSignal", "必须是对象");
+  }
+  const signal = value as Record<string, unknown>;
+  if (signal.version !== 1) throw new ValidationError("resultSignal.version", "只支持 1");
+  if (!SIGNAL_KINDS.includes(signal.kind as never)) {
+    throw new ValidationError("resultSignal.kind", "必须是 review_verdict 或 confirmation_request");
+  }
+  if (typeof signal.required !== "boolean") {
+    throw new ValidationError("resultSignal.required", "必须是布尔值");
+  }
+  if (signal.schema === null || typeof signal.schema !== "object" || Array.isArray(signal.schema)) {
+    throw new ValidationError("resultSignal.schema", "必须是对象");
+  }
+  const bytes = new TextEncoder().encode(JSON.stringify(signal)).byteLength;
+  if (bytes > MAX_RESULT_SIGNAL_BYTES) {
+    throw new ValidationError("resultSignal", `超过 ${MAX_RESULT_SIGNAL_BYTES} 字节`);
+  }
+  return {
+    version: 1,
+    kind: signal.kind as ResultSignalContract["kind"],
+    required: signal.required,
+    schema: signal.schema as Record<string, unknown>,
+  };
+}
 
 export function ensureClientId(value: unknown): string {
   if (typeof value !== "string") throw new ValidationError("clientId", "必须是字符串");
@@ -28,10 +58,10 @@ function ensurePositiveInt(value: unknown, field: string, max: number): number {
   return value;
 }
 
-export function validateDraft(draft: TaskDraft): TaskDraft {
-  if (draft === null || typeof draft !== "object") {
-    throw new ValidationError("tasks", "必须是对象数组");
-  }
+type DraftBase = Pick<TaskDraft, "instanceId" | "nodeId" | "prompt" | "timeoutMs" | "skillIds" | "taskSpacePath">;
+type DraftOptional = Pick<TaskDraft, "resultSignal" | "resumeSessionId">;
+
+function validateDraftBase(draft: TaskDraft): DraftBase {
   const instanceId = ensureUuid(draft.instanceId, "instanceId");
   if (typeof draft.nodeId !== "string" || draft.nodeId.trim() === "" || draft.nodeId.length > 200) {
     throw new ValidationError("nodeId", "长度必须是 1–200");
@@ -60,6 +90,27 @@ export function validateDraft(draft: TaskDraft): TaskDraft {
     skillIds,
     taskSpacePath: draft.taskSpacePath,
   };
+}
+
+function validateDraftOptional(draft: TaskDraft): DraftOptional {
+  const resultSignal = draft.resultSignal === undefined ? undefined : validateResultSignal(draft.resultSignal);
+  if (
+    draft.resumeSessionId !== undefined
+    && (typeof draft.resumeSessionId !== "string" || draft.resumeSessionId.length < 1 || draft.resumeSessionId.length > 200)
+  ) {
+    throw new ValidationError("resumeSessionId", "长度必须是 1–200");
+  }
+  return {
+    ...(resultSignal === undefined ? {} : { resultSignal }),
+    ...(draft.resumeSessionId === undefined ? {} : { resumeSessionId: draft.resumeSessionId }),
+  };
+}
+
+export function validateDraft(draft: TaskDraft): TaskDraft {
+  if (draft === null || typeof draft !== "object") {
+    throw new ValidationError("tasks", "必须是对象数组");
+  }
+  return { ...validateDraftBase(draft), ...validateDraftOptional(draft) };
 }
 
 const ERROR_CLASSES = [

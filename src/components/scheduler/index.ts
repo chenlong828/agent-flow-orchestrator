@@ -7,6 +7,8 @@ export type {
   FinishedRef,
   PollOptions,
   ResultAck,
+  ResultSignalContract,
+  TaskSignal,
   RunningRef,
   SchedulerPresenceRead,
   SchedulerService,

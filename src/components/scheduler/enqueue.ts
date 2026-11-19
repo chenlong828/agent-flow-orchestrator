@@ -72,6 +72,8 @@ export function createEnqueueHandler(
           timeoutMs: draft.timeoutMs,
           skillSet,
           skillSetDigest: skillSet.digest,
+          resultSignal: draft.resultSignal ?? null,
+          resumeSessionId: draft.resumeSessionId ?? null,
           notBefore: now,
           now,
         });

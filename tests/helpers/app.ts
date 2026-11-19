@@ -21,7 +21,7 @@ import { createSkillPackageSource } from "../../src/components/skill/package-sou
 import { createSkillSlugReader } from "../../src/components/skill/slug-reader.ts";
 import { createInstanceService } from "../../src/components/instance/index.ts";
 import { createScheduler } from "../../src/components/scheduler/index.ts";
-import { createRunService } from "../../src/components/run/index.ts";
+import { createRunReferenceReader, createRunService } from "../../src/components/run/index.ts";
 import { createExecutorBackend } from "../../src/executor-backend.ts";
 import { createExpertRead, createExpertService } from "../../src/components/expert/index.ts";
 import {
@@ -112,19 +112,29 @@ export async function createTestContext(
     expertRead,
     workflowRead,
   });
+  const runReferences = createRunReferenceReader({ db });
+  const guard = {
+    async check(owner: Parameters<typeof catalog.check>[0], id: string) {
+      const definitionReferences = await catalog.check(owner, id);
+      if (owner === "workflow" || owner === "harness" || owner === "expert") {
+        return [...definitionReferences, ...(await runReferences.active(owner, id))];
+      }
+      return definitionReferences;
+    },
+  };
 
   const harnessService = createHarnessService({
     db,
     clock: systemClock,
     ids: uuidv7Ids,
-    guard: catalog,
+    guard,
     actor: "tester",
   });
   const toolService = createToolService({
     db,
     clock: systemClock,
     ids: uuidv7Ids,
-    guard: catalog,
+    guard,
     actor: "tester",
   });
   const skillDraftService = createSkillDraftService({
@@ -132,7 +142,7 @@ export async function createTestContext(
     store: skillStore,
     clock: systemClock,
     ids: uuidv7Ids,
-    guard: catalog,
+    guard,
     draftTtlHours: 24,
     actor: "tester",
   });
@@ -163,7 +173,7 @@ export async function createTestContext(
     clock: systemClock,
     ids: uuidv7Ids,
     actor: "tester",
-    guard: catalog,
+    guard,
     skillSlugs: skillSlugReader,
   });
   const workflowService = createWorkflowService({
@@ -172,6 +182,7 @@ export async function createTestContext(
     ids: uuidv7Ids,
     actor: "tester",
     expertStatus: expertRead,
+    guard,
   });
 
   const backend = createExecutorBackend({ scheduler, packages, authenticator, run: runService });

@@ -1,4 +1,10 @@
-import type { Clock, FileStore, IdGenerator } from "../../core/kernel/index.ts";
+import type {
+  ClientRunFiles,
+  ClientSessionObservability,
+  Clock,
+  FileStore,
+  IdGenerator,
+} from "../../core/kernel/index.ts";
 import type { Db } from "../../core/platform/index.ts";
 import type { ExpertRead } from "../expert/index.ts";
 import type { HarnessRead } from "../harness/index.ts";
@@ -16,6 +22,9 @@ export type RunDeps = {
   harnessRead: HarnessRead;
   instance: InstanceService;
   scheduler: SchedulerService;
+  /** client 观测面只读端口；由 CMP-observability-client 适配器实现。 */
+  clientFiles?: ClientRunFiles;
+  clientSessions?: ClientSessionObservability;
   /** 节点任务默认超时（毫秒）。 */
   defaultTimeoutMs: number;
   /** 单节点最大重访轮次。 */

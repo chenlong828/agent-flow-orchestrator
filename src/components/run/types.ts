@@ -2,12 +2,13 @@ import type { Page, PageQuery } from "../../core/kernel/index.ts";
 import type { TaskResult } from "../scheduler/index.ts";
 import type { NodeType, WorkflowGraph } from "../workflow/index.ts";
 
-export type RunState = "created" | "running" | "waiting_confirm" | "done";
+export type RunState = "created" | "running" | "waiting_confirm" | "waiting_resume" | "done";
 export type RunOutcome = "succeeded" | "failed" | "cancelled";
 export type RunNodeState =
   | "queued"
   | "dispatched"
   | "waiting_confirm"
+  | "waiting_resume"
   | "succeeded"
   | "rejected"
   | "failed";
@@ -38,15 +39,21 @@ export type RunNodeView = {
   enterReason: EnterReason | null;
   message: string;
   error: { code: string; message: string } | null;
+  /** 启动时冻结的专家名；confirm 节点为 null。 */
+  expertName: string | null;
   dispatchedAt: string | null;
   finishedAt: string | null;
 };
 
 export type RunSummary = {
   runId: string;
+  /** 启动时工作流 ID；工作流可被删除，此 ID 仍保留用于筛选与追溯。 */
   workflowId: string;
+  workflowName: string;
   workflowRevision: number;
+  /** 启动时 Harness ID；Harness 可被删除，此 ID 仍保留。 */
   harnessId: string;
+  harnessName: string;
   clientId: string;
   instanceId: string;
   state: RunState;
@@ -59,6 +66,8 @@ export type RunSummary = {
 };
 
 export type RunDetail = RunSummary & {
+  /** 启动时冻结的工作流图；工作流删除后仍可展示。 */
+  graph: WorkflowGraph;
   workspacePath: string;
   taskSpacePath: string;
   autoConfirm: boolean;
@@ -101,6 +110,78 @@ export type DecideInput = {
   actor: string | null;
 };
 
+export type ResumeNodeInput = {
+  runId: string;
+  nodeId: string;
+  actor: string | null;
+};
+
+
+export type RunFileRoot = "task-space" | "workspace";
+
+export type RunFileEntry = {
+  name: string;
+  path: string;
+  type: "file" | "dir" | "symlink" | "other";
+  sizeBytes: number | null;
+  modifiedAt: string;
+  hidden: boolean;
+  previewable: boolean;
+  contentType: string | null;
+  language: string | null;
+};
+
+export type RunFileListing = {
+  runId: string;
+  root: RunFileRoot;
+  path: string;
+  entries: RunFileEntry[];
+  truncated: boolean;
+  fetchedAt: string;
+};
+
+export type RunFileContent = {
+  runId: string;
+  root: RunFileRoot;
+  path: string;
+  name: string;
+  sizeBytes: number;
+  modifiedAt: string;
+  contentType: string;
+  language: string | null;
+  content: string | null;
+  truncated: boolean;
+  reason: "binary" | "too_large" | null;
+  fetchedAt: string;
+};
+
+export type RunSessionView = {
+  runId: string;
+  nodeId: string;
+  visit: number;
+  status: string;
+  cwd: string;
+  startedAt: string;
+  finishedAt: string | null;
+  eventCount: number;
+  archive: { status: string; sizeBytes: number | null; sha256: string | null };
+};
+
+export type RunSessionEvent = {
+  seq: number;
+  ts: string;
+  kind: string;
+  event: string;
+  message?: string;
+  data?: Record<string, unknown>;
+};
+
+export type RunSessionEventPage = {
+  items: RunSessionEvent[];
+  nextCursor?: string;
+  truncatedBefore?: number;
+};
+
 export type RunService = {
   start(input: StartRun): Promise<RunDetail>;
   advance(runId: string): Promise<void>;
@@ -110,6 +191,7 @@ export type RunService = {
   archiveRequestsFor(clientId: string): Promise<ArchiveRequest[]>;
   ackArchived(clientId: string, runIds: string[]): Promise<void>;
   decide(input: DecideInput): Promise<RunDetail>;
+  resumeNode(input: ResumeNodeInput): Promise<RunDetail>;
   cancel(runId: string, actor?: string): Promise<RunDetail>;
   get(runId: string): Promise<RunDetail>;
   list(query: RunQuery): Promise<Page<RunSummary>>;
@@ -120,15 +202,41 @@ export type RunService = {
     attempt?: number;
   }): Promise<{ stream: ReadableStream<Uint8Array>; sizeBytes: number; sha256: string } | null>;
   resumePending(): Promise<{ resumed: number }>;
+  listFiles(input: { runId: string; root: RunFileRoot; path: string }): Promise<RunFileListing>;
+  readFile(input: { runId: string; root: RunFileRoot; path: string }): Promise<RunFileContent>;
+  getSession(input: { runId: string; nodeId: string; visit?: number }): Promise<RunSessionView>;
+  listSessionEvents(input: {
+    runId: string;
+    nodeId: string;
+    visit?: number;
+    cursor?: string;
+    limit?: number;
+  }): Promise<RunSessionEventPage>;
+  openSessionEvents(input: {
+    runId: string;
+    nodeId: string;
+    visit?: number;
+    lastEventId?: string;
+  }): Promise<ReadableStream<Uint8Array>>;
+  openSessionRaw(input: {
+    runId: string;
+    nodeId: string;
+    visit?: number;
+  }): Promise<{ stream: ReadableStream<Uint8Array>; sizeBytes: number; sha256: string; etag?: string }>;
+  runIdForTask(taskId: string): Promise<string | null>;
 };
 
 export type RunRow = {
   id: string;
-  workflow_id: string;
+  workflow_id: string | null;
+  workflow_ref_id: string;
+  workflow_name: string;
   workflow_revision: number;
   graph_snapshot: WorkflowGraph | string;
   intent_markdown: string;
-  harness_id: string;
+  harness_id: string | null;
+  harness_ref_id: string;
+  harness_name: string;
   client_id: string;
   instance_id: string;
   workspace_path: string;
@@ -152,8 +260,10 @@ export type RunNodeRow = {
   visit: number;
   node_type: NodeType;
   expert_id: string | null;
+  expert_name: string | null;
   state: RunNodeState;
   task_id: string | null;
+  session_id: string | null;
   verdict: Record<string, unknown> | string | null;
   enter_reason: EnterReason | string | null;
   message: string | null;

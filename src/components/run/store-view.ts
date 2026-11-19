@@ -10,9 +10,11 @@ function parseJson<T>(value: T | string | null): T | null {
 export function toRunSummary(row: RunRow): RunSummary {
   return {
     runId: row.id,
-    workflowId: row.workflow_id,
+    workflowId: row.workflow_ref_id,
+    workflowName: row.workflow_name,
     workflowRevision: row.workflow_revision,
-    harnessId: row.harness_id,
+    harnessId: row.harness_ref_id,
+    harnessName: row.harness_name,
     clientId: row.client_id,
     instanceId: row.instance_id,
     state: row.state,
@@ -36,6 +38,7 @@ export function toNodeView(row: RunNodeRow): RunNodeView {
     enterReason: parseJson(row.enter_reason),
     message: row.message ?? "",
     error: parseJson(row.error),
+    expertName: row.expert_name,
     dispatchedAt: toIsoOrNull(row.dispatched_at),
     finishedAt: toIsoOrNull(row.finished_at),
   };

@@ -18,12 +18,20 @@ export type PromptEntry = {
   reason: string;
 };
 
+export type PromptConfirmation = {
+  question: string;
+  decision: "pass" | "reject";
+  comment: string | null;
+  options?: string[];
+};
+
 export type PromptInput = {
   node: WorkflowNode;
   expert: PromptExpert;
   taskSpacePath: string;
   entry?: PromptEntry;
   intentMarkdown?: string;
+  confirmation?: PromptConfirmation;
 };
 
 const ENTRY_REASON_LIMIT = 300;
@@ -55,6 +63,22 @@ function entryBlock(entry: PromptEntry): string[] {
   return [head, `${label}：${reason}`];
 }
 
+function confirmationBlock(confirmation: PromptConfirmation): string[] {
+  const decision = confirmation.decision === "pass" ? "通过" : "拒绝";
+  const answer = confirmation.comment?.trim();
+  const lines = ["[人工确认]", `问题：${confirmation.question}`, `人工决定：${decision}`];
+  if (confirmation.options !== undefined && confirmation.options.length > 0) {
+    lines.push(`可选项：${confirmation.options.join(" / ")}`);
+  }
+  lines.push(`人的回答/意见：${answer === undefined || answer === "" ? "（无补充）" : truncate(answer)}`);
+  lines.push(
+    confirmation.decision === "pass"
+      ? "继续完成本节点；按人工确认继续执行。"
+      : "继续完成本节点；按拒绝意见调整，不要重复被拒绝的方案。",
+  );
+  return lines;
+}
+
 function truncate(text: string): string {
   const chars = [...text];
   return chars.length <= ENTRY_REASON_LIMIT
@@ -83,7 +107,13 @@ export function composeNodePrompt(input: PromptInput): string {
     );
   }
   lines.push("[输出要求] 无特别要求，跟随Skill执行。");
+  if (input.node.type === "agent") {
+    lines.push(
+      "[确认通道] 遇到契约变更、严重超出范围、关键信息缺失或无法解决的冲突时，调用 mcp__agentflow__confirm 提交需要人确认的问题；普通可判断的问题不要打断人。",
+    );
+  }
   if (input.entry !== undefined) lines.push(...entryBlock(input.entry));
+  if (input.confirmation !== undefined) lines.push(...confirmationBlock(input.confirmation));
   lines.push("");
   lines.push(...expertBlock(input.expert));
   const prompt = lines.join("\n");

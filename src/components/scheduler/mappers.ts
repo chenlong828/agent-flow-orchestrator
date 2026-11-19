@@ -1,4 +1,4 @@
-import type { SkillSet, TaskEnvelope, TaskError, TaskSnapshot } from "./types.ts";
+import type { ResultSignalContract, SkillSet, TaskEnvelope, TaskError, TaskSnapshot } from "./types.ts";
 import type { TaskRow } from "./store.ts";
 
 export function toIso(value: Date | string): string {
@@ -14,6 +14,13 @@ function errorOf(row: TaskRow): TaskError | null {
   return typeof row.error === "string" ? (JSON.parse(row.error) as TaskError) : row.error;
 }
 
+function resultSignalOf(row: TaskRow): ResultSignalContract | undefined {
+  if (row.result_signal === null) return undefined;
+  return typeof row.result_signal === "string"
+    ? (JSON.parse(row.result_signal) as ResultSignalContract)
+    : (row.result_signal as ResultSignalContract);
+}
+
 export function envelope(row: TaskRow): TaskEnvelope {
   return {
     taskId: row.id,
@@ -25,6 +32,8 @@ export function envelope(row: TaskRow): TaskEnvelope {
     taskSpacePath: row.task_space_path,
     timeoutMs: row.timeout_ms,
     skillSet: skillSetOf(row),
+    ...(resultSignalOf(row) === undefined ? {} : { resultSignal: resultSignalOf(row) }),
+    ...(row.resume_session_id === null ? {} : { resumeSessionId: row.resume_session_id }),
   };
 }
 

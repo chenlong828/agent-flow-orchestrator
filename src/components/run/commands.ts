@@ -4,10 +4,12 @@ import {
   RunConflictError,
   ValidationError,
 } from "../../core/kernel/index.ts";
-import type { DecideInput, RunDetail, StartRun } from "./types.ts";
+import { isForeignKeyViolation, violationConstraint } from "../../core/platform/index.ts";
+import type { DecideInput, ResumeNodeInput, RunDetail, StartRun } from "./types.ts";
 import { advanceLocked } from "./advance.ts";
 import { assertRunnableGraph, nodeById, startNode } from "./graph-checks.ts";
 import type { RunRuntime } from "./runtime.ts";
+import { confirmationFromVerdict } from "./signals.ts";
 import { ensureAbsolutePath, taskSpaceFor } from "./validate.ts";
 
 type CommandsDeps = {
@@ -84,35 +86,56 @@ async function start(input: StartRun, runtime: RunRuntime, deps: CommandsDeps): 
   const runId = runtime.deps.ids.next();
   const startNodeValue = startNode(graph);
   if (startNodeValue === null) throw new ValidationError("graph.nodes", "缺少开始节点");
+  const startExpert =
+    startNodeValue.expertId === null
+      ? null
+      : await runtime.readExpertOrInvalid(startNodeValue.id, startNodeValue.expertId);
   const now = runtime.deps.clock.now();
   const taskSpacePath = await resolveTaskSpacePath(runtime, workspacePath, now);
-  await runtime.deps.db.transaction(async (tx) => {
-    await runtime.store.insertRun(tx, {
-      id: runId,
-      workflowId: input.workflowId,
-      workflowRevision: workflow.revision,
-      graphSnapshot: graph,
-      intentMarkdown: input.intentMarkdown,
-      harnessId: input.harnessId,
-      clientId,
-      instanceId: instance.instanceId,
-      workspacePath,
-      taskSpacePath,
-      autoConfirm: input.autoConfirm ?? false,
-      now,
-      actor: input.actor ?? null,
+  try {
+    await runtime.deps.db.transaction(async (tx) => {
+      await runtime.store.insertRun(tx, {
+        id: runId,
+        workflowId: input.workflowId,
+        workflowName: workflow.name,
+        workflowRevision: workflow.revision,
+        graphSnapshot: graph,
+        intentMarkdown: input.intentMarkdown,
+        harnessId: input.harnessId,
+        harnessName: harness.name,
+        clientId,
+        instanceId: instance.instanceId,
+        workspacePath,
+        taskSpacePath,
+        autoConfirm: input.autoConfirm ?? false,
+        now,
+        actor: input.actor ?? null,
+      });
+      await runtime.store.insertNode(tx, {
+        runId,
+        nodeId: startNodeValue.id,
+        visit: 1,
+        nodeType: startNodeValue.type,
+        expertId: startNodeValue.expertId,
+        expertName: startExpert?.name ?? null,
+        state: "queued",
+        now,
+      });
+      await runtime.store.setCurrentNode(tx, runId, startNodeValue.id, now);
     });
-    await runtime.store.insertNode(tx, {
-      runId,
-      nodeId: startNodeValue.id,
-      visit: 1,
-      nodeType: startNodeValue.type,
-      expertId: startNodeValue.expertId,
-      state: "queued",
-      now,
-    });
-    await runtime.store.setCurrentNode(tx, runId, startNodeValue.id, now);
-  });
+  } catch (error) {
+    // 启动窗口内工作流/Harness 被并发删除：外键兜底，映射为 404 而不是 500。
+    if (isForeignKeyViolation(error)) {
+      const constraint = violationConstraint(error);
+      if (constraint === "workflow_run_workflow_id_fkey") {
+        throw new NotFoundError("工作流", input.workflowId);
+      }
+      if (constraint === "workflow_run_harness_id_fkey") {
+        throw new NotFoundError("Harness", input.harnessId);
+      }
+    }
+    throw error;
+  }
   await advanceLocked(runtime, runId);
   return deps.get(runId);
 }
@@ -131,6 +154,33 @@ async function decide(
   if (row.state !== "waiting_confirm") throw new InvalidStateError("节点不在 waiting_confirm");
   const node = nodeById(runtime.graphFor(run), row.node_id);
   if (node === null) throw new NotFoundError("节点", row.node_id);
+  const confirmation = confirmationFromVerdict(row.verdict);
+  if (confirmation !== null) {
+    // 确认点：pass/reject 都续跑同一 session，不结算节点、不推进。
+    await runtime.withLock(run.id, async () => {
+      const fresh = await runtime.loadRun(run.id);
+      const freshRow = await runtime.store.findNode(runtime.deps.db, run.id, input.nodeId);
+      if (freshRow === null || freshRow.state !== "waiting_confirm") {
+        throw new InvalidStateError("节点不在 waiting_confirm");
+      }
+      const latest = confirmationFromVerdict(freshRow.verdict);
+      if (latest === null) throw new InvalidStateError("节点不是确认点");
+      const sessionId = freshRow.session_id;
+      if (sessionId === null || sessionId === "") {
+        throw new InvalidStateError("确认点缺少 session，无法续跑");
+      }
+      await runtime.dispatch(fresh, node, freshRow, {
+        resumeSessionId: sessionId,
+        confirmation: {
+          question: latest.question,
+          decision: input.decision,
+          comment: input.comment,
+          ...(latest.options === undefined ? {} : { options: latest.options }),
+        },
+      });
+    });
+    return deps.get(run.id);
+  }
   await runtime.withLock(run.id, async () => {
     const fresh = await runtime.loadRun(run.id);
     if (input.decision === "pass") {
@@ -154,8 +204,54 @@ async function decide(
   return deps.get(run.id);
 }
 
-async function cancel(runId: string, runtime: RunRuntime, deps: CommandsDeps, actor?: string): Promise<RunDetail> {
-  const run = await runtime.loadRun(runId);
+/** 人工续跑：同一 task 重开 attempt，run_node 回到 dispatched。 */
+async function resumeNode(
+  input: ResumeNodeInput,
+  runtime: RunRuntime,
+  deps: CommandsDeps,
+): Promise<RunDetail> {
+  return runtime.withLock(input.runId, async () => {
+    const run = await runtime.loadRun(input.runId);
+    const row = await runtime.store.findNode(runtime.deps.db, run.id, input.nodeId);
+    if (row === null) throw new NotFoundError("run_node", `${run.id}/${input.nodeId}`);
+    if (row.state === "dispatched") return deps.get(run.id);
+    if (row.state !== "waiting_resume" || run.state !== "waiting_resume") {
+      throw new InvalidStateError("node_not_waiting_resume");
+    }
+    if (row.task_id === null) throw new InvalidStateError("task_missing");
+    const sessionId = row.session_id;
+    if (sessionId === null || sessionId === "") throw new InvalidStateError("session_missing");
+
+    const harnessId = run.harness_id;
+    if (harnessId === null) throw new InvalidStateError("harness_missing");
+    const harness = await runtime.deps.harnessRead.get(harnessId);
+    if (!harness.enabled || harness.clientId !== run.client_id) {
+      throw new InvalidStateError("instance_not_dispatchable");
+    }
+    if (!(await runtime.deps.instance.isDispatchable(run.instance_id, run.client_id))) {
+      throw new InvalidStateError("instance_not_dispatchable");
+    }
+
+    await runtime.deps.scheduler.resumeTask(run.client_id, row.task_id, sessionId);
+    const now = runtime.deps.clock.now();
+    await runtime.deps.db.transaction(async (tx) => {
+      await runtime.store.setNodeResumed(tx, {
+        runId: run.id,
+        nodeId: row.node_id,
+        visit: row.visit,
+        now,
+      });
+      await runtime.store.setRunProgress(tx, run.id, {
+        state: "running",
+        currentNodeId: row.node_id,
+        now,
+      });
+    });
+    return deps.get(run.id);
+  });
+}
+
+async function cancel(runId: string, runtime: RunRuntime, deps: CommandsDeps, actor?: string): Promise<RunDetail> {  const run = await runtime.loadRun(runId);
   if (run.state === "done") return deps.get(run.id);
   await runtime.withLock(run.id, async () => {
     const fresh = await runtime.loadRun(run.id);
@@ -182,6 +278,7 @@ export function createCommands(runtime: RunRuntime, deps: CommandsDeps) {
   return {
     start: (input: StartRun) => start(input, runtime, deps),
     decide: (input: DecideInput) => decide(input, runtime, deps),
+    resumeNode: (input: ResumeNodeInput) => resumeNode(input, runtime, deps),
     cancel: (runId: string, actor?: string) => cancel(runId, runtime, deps, actor),
   };
 }

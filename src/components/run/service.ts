@@ -6,6 +6,7 @@ import { createCommands } from "./commands.ts";
 import { createQueries } from "./queries.ts";
 import { createResultHandler } from "./results.ts";
 import { createRuntime } from "./runtime.ts";
+import { createClientObservabilityQueries } from "./client-observability.ts";
 
 /** `CMP-run` 服务门面：推进、结算、命令、查询与制品。 */
 export function createRunService(deps: RunDeps): RunService {
@@ -13,6 +14,7 @@ export function createRunService(deps: RunDeps): RunService {
   const queries = createQueries(runtime);
   const commands = createCommands(runtime, queries);
   const artifacts = createArtifacts(runtime);
+  const clientObservability = createClientObservabilityQueries(runtime);
 
   return {
     start: commands.start,
@@ -23,10 +25,18 @@ export function createRunService(deps: RunDeps): RunService {
     archiveRequestsFor: artifacts.archiveRequestsFor,
     ackArchived: artifacts.ackArchived,
     decide: commands.decide,
+    resumeNode: commands.resumeNode,
     cancel: commands.cancel,
     get: queries.get,
     list: queries.list,
     readSessionLog: artifacts.readSessionLog,
     resumePending: queries.resumePending,
+    listFiles: clientObservability.listFiles,
+    readFile: clientObservability.readFile,
+    getSession: clientObservability.getSession,
+    listSessionEvents: clientObservability.listSessionEvents,
+    openSessionEvents: clientObservability.openSessionEvents,
+    openSessionRaw: clientObservability.openSessionRaw,
+    runIdForTask: clientObservability.runIdForTask,
   };
 }

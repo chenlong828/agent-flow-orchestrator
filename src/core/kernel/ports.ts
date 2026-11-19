@@ -7,12 +7,20 @@ export type IdGenerator = {
 };
 
 /** 可被引用的资产类型；删除前由领域服务通过 ReferenceGuard 检查。 */
-export type ReferenceOwner = "harness" | "tool" | "skill" | "expert";
+export type ReferenceOwner = "harness" | "tool" | "skill" | "expert" | "workflow";
 
 export type Reference = {
-  type: "tool" | "expert" | "workflow";
+  type: "tool" | "expert" | "workflow" | "run";
   id: string;
   name: string;
+};
+
+/** 历史 run 的活跃引用；由 CMP-run 实现，组合根与 catalog 的引用合并。 */
+export type RunReferenceOwner = "workflow" | "harness" | "expert";
+
+export type RunReferenceReader = {
+  /** 仍处于 created/running/waiting_confirm/waiting_resume 的 run；终态不返回。 */
+  active(owner: RunReferenceOwner, id: string): Promise<Reference[]>;
 };
 
 /** 只读专家可用性查询；由专家组件实现，供工作流校验不跨组件读表。 */
@@ -87,4 +95,121 @@ export type FileStore = {
   list(prefix: string): Promise<FileStat[]>;
   delete(key: string): Promise<void>;
   move(from: string, to: string): Promise<void>;
+};
+
+/** client 观测面根：task-space 或 workspace。 */
+export type ClientRunFileRoot = "task-space" | "workspace";
+
+export type ClientRunFileEntry = {
+  name: string;
+  type: "file" | "dir" | "symlink" | "other";
+  sizeBytes: number | null;
+  modifiedAt: string;
+};
+
+export type ClientRunFileListing = {
+  entries: ClientRunFileEntry[];
+  truncated: boolean;
+};
+
+export type ClientRunFileContent = {
+  name: string;
+  sizeBytes: number;
+  modifiedAt: string;
+  content: string | null;
+  encoding: "utf-8" | null;
+  binary: boolean;
+  truncated: boolean;
+};
+
+export type ClientSessionArchive = {
+  status: string;
+  sizeBytes: number | null;
+  sha256: string | null;
+};
+
+export type ClientSessionView = {
+  sessionId: string;
+  attemptId?: string;
+  instanceId: string;
+  nodeId: string;
+  runId?: string;
+  cwd: string;
+  status: string;
+  startedAt: string;
+  finishedAt: string | null;
+  eventCount: number;
+  archive: ClientSessionArchive;
+};
+
+export type ClientSessionEvent = {
+  seq: number;
+  ts: string;
+  sessionId?: string;
+  attemptId?: string;
+  kind: string;
+  event: string;
+  message?: string;
+  data?: Record<string, unknown>;
+};
+
+export type ClientSessionEventPage = {
+  items: ClientSessionEvent[];
+  nextCursor?: string;
+  truncatedBefore?: number;
+};
+
+export type ClientStream = {
+  stream: ReadableStream<Uint8Array>;
+  sizeBytes: number;
+  sha256: string;
+  etag?: string;
+};
+
+/** client 运行文件只读端口；由 CMP-observability-client 实现并注入 run。 */
+export type ClientRunFiles = {
+  listFiles(input: {
+    clientId: string;
+    runId: string;
+    root: ClientRunFileRoot;
+    path: string;
+  }): Promise<ClientRunFileListing>;
+  readFile(input: {
+    clientId: string;
+    runId: string;
+    root: ClientRunFileRoot;
+    path: string;
+  }): Promise<ClientRunFileContent>;
+};
+
+/** client session 只读端口；O-06/O-07/O-08/O-11。 */
+export type ClientSessionObservability = {
+  /** 运行中节点尚无 run_node.session_id 时，用 client O-02 按 run/node/task 反查 session；不暴露 attempt。 */
+  findSession(input: { clientId: string; runId: string; nodeId: string; taskId: string }): Promise<string | null>;
+  getSession(input: { clientId: string; sessionId: string }): Promise<ClientSessionView>;
+  listEvents(input: {
+    clientId: string;
+    sessionId: string;
+    cursor?: string;
+    limit?: number;
+  }): Promise<ClientSessionEventPage>;
+  openEvents(input: {
+    clientId: string;
+    sessionId: string;
+    lastEventId?: string;
+  }): Promise<ReadableStream<Uint8Array>>;
+  openRaw(input: { clientId: string; sessionId: string }): Promise<ClientStream>;
+};
+
+/** client 观测面地址目录；由 platform 实现，网关写、适配器读。 */
+export type ObservabilityTarget = { url: string };
+
+export type ObservabilityDirectory = {
+  register(clientId: string, url: string): void;
+  resolve(clientId: string): ObservabilityTarget | null;
+};
+
+/** client → orchestrator 的观测面 Bearer 凭据读取；由 harness 实现。 */
+export type ClientCredentialReader = {
+  clientToken(clientId: string): Promise<string | null>;
 };

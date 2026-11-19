@@ -136,6 +136,8 @@ async function stepNode(
     case "waiting_confirm":
       await runtime.setWaitingConfirm(run.id);
       return { type: "stop" };
+    case "waiting_resume":
+      return { type: "stop" };
     case "failed":
       return { type: "stop" };
     case "rejected":
@@ -149,7 +151,7 @@ async function stepNode(
 
 export async function advanceLocked(runtime: RunRuntime, runId: string): Promise<void> {
   const run = await runtime.loadRun(runId);
-  if (run.state === "done") return;
+  if (run.state === "done" || run.state === "waiting_resume") return;
   const graph = runtime.graphFor(run);
   const start = startNode(graph);
   if (start === null) throw new ValidationError("graph.nodes", "缺少开始节点");

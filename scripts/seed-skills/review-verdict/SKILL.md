@@ -1,12 +1,12 @@
 ---
 name: "review-verdict"
-description: "审核判定：核验 task-space 产物并输出 verdict JSON（pass/fail）；结束前必须输出，否则本次判定无效。触发：review 节点、审核、准出、判定"
-version: "v1.7"
+description: "审核判定：核验 task-space 产物并通过 MCP 信号提交 verdict（pass/fail）；不再使用最终消息 JSON。触发：review 节点、审核、准出、判定"
+version: "v1.9"
 ---
 
 # 用途
 
-评审节点使用。把「审什么、怎么算过」落成可解析的结论：**报告写进 `review.md`，最终消息只留一行 verdict JSON**。
+评审节点使用。把「审什么、怎么算过」落成结构化结论：**报告写进 `review.md`，结论通过 MCP 工具提交**。
 
 ## 步骤
 
@@ -14,11 +14,12 @@ version: "v1.7"
 2. 读取本阶段应审的产物（方案、代码说明、测试结论等），逐项对照目标核验。
 3. 每条结论给出证据：文件路径、命令输出或测试结果；找不到证据的一律按不通过处理。
 4. 把完整报告写进 `<task-space>/review.md`（审什么、证据、结论、未决项）。
-5. 结束前在最终消息的**末尾**输出一个裸 JSON 对象（独占最后一行，或紧跟在最后一句之后都可以），不加代码围栏、不加行内反引号；它之后不要再出现别的 JSON。两种形态：
-
-   {"verdict":"pass","reason":"通过依据"}
-
-   {"verdict":"fail","reason":"可执行的回退理由"}
+5. 调用工具列表里的 `mcp__agentflow__signal`（语义别名 `agentflow_signal`）提交结论：
+   - `kind=review_verdict`
+   - `verdict=pass` 或 `fail`
+   - `reason`：通过依据或可执行的回退理由
+   - `evidence`：证据列表（文件/命令/测试结果，可选）
+   - 参数错误时按工具返回的错误修正后重试；不要在正文里另写一份 verdict。
 
 ## 判定标准
 
@@ -30,8 +31,8 @@ version: "v1.7"
 
 ## 常见踩坑
 
-- 只写自然语言结论、消息里没有 verdict JSON，编排侧判 `verdict_invalid`。
-- 把 JSON 放在正文中间、后面还跟了新的 JSON 示例：取最后一个 verdict 对象，容易判错对象。
-- JSON 里 `verdict` 用了 `passed`/`ok`/`true` 之类的值，解析失败。
+- 工具可用却只在正文写结论：服务端不再解析消息 JSON，会按 `verdict_invalid` 判失败。
+- 把工具公开名写成裸 `agentflow_signal` 去调用；模型应以工具列表显示的名字为准。
+- `verdict` 用了 `passed`/`ok`/`true` 之类的值；工具会拒绝，按错误修正。
 - 为了推进流程默认给 pass，却没有证据。
 - 用「证据不够」判 fail，却指不出任务出口/场景卡的哪一条，或要求卡外的更高层级证据。

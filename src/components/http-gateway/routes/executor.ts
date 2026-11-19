@@ -157,6 +157,10 @@ function withDownloadUrl(task: ExecutorTask): ExecutorTask & { skillSet: { packa
 
 async function poll(ctx: ExecutorContext, clientId: string): Promise<Response> {
   const report = parsePollBody(await readJson(ctx.request, POLL_FIELDS));
+  const observabilityUrl = ctx.request.headers.get("x-observability-url");
+  if (observabilityUrl !== null && observabilityUrl.length <= 2048 && /^https?:\/\//.test(observabilityUrl)) {
+    await ctx.deps.backend.registerObservability?.(clientId, observabilityUrl);
+  }
   const decision = await ctx.deps.backend.poll(clientId, report, {
     holdMs: ctx.deps.pollHoldMs ?? POLL_HOLD_MS,
   });

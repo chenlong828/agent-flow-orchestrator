@@ -35,8 +35,13 @@ function graphReview(expertId: string): WorkflowGraph {
   };
 }
 
-function verdictMessage(verdict: "pass" | "fail", reason = ""): string {
-  return `审核意见如下：\n\n\`\`\`json\n{"verdict":"${verdict}","reason":"${reason}"}\n\`\`\`\n`;
+function reviewSignal(verdict: "pass" | "fail", reason: string) {
+  return [{
+    seq: 1,
+    at: "2026-11-18T00:00:00.000Z",
+    kind: "review_verdict" as const,
+    data: { verdict, reason },
+  }];
 }
 
 async function driveToReview(
@@ -114,7 +119,8 @@ describe("SCN-0302 判定、回退与会话日志", () => {
       passFixture.token,
       passTask,
       "succeeded",
-      verdictMessage("pass", "可以"),
+      "审核意见：可以",
+      { sessionId: "session-review-pass", signals: reviewSignal("pass", "可以") },
     );
     expect(passed.status).toBe(200);
     let detail = await getRun(ctx, passRun.body.runId);
@@ -122,8 +128,14 @@ describe("SCN-0302 判定、回退与会话日志", () => {
     expect(detail.body.nodes.find((node: any) => node.nodeId === "n3").verdict).toMatchObject({
       verdict: "pass",
     });
+    expect(detail.body.nodes.find((node: any) => node.nodeId === "n3").sessionId).toBeUndefined();
     expect(detail.body.nodes.find((node: any) => node.nodeId === "n4").state).toBe("dispatched");
     expect(detail.body.state).toBe("running");
+    const passSession = await ctx.db.query<{ session_id: string | null }>(
+      "select session_id from run_node where run_id = $1 and node_id = $2 and visit = 1",
+      [passRun.body.runId, "n3"],
+    );
+    expect(passSession[0]?.session_id).toBe("session-review-pass");
 
     const failFixture = await createRunFixture(ctx, graphReview);
     const failRun = await startRun(ctx, failFixture, { workspacePath: "/work/review-fail" });
@@ -135,7 +147,8 @@ describe("SCN-0302 判定、回退与会话日志", () => {
       failFixture.token,
       failTask,
       "succeeded",
-      verdictMessage("fail", "需要修改"),
+      "审核意见：需要修改",
+      { sessionId: "session-review-fail", signals: reviewSignal("fail", "需要修改") },
     );
     expect(failed.status).toBe(200);
     detail = await getRun(ctx, failRun.body.runId);
@@ -147,6 +160,11 @@ describe("SCN-0302 判定、回退与会话日志", () => {
     expect(agents).toHaveLength(2);
     expect(agents.find((node: any) => node.visit === 2).state).toBe("dispatched");
     expect(detail.body.state).toBe("running");
+    const failSession = await ctx.db.query<{ session_id: string | null }>(
+      "select session_id from run_node where run_id = $1 and node_id = $2 and visit = 1",
+      [failRun.body.runId, "n3"],
+    );
+    expect(failSession[0]?.session_id).toBe("session-review-fail");
   });
 
   test("TC-RUN-007 回退轮次用尽后 run.failed(visit_limit_exceeded)，不再派发新任务", async () => {
@@ -166,7 +184,8 @@ describe("SCN-0302 判定、回退与会话日志", () => {
         fixture.token,
         reviewTask,
         "succeeded",
-        verdictMessage("fail", `第 ${attempt} 次不通过`),
+        `审核意见：第 ${attempt} 次不通过`,
+        { signals: reviewSignal("fail", `第 ${attempt} 次不通过`) },
       );
       if ((await getRun(ctx, runId)).body.state === "done") break;
       await completeNextTask(ctx, fixture.token, `n2-${attempt}`);
@@ -180,7 +199,7 @@ describe("SCN-0302 判定、回退与会话日志", () => {
     expect(await nextTask(ctx, fixture.token)).toBeNull();
   });
 
-  test("TC-RUN-008 缺日志报结果 409 且不结算；补传后成功；verdict 非法使节点与 run 失败", async () => {
+  test("TC-RUN-008 缺日志报结果 409 且不结算；补传后成功；没有 review_verdict 信号时失败，不再解析 message JSON", async () => {
     const fixture = await createRunFixture(ctx, graphReview);
     const started = await startRun(ctx, fixture, { workspacePath: "/work/log-missing" });
     const runId = started.body.runId as string;
@@ -198,13 +217,24 @@ describe("SCN-0302 判定、回退与会话日志", () => {
     expect(retried.body).toEqual({ taskId: task.taskId, accepted: true });
     detail = await getRun(ctx, runId);
     expect(detail.body.nodes.find((node: any) => node.nodeId === "n2").state).toBe("succeeded");
+    const noSession = await ctx.db.query<{ session_id: string | null }>(
+      "select session_id from run_node where run_id = $1 and node_id = $2 and visit = 1",
+      [runId, "n2"],
+    );
+    expect(noSession[0]?.session_id).toBeNull();
 
     const badFixture = await createRunFixture(ctx, graphReview);
     const badRun = await startRun(ctx, badFixture, { workspacePath: "/work/verdict-invalid" });
     await driveRun(ctx, badFixture, badRun.body.runId, { steps: 2 });
     const reviewTask = (await nextTask(ctx, badFixture.token))!;
     await uploadSessionLog(ctx, badFixture.token, reviewTask.taskId, 1);
-    const badReport = await reportTask(ctx, badFixture.token, reviewTask, "succeeded", "没有 verdict");
+    const badReport = await reportTask(
+      ctx,
+      badFixture.token,
+      reviewTask,
+      "succeeded",
+      '审核意见：{"verdict":"pass","reason":"message 里的旧出口"}',
+    );
     expect(badReport.status).toBe(200);
     const badDetail = await getRun(ctx, badRun.body.runId);
     expect(badDetail.body.outcome).toBe("failed");

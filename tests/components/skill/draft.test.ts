@@ -94,7 +94,7 @@ describe("Skill 草稿生命周期", () => {
 
     expect(draft.skillId).toBe(skillId);
     expect(draft.baseRevision).toBe(1);
-    expect(draft.baseVersion).toBe("v1.1");
+    expect(draft.baseVersion).toBe("v1.3");
     expect(draft.files.map((file) => file.path)).toEqual([
       "SKILL.md",
       "references/arch-design-workflow.md",
@@ -241,7 +241,7 @@ describe("Skill 保存、启停与 GC", () => {
       tags: ["架构"],
       body: "## 更新",
     });
-    expect(saved).toMatchObject({ revision: 2, version: "v1.2", created: false });
+    expect(saved).toMatchObject({ revision: 2, version: "v1.4", created: false });
     expect(await store.head(`packages/${before!.package_key}`)).toBeNull();
 
     await db.query("update skill set version = 'v1.9' where id = $1", [skillId]);

@@ -1,4 +1,4 @@
-import { AppError } from "../../core/kernel/index.ts";
+import { AppError, ClientObservabilityHttpError } from "../../core/kernel/index.ts";
 
 export type JsonValue = Record<string, unknown> | unknown[];
 
@@ -35,6 +35,7 @@ export function notModified(): Response {
 }
 
 function restCode(error: AppError): string {
+  if (error instanceof ClientObservabilityHttpError) return error.clientCode;
   return error.code === "database_unavailable" ? "service_unavailable" : error.code;
 }
 
@@ -65,9 +66,15 @@ const STATUS_BY_CODE: Record<AppError["code"], number> = {
   invalid_archive: 400,
   unsupported_node_type: 400,
   database_unavailable: 503,
+  client_observability_unavailable: 504,
+  client_observability_unauthorized: 502,
+  client_observability_invalid: 502,
+  client_observability_http: 502,
+  session_not_linked: 404,
 };
 
 function statusFor(error: AppError): number {
+  if (error instanceof ClientObservabilityHttpError) return error.status;
   return STATUS_BY_CODE[error.code];
 }
 

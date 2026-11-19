@@ -438,7 +438,6 @@ export function createHarnessService(deps: HarnessDeps): HarnessService {
 export function createHarnessRead(deps: { db: Db }): HarnessRead {
   const { db } = deps;
   const store = createHarnessStore();
-
   return {
     async list(query): Promise<Page<HarnessSummary>> {
       const { rows, total } = await store.listRoots(db, query);
@@ -470,8 +469,11 @@ export function createHarnessRead(deps: { db: Db }): HarnessRead {
     },
 
     async listClientIds(): Promise<string[]> {
-      const rows = await store.listDispatchableClientIds(db);
-      return rows;
+      return store.listDispatchableClientIds(db);
+    },
+    async clientToken(clientId): Promise<string | null> {
+      const row = await db.one<{ client_token: string | null }>("select client_token from harness where client_id = $1", [clientId]);
+      return row?.client_token ?? null;
     },
   };
 }

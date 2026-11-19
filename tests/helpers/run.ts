@@ -22,6 +22,13 @@ export type ExecutorTask = {
   workspacePath: string;
   taskSpacePath: string;
   timeoutMs: number;
+  resultSignal?: {
+    version: number;
+    kind: "review_verdict" | "confirmation_request";
+    required: boolean;
+    schema: Record<string, unknown>;
+  };
+  resumeSessionId?: string;
 };
 
 let sequence = 0;
@@ -161,6 +168,15 @@ export function reportTask(
   task: { taskId: string; attempt: number },
   status: "succeeded" | "failed" | "cancelled" | "timeout",
   message: string,
+  options: {
+    sessionId?: string;
+    signals?: Array<{
+      seq: number;
+      at: string;
+      kind: "review_verdict" | "confirmation_request";
+      data: Record<string, unknown>;
+    }>;
+  } = {},
 ) {
   return call(ctx.app, "POST", `/api/v1/executor/tasks/${task.taskId}/result`, {
     headers: execHeaders(token),
@@ -168,10 +184,12 @@ export function reportTask(
       taskId: task.taskId,
       attempt: task.attempt,
       status,
+      ...(options.sessionId === undefined ? {} : { sessionId: options.sessionId }),
       message,
       truncated: false,
       stopReason: status === "succeeded" ? "end_turn" : null,
       usage: null,
+      ...(options.signals === undefined ? {} : { signals: options.signals }),
       error:
         status === "succeeded"
           ? null

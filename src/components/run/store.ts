@@ -1,6 +1,7 @@
 import { createArchiveStore } from "./store-archive.ts";
 import { createLogStore } from "./store-log.ts";
 import { createNodeReads } from "./store-node-read.ts";
+import { createNodeResumeWrites } from "./store-node-resume.ts";
 import { createNodeWrites } from "./store-node-write.ts";
 import { createRunReads } from "./store-run-read.ts";
 import { createRunWrites } from "./store-run-write.ts";
@@ -15,6 +16,7 @@ export function createRunStore() {
     ...createRunWrites(),
     ...createNodeReads(),
     ...createNodeWrites(),
+    ...createNodeResumeWrites(),
     ...createLogStore(),
     ...createArchiveStore(),
   };

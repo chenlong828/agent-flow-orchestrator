@@ -130,6 +130,10 @@ describe("platform 迁移执行", () => {
       "0007_drop_instance_blocked.sql",
       "0008_skill_category_flow.sql",
       "0009_run_node_enter_reason.sql",
+      "0010_run_node_session_id.sql",
+      "0011_task_signal_continuation.sql",
+      "0012_run_timeout_resume.sql",
+      "0013_run_asset_snapshot.sql",
     ]);
     const after = await db.query("select version, checksum from schema_migrations order by version");
     expect(after).toEqual(before);
