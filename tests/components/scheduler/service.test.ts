@@ -666,3 +666,90 @@ describe("节点门禁与观测", () => {
     expect(decision.tasks).toHaveLength(1);
   });
 });
+
+describe("入队事务与唤醒顺序（派发原子性）", () => {
+  test("TC-EXD-030 传入 tx 时任务行随调用方事务提交：提交前不可见，回滚后不存在", async () => {
+    const clientId = "node-tx-visibility";
+    await bindNode(clientId);
+    const instanceId = await enroll(clientId);
+    const skillId = await createSkill("事务技能");
+    const taskSpacePath = taskSpaceOf(instanceId);
+    let taskId = "";
+    let clientIds: string[] = [];
+
+    await expect(
+      ctx.db.transaction(async (tx) => {
+        const enqueued = await ctx.scheduler.enqueue(
+          {
+            tasks: [
+              {
+                instanceId,
+                nodeId: "n1",
+                prompt: "事务任务",
+                taskSpacePath,
+                timeoutMs: 1800000,
+                skillIds: [skillId],
+              },
+            ],
+          },
+          { tx },
+        );
+        taskId = enqueued.taskIds[0] as string;
+        clientIds = enqueued.clientIds;
+        const visible = await ctx.db.query<{ id: string }>("select id from task where id = $1", [taskId]);
+        expect(visible).toHaveLength(0);
+        throw new Error("rollback");
+      }),
+    ).rejects.toThrow("rollback");
+
+    expect(clientIds).toEqual([clientId]);
+    const rows = await ctx.db.query<{ id: string }>("select id from task where id = $1", [taskId]);
+    expect(rows).toHaveLength(0);
+    const decision = await poll(ctx.scheduler, clientId, 1);
+    expect(decision.tasks).toHaveLength(0);
+  });
+
+  test("TC-EXD-031 传入 tx 时不唤醒，提交后 notifyClient 才唤醒", async () => {
+    const clientId = "node-tx-notify";
+    await bindNode(clientId);
+    const instanceId = await enroll(clientId);
+    const skillId = await createSkill("唤醒技能");
+    const taskSpacePath = taskSpaceOf(instanceId);
+
+    let settled = false;
+    const pending = ctx.scheduler
+      .poll(clientId, report(1), { holdMs: 2000 })
+      .then((decision) => {
+        settled = true;
+        return decision;
+      });
+    await Bun.sleep(80);
+    expect(settled).toBe(false);
+
+    await ctx.db.transaction(async (tx) => {
+      await ctx.scheduler.enqueue(
+        {
+          tasks: [
+            {
+              instanceId,
+              nodeId: "n1",
+              prompt: "唤醒任务",
+              taskSpacePath,
+              timeoutMs: 1800000,
+              skillIds: [skillId],
+            },
+          ],
+        },
+        { tx },
+      );
+    });
+    await Bun.sleep(80);
+    expect(settled).toBe(false);
+
+    ctx.scheduler.notifyClient(clientId);
+    const decision = await pending;
+    expect(settled).toBe(true);
+    expect(decision.tasks).toHaveLength(1);
+    expect(decision.tasks[0]!.nodeId).toBe("n1");
+  });
+});

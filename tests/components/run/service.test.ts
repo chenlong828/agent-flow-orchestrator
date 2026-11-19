@@ -87,8 +87,10 @@ function fakeScheduler(): SchedulerService & {
           return id;
         }),
         skillSets: [],
+        clientIds: ["run-client"],
       };
     },
+    notifyClient: () => {},
     acceptResult: async (_clientId: string, result: TaskResult) => {
       const task = tasks.get(result.taskId);
       if (task !== undefined) task.state = "done";

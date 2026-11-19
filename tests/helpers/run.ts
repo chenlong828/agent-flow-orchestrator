@@ -18,6 +18,8 @@ export type ExecutorTask = {
   instanceId: string;
   nodeId: string;
   attempt: number;
+  /** 所属 workflow run；手工任务可缺。 */
+  runId?: string;
   prompt: string;
   workspacePath: string;
   taskSpacePath: string;

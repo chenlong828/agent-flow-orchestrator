@@ -216,7 +216,7 @@ type RunService = {
 
 | 方法 | 目的 | 输入 | 输出 | 错误 | 并发/事务 |
 |---|---|---|---|---|---|
-| `start` | 建 run 并推进首节点 | `StartRun` | `RunDetail` | `ValidationError`（图/专家/字段）、`NotFoundError`（工作流/Harness/节点；含启动窗口并发删除）、`BindingConflictError`（实例登记）、`RunConflictError`（同工作区已有活跃 run）、`PayloadTooLargeError`（intent 或 prompt 超限） | 校验与建 run 两段：校验只读；建 run + 首节点单事务；`enqueue` 在事务外 |
+| `start` | 建 run 并推进首节点 | `StartRun` | `RunDetail` | `ValidationError`（图/专家/字段）、`NotFoundError`（工作流/Harness/节点；含启动窗口并发删除）、`BindingConflictError`（实例登记）、`RunConflictError`（同工作区已有活跃 run）、`PayloadTooLargeError`（intent 或 prompt 超限） | 校验只读；建 run + 首节点单事务；派发把 `enqueue({ tx })`、`run_node.task_id` 与 `workflow_run` 游标放在同一事务，提交后唤醒 client |
 | `advance` | 推进一个节点 | `runId` | `void` | `NotFoundError` | 同一 run 进程内单飞；状态迁移单事务 |
 | `handleTaskResult` | 结算并推进 | `clientId`、`TaskResult` | `ResultAck` | `TaskNotFoundError`、`ValidationError` | 同一 run 单飞；`acceptResult` 与 `run_node` 结算分属两个事务，先调度器后编排 |
 | `attachSessionLog` | 登记日志 | `clientId`、`taskId`、`attempt`、`bytes`、`sha256` | `{stored}` | `TaskNotFoundError`、`PayloadTooLargeError` | 先写临时键、校验后原子改名；同键后到覆盖，`stored` 为 `created`/`replaced`/`unchanged` |

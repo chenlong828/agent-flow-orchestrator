@@ -1,4 +1,5 @@
 import type { SkillPackageRef } from "../../core/kernel/index.ts";
+import type { Db } from "../../core/platform/index.ts";
 
 export type TaskState = "queued" | "dispatched" | "done";
 export type TaskOutcome = "succeeded" | "failed" | "cancelled" | "timeout";
@@ -35,9 +36,19 @@ export type TaskDraft = {
 
 export type EnqueueInput = { tasks: TaskDraft[]; actor?: string };
 
+export type EnqueueOptions = {
+  /**
+   * 传入时：任务行插入跑在调用方事务内，且本方法**不唤醒**；
+   * 由调用方在提交后调 `notifyClient`，保证唤醒时任务行与关联字段同时可见。
+   */
+  tx?: Db;
+};
+
 export type EnqueueResult = {
   taskIds: string[];
   skillSets: { instanceId: string; skillSet: SkillSet }[];
+  /** 任务所属 client 的 ID（去重）；传入 `tx` 时由调用方据此唤醒。 */
+  clientIds: string[];
 };
 
 export type RunningRef = {
@@ -128,7 +139,9 @@ export type SchedulerPresenceRead = {
 };
 
 export type SchedulerService = {
-  enqueue(input: EnqueueInput): Promise<EnqueueResult>;
+  enqueue(input: EnqueueInput, options?: EnqueueOptions): Promise<EnqueueResult>;
+  /** 单客户端唤醒；`enqueue` 缺省路径在提交后自动调用，传入 `tx` 时由调用方调用。 */
+  notifyClient(clientId: string): void;
   poll(clientId: string, report: ClientReport, options: PollOptions): Promise<DispatchDecision>;
   acceptResult(clientId: string, result: TaskResult): Promise<ResultAck>;
   /** 人工续跑：把 done(timeout) 的同一 task 重开为下一 attempt。 */

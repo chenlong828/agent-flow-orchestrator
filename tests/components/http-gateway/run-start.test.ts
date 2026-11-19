@@ -200,6 +200,23 @@ describe("SCN-0301 运行启动与节点推进", () => {
     await expectRejected(missingExpertFixture, "/work/invalid-expert", "validation_error");
   });
 
+  test("派发任务携带 runId：首节点与后继节点都必须带，且等于所属 run", async () => {
+    const fixture = await createRunFixture(ctx, graphLinear);
+    const started = await startRun(ctx, fixture, { workspacePath: "/work/run-runid" });
+    expect(started.status).toBe(201);
+    const runId = started.body.runId as string;
+
+    const first = await nextTask(ctx, fixture.token);
+    if (first === null) throw new Error("启动后没有派发任务");
+    expect(first.runId).toBe(runId);
+
+    await completeNextTask(ctx, fixture.token, "首节点完成");
+    const second = await nextTask(ctx, fixture.token);
+    if (second === null) throw new Error("后继节点没有派发任务");
+    expect(second.nodeId).toBe("n2");
+    expect(second.runId).toBe(runId);
+  });
+
   test("启动请求字段校验：缺失 harnessId、空/超长 intent、非布尔 autoConfirm 均 400", async () => {
     const fixture = await createRunFixture(ctx, graphLinear);
     const workspacePath = "/work/request-validation";

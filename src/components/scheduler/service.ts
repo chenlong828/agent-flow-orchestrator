@@ -30,6 +30,7 @@ export function createScheduler(deps: SchedulerDeps): SchedulerHandle {
 
   return {
     enqueue: createEnqueueHandler(deps, store, waiters.notifyAll),
+    notifyClient: (clientId: string) => waiters.notify(ensureClientId(clientId)),
     poll: createPollHandler(deps, store, tracker, waiters),
     acceptResult: createResultHandler(deps, store, waiters.notify),
     resumeTask: createResumeHandler(deps, store, waiters.notify),

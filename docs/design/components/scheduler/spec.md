@@ -162,7 +162,10 @@ type TaskSnapshot = {
 ```ts
 type SchedulerService = {
   /** 上游接缝：冻结快照并入队；同批同实例必须同一技能集。 */
-  enqueue(input: EnqueueInput): Promise<EnqueueResult>;
+  enqueue(input: EnqueueInput, options?: EnqueueOptions): Promise<EnqueueResult>;
+
+  /** 单客户端唤醒；缺省 enqueue 提交后自动调用，传入 `tx` 时由调用方在提交后调用。 */
+  notifyClient(clientId: string): void;
 
   /** P-01：容量裁决 + 批量下发 + 对账 + 电平控制；可能挂起至多 holdMs。 */
   poll(clientId: string, report: ClientReport, options: PollOptions): Promise<DispatchDecision>;
@@ -193,7 +196,8 @@ type SchedulerPresenceRead = {
 
 | 方法 | 目的 | 输入 | 输出 | 错误 | 并发/事务 |
 |---|---|---|---|---|---|
-| `enqueue` | 冻结快照并入队 | `EnqueueInput` | `EnqueueResult` | `ValidationError`、`PayloadTooLargeError`、`NotFoundError`（实例未登记）、`DatabaseUnavailableError` | 一批一个事务；同批同实例的 `skillIds` 投影不一致、或与该实例已下发未结算任务的 digest 不一致 → 整批拒绝 |
+| `enqueue` | 冻结快照并入队 | `EnqueueInput`、可选 `EnqueueOptions.tx` | `EnqueueResult`（含 `clientIds`） | `ValidationError`、`PayloadTooLargeError`、`NotFoundError`（实例未登记）、`DatabaseUnavailableError` | 一批一个事务；同批同实例的 `skillIds` 投影不一致、或与该实例已下发未结算任务的 digest 不一致 → 整批拒绝。传 `tx` 时插入加入调用方事务且**不唤醒**，由调用方提交后 `notifyClient` |
+| `notifyClient` | 唤醒指定 client 的长轮询 | `clientId` | `void` | `ValidationError`（clientId 非法） | 进程内唤醒，无持久化 |
 | `poll` | 派发与对账 | `clientId`、`ClientReport`、`PollOptions` | `DispatchDecision` | `ValidationError`、`DatabaseUnavailableError` | 同 `clientId` 串行（单飞）；派发预留与任务状态同事务 |
 | `acceptResult` | 接受结果并结算 | `clientId`、`TaskResult` | `ResultAck` | `TaskNotFoundError`、`ValidationError`、`DatabaseUnavailableError` | 单事务；首份为准，后到只回 `accepted=false`；已结算 attempt 的迟到结果同样 `accepted=false` |
 | `resumeTask` | 人工重开超时任务 | `clientId`、`taskId`、`resumeSessionId` | `TaskSnapshot` | `TaskNotFoundError`、`InvalidStateError`（非 done(timeout) 或非本 client）、`ValidationError`（sessionId 长度） | 单事务；同一任务 `attempt+1`、`resume_session_id` 写入；幂等：已 queued/dispatched 且 session 相同直接返回 |
@@ -204,7 +208,8 @@ type SchedulerPresenceRead = {
 
 - 错误类型定义在 [`CMP-kernel`](../kernel/spec.md)；`TaskNotFoundError` 对应 `404 task_not_found`，与「任务不存在」同义，用于 `P-02` 与未知 `taskId`。
 - `enqueue` 与 `poll` 的入参使用领域类型，不出现 HTTP 头、协议版本或 DTO 字段名；`CMP-http-gateway` 负责映射。
-- `poll` 的长轮询挂起在本组件：`enqueue` 与 `acceptResult` 唤醒同一 `clientId` 的等待者，`holdMs` 到期返回空批。挂起是进程内行为，调度器单进程部署；多实例部署不在本轮范围。
+- `poll` 的长轮询挂起在本组件：`enqueue`（缺省路径）与 `acceptResult` 唤醒同一 `clientId` 的等待者，`holdMs` 到期返回空批。挂起是进程内行为，调度器单进程部署；多实例部署不在本轮范围。
+- 派发与关联数据必须同时可见：`CMP-run` 的派发把 `enqueue({ tx })` 与 `run_node.task_id` 放进同一事务，提交后调 `notifyClient`，避免 poll 在下发的任务里拿不到 `runId`。
 - `poll` 不抛「无任务」错误：无任务返回空批，`nextPollAfterMs` 为 `0`（服务端已挂起一个周期）。
 
 ## 4 状态机与不变量
