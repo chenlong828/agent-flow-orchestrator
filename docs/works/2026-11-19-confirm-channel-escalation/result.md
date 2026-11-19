@@ -12,7 +12,7 @@ procedure: 2026-11-19-confirm-channel-escalation
 
 - **orchestrator 侧已落地**：review 节点在 `review_verdict` 之外额外下发可选的 `confirmation` 契约；client 同时拿到 `signal` 与 `confirm` 两个契约的意图；prompt 按 agent/review 输出两段互斥文案；调度器把两个契约一起冻结、重派原样下发。
 - **client 侧只出提案**：[`client-implementation-proposal.md`](client-implementation-proposal.md) 写明多契约 prepare/mount/collect 的具体改法；真实 client 实现后由本工序做联调（`T-CCE-06`）。
-- **未做真实 client 联调**：本仓库用桩任务覆盖 review confirm pass/reject/无答复/取消；client 尚未挂载 `mcp__agentflow__confirm`，所以“模型实际呼人”这一段未验证，标为待后续。
+- **真实 client 联调已完成**：真实 client（含多契约改动）+ 真实 DSH + 本机 orchestrator 跑通 review confirm 的 pass、reject、无答复、取消四条路径；模型实际调用 `mcp__agentflow__confirm`，Q/A 写入 `review.md`。证据与复跑方式见 [`e2e.md`](e2e.md)。
 
 ## 2 验收对照（brief §4 实现阶段）
 
@@ -21,7 +21,8 @@ procedure: 2026-11-19-confirm-channel-escalation
 | 4. agent prompt 显式列出严重场景，普通决策不暂停 | 通过 | `[确认通道]` 新文案六类场景 + `auto-confirm §2`；`tests/components/run/prompt.test.ts` 断言原句与互斥 |
 | 5. review prompt 有严格确认通道；confirm 后 `waiting_confirm`；答复后同一 session 续跑；仍须自行提交 verdict | 通过 | review prompt 单测；`tests/components/http-gateway/run-signals.test.ts` 三个 review confirm 用例 + 确认优先用例 |
 | 6. agent confirm 不回归；没有 `confirmation` 的任务保持旧行为 | 通过 | 既有 agent confirm pass/reject 用例全绿；`TaskDraft` 无 `confirmation` 时 `envelope` 不出现该字段（`tests/components/scheduler/validate.test.ts`、`TC-EXD-009`） |
-| 7. 单测/契约测试/集成通过；执行面契约、组件规格、技能文本同步 | 通过（E2E 待 client） | `bun run typecheck`、`bun test` 全绿；`docs:check` 通过；契约/规格/seed 已改 |
+| 7. 单测/契约测试/集成通过；执行面契约、组件规格、技能文本同步 | 通过 | `bun run typecheck`、`bun test` 全绿；`docs:check` 通过；契约/规格/seed 已改 |
+| 8. E2E：真实 client 的 review confirm pass/reject/无答复/取消，Q/A 落 `review.md` | 通过 | [`e2e.md`](e2e.md)：三条 run、四种路径；[`evidence/`](evidence/) 存 client 日志、评审报告与 run 快照 |
 
 ## 3 落点
 
@@ -38,6 +39,7 @@ procedure: 2026-11-19-confirm-channel-escalation
 | 技能 seed | [`auto-confirm`](../../../scripts/seed-skills/auto-confirm/SKILL.md) §5（v1.3）、[`review-verdict`](../../../scripts/seed-skills/review-verdict/SKILL.md)（v1.11） |
 | 测试 | [`prompt.test.ts`](../../../tests/components/run/prompt.test.ts)、[`validate.test.ts`](../../../tests/components/scheduler/validate.test.ts)、[`service.test.ts`](../../../tests/components/scheduler/service.test.ts) `TC-EXD-009`、[`run-signals.test.ts`](../../../tests/components/http-gateway/run-signals.test.ts) review confirm 用例 |
 | client 提案 | [`client-implementation-proposal.md`](client-implementation-proposal.md) |
+| E2E 联调 | [`e2e.md`](e2e.md)、[`evidence/client-serve.out`](evidence/client-serve.out)、[`evidence/review-pass.md`](evidence/review-pass.md)、[`evidence/review-reject.md`](evidence/review-reject.md)、[`evidence/runs.json`](evidence/runs.json) |
 
 ## 4 决策与默认
 
@@ -67,16 +69,23 @@ $ ./.local/bun/bun run docs:check
 
 $ ./.local/bun/bun run quality:report
 合计：违规 0 条；仅报告 223 条；规则分组 3 组；工具健康 8/8
+
+# E2E（真实 client + DSH，详见 e2e.md）
+# pass：waiting_confirm → decide pass → 同 session 续跑 → verdict fail → rejected → 回退
+# reject：waiting_confirm → decide reject → 同 session 续跑（prompt 含拒绝意见）→ verdict fail
+# 无答复：保持 waiting_confirm，无新任务、不自动 pass
+# 取消：run cancelled，节点 failed(cancelled)，verdict=null
 ```
 
 ## 6 未完成与后续
 
-1. `T-CCE-04`：client 仓库按 [`client-implementation-proposal.md`](client-implementation-proposal.md) 实现多契约 prepare/mount/collect；本仓库未改动 client。
-2. `T-CCE-06`：真实 client + orchestrator 的 review confirm pass/reject/无答复/取消联调；Q/A 落 `review.md`。
-3. `T-CCE-05` 中 brief 原列的 `arch-reviewer` 在 seed 目录不存在；实际同步的是 `auto-confirm` 与 `review-verdict`，`arch-design-spec` 的确认语义已由 `auto-confirm` 覆盖，未改。
-4. 旧 `task.result_signal` 行（单契约形状）不兼容复合形状：按用户决定不做迁移与读兼容；开发库如遇旧任务重派，需要重置数据。
-5. 混跑旧 client：旧 client 不解析 `confirmation`，review 仍能回 verdict，但无法呼人；v1 按同版本发布处理。
+1. client 改动仍在工作区（未提交）；联调通过的是该工作区版本，client 提交/发版由 client 侧处理。
+2. `T-CCE-05` 中 brief 原列的 `arch-reviewer` 在 seed 目录不存在；实际同步的是 `auto-confirm` 与 `review-verdict`，`arch-design-spec` 的确认语义已由 `auto-confirm` 覆盖，未改。
+3. 旧 `task.result_signal` 行（单契约形状）不兼容复合形状：按用户决定不做迁移与读兼容；开发库如遇旧任务重派，需要重置数据。
+4. 混跑旧 client：旧 client 不解析 `confirmation`，review 仍能回 verdict，但无法呼人；v1 按同版本发布处理。
+5. 联调夹具（`e2e-review-confirm` harness、`E2E-REVIEW-CONFIRM` workflow、三次 run）留在本机 dev DB；`.local/e2e/2026-11-19-confirm/` 为本地证据目录，未入库。
+6. 服务端确认次数计数未实现；本轮模型每次访问只问一次，未观察到滥用。
 
 ## 7 裁决摘要
 
-blocker 0 / decision 2（持久化形态、确认优先，均已落文档与测试）/ hold 5（client 实现、真实联调、服务端计数与超时、旧行兼容、`arch-reviewer` 文本，均已写明不阻塞理由）。详见 [`review.md`](review.md)。
+blocker 0 / decision 2（持久化形态、确认优先，均已落文档与测试）/ hold 4（client 提交/发版、服务端计数与超时、旧行兼容、`arch-reviewer` 文本，均已写明不阻塞理由）。client 实现与真实联调已由 [`e2e.md`](e2e.md) 覆盖。详见 [`review.md`](review.md)。

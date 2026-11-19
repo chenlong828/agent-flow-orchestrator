@@ -152,4 +152,4 @@ review 调 mcp__agentflow__confirm(question, context, options?)
 
 ## 9 待确认
 
-无。后续只剩 `T-CCE-04`（client 实现）与 `T-CCE-06`（真实 client 联调）。
+无。`T-CCE-04`（client 实现）与 `T-CCE-06`（真实 client 联调）均已完成；四条路径证据见 [`e2e.md`](e2e.md)。剩余事项是 client 侧提交/发版与联调夹具清理。

@@ -65,9 +65,9 @@ level: P2
 | `T-CCE-01` | design | global | 本提案与契约/语义/测试/发布设计 | 完成 |
 | `T-CCE-02` | design | global | 确认级别、契约形状（`confirmation` vs `resultSignals[]`）、评审范围 | 完成（[`proposal.md`](proposal.md) §8） |
 | `T-CCE-03` | change | run/scheduler/http-gateway | prompt 文案、review 确认契约、调度校验/透传、run 测试 | 完成 |
-| `T-CCE-04` | change | client（跨项目） | 多契约 prepare/mount/collect、review 工具暴露、测试 | 提案完成；实现待 client 仓库 |
+| `T-CCE-04` | change | client（跨项目） | 多契约 prepare/mount/collect、review 工具暴露、测试 | 完成（client 工作区，未提交） |
 | `T-CCE-05` | change | scripts/seed | `auto-confirm` §5、`review-verdict` 文本同步 | 完成 |
-| `T-CCE-06` | verify | global | review confirm pass/reject/无答复；agent confirm 回归；真实 client 联调 | 本仓库用桩覆盖；真实 client 联调待 `T-CCE-04` |
+| `T-CCE-06` | verify | global | review confirm pass/reject/无答复/取消；agent confirm 回归；真实 client 联调 | 完成（[`e2e.md`](e2e.md)，四条路径） |
 | `T-CCE-07` | docs | global | 执行面契约、组件规格、发布记录 | 完成 |
 
 ## 6 装载清单
@@ -79,7 +79,8 @@ level: P2
 - 技能：[`auto-confirm`](../../../scripts/seed-skills/auto-confirm/SKILL.md)、[`review-verdict`](../../../scripts/seed-skills/review-verdict/SKILL.md)、[`arch-design-spec`](../../../scripts/seed-skills/arch-design-spec/SKILL.md)
 - 本工序提案：[`proposal.md`](proposal.md)
 - client 侧实施提案：[`client-implementation-proposal.md`](client-implementation-proposal.md)
+- 真实 client 联调：[`e2e.md`](e2e.md)
 
 ## 7 待定
 
-全部已定，见 [`proposal.md`](proposal.md) §8。剩余未完成项是 `T-CCE-04`（client 实现）与 `T-CCE-06`（真实 client 联调）。
+全部已定，见 [`proposal.md`](proposal.md) §8。`T-CCE-04` 与 `T-CCE-06` 已完成；只剩 client 侧提交/发版与联调夹具清理。
