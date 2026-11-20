@@ -1,8 +1,8 @@
 ---
 layer: works
 module: run
-status: active
-updated: 2026-11-19
+status: frozen
+updated: 2026-11-20
 procedure: 2026-11-19-run-start-images
 target: agent-flow-client
 ---
@@ -12,7 +12,7 @@ target: agent-flow-client
 > 依据：[`proposal.md`](proposal.md) 与 2026-11-19 用户裁决（client 支持图片；粘贴即上传；只支持图片）。
 > 本文给 `agent-flow-client` 项目使用，描述客户端需要实现的模型配置、执行面拉取、task-space 落盘与测试；后端契约以 [`proposal.md`](proposal.md) §5.1/§5.2 为准。本文不改 client 代码。
 >
-> **2026-11-19 client 已实现**：`T-CLI-IMG-01`–`07` 已落地，`bun run check` 285 pass，`promptCapabilities.image=true`，`read_image` 实测通过；真实 orchestrator 联调待编排侧 `EXE-06/07` 落地。见 [result.md](../../../../agent-flow-client/docs/works/2026-11-19-run-start-inputs/result.md)。
+> **2026-11-19 client 已实现**：`T-CLI-IMG-01`–`07` 已落地，`bun run check` 285 pass，`promptCapabilities.image=true`，`read_image` 实测通过；真实 orchestrator 联调待编排侧 `EXE-06/07` 落地。见 [result.md](../../../../../agent-flow-client/docs/works/2026-11-19-run-start-inputs/result.md)。
 
 ## 1 目标
 
@@ -63,13 +63,13 @@ type ExecutorRunInputRef = {
 
 | 事实 | 位置 | 影响 |
 |---|---|---|
-| client 的 pi-ai 模型条目只有 `{ id, name }` | [`profile.ts`](../../../../agent-flow-client/src/components/runtime/profile.ts) 第 47 行 | 路由未声明图片输入，`read_image` 被拒 |
-| ACP `initialize` 当前 `promptCapabilities.image=false` | [`summary.protocol.jsonl`](../../../../agent-flow-client/docs/history/works/2026-11-14-acp-progress-feedback/probe/summary.protocol.jsonl) 第 2 行 | 佐证路由未声明；补 `input` 后应变为 true |
-| prompt 只发 `{type:"text"}` | [`runtime.ts`](../../../../agent-flow-client/src/components/runtime/runtime.ts) 第 138 行 | 不靠 ACP 图片块；走文件 + `read_image` |
-| task-space 只 `mkdir -p`，不写内容 | [`workspace.ts`](../../../../agent-flow-client/src/components/workspace/workspace.ts) 第 94–106 行 | 需要新增受控写入 `inputs/` |
-| 执行面客户端只有 poll/result/package/log/archive | [`gateway.ts`](../../../../agent-flow-client/src/components/gateway/gateway.ts) | 需要新增 list/download 方法与 wire 解析 |
-| 任务执行前没有「准备资料」步骤 | [`executor.ts`](../../../../agent-flow-client/src/components/executor/executor.ts) `#prepareTask` | 在 `ensureTaskSpace` 后、建 session 前插入 seed |
-| `result.ts` 的错误分类没有初始资料码 | [`result.ts`](../../../../agent-flow-client/src/components/result/result.ts) `MAPPING` | 新码归 `asset` |
+| client 的 pi-ai 模型条目只有 `{ id, name }` | [`profile.ts`](../../../../../agent-flow-client/src/components/runtime/profile.ts) 第 47 行 | 路由未声明图片输入，`read_image` 被拒 |
+| ACP `initialize` 当前 `promptCapabilities.image=false` | [`summary.protocol.jsonl`](../../../../../agent-flow-client/docs/history/works/2026-11-14-acp-progress-feedback/probe/summary.protocol.jsonl) 第 2 行 | 佐证路由未声明；补 `input` 后应变为 true |
+| prompt 只发 `{type:"text"}` | [`runtime.ts`](../../../../../agent-flow-client/src/components/runtime/runtime.ts) 第 138 行 | 不靠 ACP 图片块；走文件 + `read_image` |
+| task-space 只 `mkdir -p`，不写内容 | [`workspace.ts`](../../../../../agent-flow-client/src/components/workspace/workspace.ts) 第 94–106 行 | 需要新增受控写入 `inputs/` |
+| 执行面客户端只有 poll/result/package/log/archive | [`gateway.ts`](../../../../../agent-flow-client/src/components/gateway/gateway.ts) | 需要新增 list/download 方法与 wire 解析 |
+| 任务执行前没有「准备资料」步骤 | [`executor.ts`](../../../../../agent-flow-client/src/components/executor/executor.ts) `#prepareTask` | 在 `ensureTaskSpace` 后、建 session 前插入 seed |
+| `result.ts` 的错误分类没有初始资料码 | [`result.ts`](../../../../../agent-flow-client/src/components/result/result.ts) `MAPPING` | 新码归 `asset` |
 
 ## 5 设计总览
 
@@ -97,7 +97,7 @@ task（runId / taskSpacePath / prompt）
 
 ### 6.1 图片模型能力（前置，单独先做）
 
-[`runtime/profile.ts`](../../../../agent-flow-client/src/components/runtime/profile.ts)：
+[`runtime/profile.ts`](../../../../../agent-flow-client/src/components/runtime/profile.ts)：
 
 ```ts
 export type ModelInput = "text" | "image";
@@ -133,10 +133,10 @@ models: [{
 
 ### 6.2 能力声明（poll 头）
 
-[`gateway/transport.ts`](../../../../agent-flow-client/src/components/gateway/transport.ts)：
+[`gateway/transport.ts`](../../../../../agent-flow-client/src/components/gateway/transport.ts)：
 
 - 给 `#request` 的调用增加可选 `headers`（`get/getBytes` 已有；`post` 增加第 4 个参数）。
-- 在 [`gateway.ts`](../../../../agent-flow-client/src/components/gateway/gateway.ts) 的 `poll` 传入：
+- 在 [`gateway.ts`](../../../../../agent-flow-client/src/components/gateway/gateway.ts) 的 `poll` 传入：
 
 ```ts
 const CAPABILITIES: Record<string, string> = { "X-Executor-Capabilities": "run-inputs" };
@@ -157,7 +157,7 @@ async poll(request: PollRequest): Promise<PollResponse> {
 
 ### 6.3 拉取端口与 wire 解析
 
-**类型**（[`executor/types.ts`](../../../../agent-flow-client/src/components/executor/types.ts)）：
+**类型**（[`executor/types.ts`](../../../../../agent-flow-client/src/components/executor/types.ts)）：
 
 ```ts
 export type ExecutorRunInput = {
@@ -170,7 +170,7 @@ export type ExecutorRunInput = {
 };
 ```
 
-**端口**（[`executor/ports.ts`](../../../../agent-flow-client/src/components/executor/ports.ts)）：
+**端口**（[`executor/ports.ts`](../../../../../agent-flow-client/src/components/executor/ports.ts)）：
 
 ```ts
 export interface RunInputPort {
@@ -179,7 +179,7 @@ export interface RunInputPort {
 }
 ```
 
-**wire 解析**（[`gateway/wire.ts`](../../../../agent-flow-client/src/components/gateway/wire.ts)）：新增 `parseRunInputs`，逐字段校验，非法即 `protocol_error`：
+**wire 解析**（[`gateway/wire.ts`](../../../../../agent-flow-client/src/components/gateway/wire.ts)）：新增 `parseRunInputs`，逐字段校验，非法即 `protocol_error`：
 
 ```ts
 export function parseRunInputs(body: unknown): ExecutorRunInput[] {
@@ -212,7 +212,7 @@ export function assertInputDownloadPath(path: string): void {
 }
 ```
 
-**网关实现**（[`gateway/gateway.ts`](../../../../agent-flow-client/src/components/gateway/gateway.ts)）：
+**网关实现**（[`gateway/gateway.ts`](../../../../../agent-flow-client/src/components/gateway/gateway.ts)）：
 
 ```ts
 const RUN_INPUT_TIMEOUT_MS = 120_000;
@@ -250,7 +250,7 @@ export class HttpScheduler implements SchedulerPort, RunInputPort {
 
 ### 6.4 task-space 受控写入
 
-[`workspace/workspace.ts`](../../../../agent-flow-client/src/components/workspace/workspace.ts) 实现三个新方法：
+[`workspace/workspace.ts`](../../../../../agent-flow-client/src/components/workspace/workspace.ts) 实现三个新方法：
 
 ```ts
 export interface WorkspacePort {
@@ -273,7 +273,7 @@ export interface WorkspacePort {
 
 ### 6.5 执行前 seed
 
-[`executor/executor.ts`](../../../../agent-flow-client/src/components/executor/executor.ts)：
+[`executor/executor.ts`](../../../../../agent-flow-client/src/components/executor/executor.ts)：
 
 - `NodeExecutorOptions` 增加：
 
@@ -344,7 +344,7 @@ function sha256Hex(bytes: Uint8Array): string {
 
 ### 6.6 错误码与分类
 
-[`result/result.ts`](../../../../agent-flow-client/src/components/result/result.ts) 的 `MAPPING` 的 `asset` 行增加：
+[`result/result.ts`](../../../../../agent-flow-client/src/components/result/result.ts) 的 `MAPPING` 的 `asset` 行增加：
 
 ```ts
 input_fetch_failed
@@ -356,13 +356,13 @@ input_path_invalid
 
 ### 6.7 组合根
 
-[`cli/serve-compose.ts`](../../../../agent-flow-client/src/components/cli/serve-compose.ts)：
+[`cli/serve-compose.ts`](../../../../../agent-flow-client/src/components/cli/serve-compose.ts)：
 
 - `HttpScheduler` 已实现 `RunInputPort`；`createExecutor` 的入参增加 `runInputs`，并在 `new NodeExecutor({ ... runInputs })` 传入。
 - `composeForServe` 调用 `createExecutor({ ..., runInputs: gateway })`。
 - `HttpTransport` 不需要新配置；能力头在 `poll` 里固定发送。
 
-[`cli/compose.ts`](../../../../agent-flow-client/src/components/cli/compose.ts) 的本地 `run` 不传 `runInputs`：手工任务没有执行面，跳过 seed；这与「无 runId 的任务」行为一致。
+[`cli/compose.ts`](../../../../../agent-flow-client/src/components/cli/compose.ts) 的本地 `run` 不传 `runInputs`：手工任务没有执行面，跳过 seed；这与「无 runId 的任务」行为一致。
 
 ### 6.8 文档与版本
 
@@ -436,15 +436,15 @@ input_path_invalid
 | `T-CLI-IMG-06` | test | 上述单元/组件/场景测试 | 01–05 |
 | `T-CLI-IMG-07` | docs | README 与 executor 契约副本 | 05 |
 
-> 状态（2026-11-19）：`T-CLI-IMG-01`–`07` 已全部完成，`bun run check` 285 pass，读图探针通过；见 [result.md](../../../../agent-flow-client/docs/works/2026-11-19-run-start-inputs/result.md)。
+> 状态（2026-11-19）：`T-CLI-IMG-01`–`07` 已全部完成，`bun run check` 285 pass，读图探针通过；见 [result.md](../../../../../agent-flow-client/docs/works/2026-11-19-run-start-inputs/result.md)。
 
 ## 11 参考
 
 - 后端方案：[`proposal.md`](proposal.md)
 - UI 方案：[`ui-proposal.md`](ui-proposal.md)
-- 现有执行面客户端：[`gateway.ts`](../../../../agent-flow-client/src/components/gateway/gateway.ts)、[`transport.ts`](../../../../agent-flow-client/src/components/gateway/transport.ts)、[`wire.ts`](../../../../agent-flow-client/src/components/gateway/wire.ts)
-- 现有执行内核：[`executor.ts`](../../../../agent-flow-client/src/components/executor/executor.ts)、[`ports.ts`](../../../../agent-flow-client/src/components/executor/ports.ts)
-- 工作区：[`workspace.ts`](../../../../agent-flow-client/src/components/workspace/workspace.ts)
-- 模型配置：[`profile.ts`](../../../../agent-flow-client/src/components/runtime/profile.ts)
-- 能力探针：[`summary.protocol.jsonl`](../../../../agent-flow-client/docs/history/works/2026-11-14-acp-progress-feedback/probe/summary.protocol.jsonl)
+- 现有执行面客户端：[`gateway.ts`](../../../../../agent-flow-client/src/components/gateway/gateway.ts)、[`transport.ts`](../../../../../agent-flow-client/src/components/gateway/transport.ts)、[`wire.ts`](../../../../../agent-flow-client/src/components/gateway/wire.ts)
+- 现有执行内核：[`executor.ts`](../../../../../agent-flow-client/src/components/executor/executor.ts)、[`ports.ts`](../../../../../agent-flow-client/src/components/executor/ports.ts)
+- 工作区：[`workspace.ts`](../../../../../agent-flow-client/src/components/workspace/workspace.ts)
+- 模型配置：[`profile.ts`](../../../../../agent-flow-client/src/components/runtime/profile.ts)
+- 能力探针：[`summary.protocol.jsonl`](../../../../../agent-flow-client/docs/history/works/2026-11-14-acp-progress-feedback/probe/summary.protocol.jsonl)
 - 本机读图实测：[`vision-probe.md`](probe/vision-probe.md)

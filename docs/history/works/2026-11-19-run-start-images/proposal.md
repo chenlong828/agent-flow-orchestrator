@@ -1,8 +1,8 @@
 ---
 layer: works
 module: run
-status: active
-updated: 2026-11-19
+status: frozen
+updated: 2026-11-20
 procedure: 2026-11-19-run-start-images
 level: P1
 ---
@@ -15,9 +15,9 @@ level: P1
 >
 > **2026-11-19 用户裁决**：client 确认支持图片，必须补模型 `input` 声明；首期只支持图片。
 >
-> **2026-11-19 UI 实施修订**：上传时机由「粘贴即上传」改为「提交时上传」（点「发起运行」后逐张上传，全部成功再启动）；后端契约不变，服务端只认 `inputId`。见 [UI result](../../../../agent-flow-ui/docs/history/works/2026-11-19-run-start-images/result.md)。
+> **2026-11-19 UI 实施修订**：上传时机由「粘贴即上传」改为「提交时上传」（点「发起运行」后逐张上传，全部成功再启动）；后端契约不变，服务端只认 `inputId`。见 [UI result](../../../../../agent-flow-ui/docs/history/works/2026-11-19-run-start-images/result.md)。
 >
-> **2026-11-19 client 已实现**：`T-CLI-IMG-01`–`07` 落地，`read_image` 实测通过；真实联调待编排侧 `EXE-06/07`。见 [client result](../../../../agent-flow-client/docs/works/2026-11-19-run-start-inputs/result.md)。
+> **2026-11-19 client 已实现**：`T-CLI-IMG-01`–`07` 落地，`read_image` 实测通过；真实联调待编排侧 `EXE-06/07`。见 [client result](../../../../../agent-flow-client/docs/works/2026-11-19-run-start-inputs/result.md)。
 
 ## 0 结论
 
@@ -31,9 +31,9 @@ level: P1
 
 ### 0.2 三条硬结论
 
-1. **task-space 只能由 client 写**。`REQ-0001` §4 明确「服务端不访问 client 工作区」，`task_space_path` 由服务端生成、目录由 client 创建（[`run/spec.md`](../../design/components/run/spec.md) §2、[`executor-http-v3`](../../design/contracts/executor-http-v3.md) §4.1 #4）。因此图片字节必须经 client 之手落到 task-space；编排服务端直接写 `workspacePath` 的方案在远端部署下不成立。
-2. **图片不能进 prompt**。`maxPromptBytes` 是 1 MiB，`intent_markdown` 上限 256 KiB（[`run/spec.md`](../../design/components/run/spec.md) §2），且 client 的 ACP prompt 只发 `{type:"text"}`（[`runtime.ts`](../../../../agent-flow-client/src/components/runtime/runtime.ts) 第 138 行）。图片只能作为文件落在 task-space，再由模型用 `read_image` 按需读取。
-3. **视觉能力是前置条件，用户已确认 client 支持**。client 的 ACP `initialize` 当前报 `promptCapabilities.image=false`（[`summary.protocol.jsonl`](../../../../agent-flow-client/docs/history/works/2026-11-14-acp-progress-feedback/probe/summary.protocol.jsonl) 第 2 行）；client 的 pi-ai 模型条目只写了 `{ id, name }`，没有声明 `input: ["text","image"]`（[`profile.ts`](../../../../agent-flow-client/src/components/runtime/profile.ts) 第 47 行）。`dsh-base` 已挂载 `attachment-local`，当前最可能的直接原因是**路由未声明图片输入**。本机同一模型 id 的会话已能读图（[`vision-probe.md`](probe/vision-probe.md)），项目技能 `swift-ui-probe` 也依赖 `read_image`。**按用户裁决：client 补 `input: ["text","image"]` 并实测 `read_image`，作为实施第一步。**
+1. **task-space 只能由 client 写**。`REQ-0001` §4 明确「服务端不访问 client 工作区」，`task_space_path` 由服务端生成、目录由 client 创建（[`run/spec.md`](../../../design/components/run/spec.md) §2、[`executor-http-v3`](../../../design/contracts/executor-http-v3.md) §4.1 #4）。因此图片字节必须经 client 之手落到 task-space；编排服务端直接写 `workspacePath` 的方案在远端部署下不成立。
+2. **图片不能进 prompt**。`maxPromptBytes` 是 1 MiB，`intent_markdown` 上限 256 KiB（[`run/spec.md`](../../../design/components/run/spec.md) §2），且 client 的 ACP prompt 只发 `{type:"text"}`（[`runtime.ts`](../../../../../agent-flow-client/src/components/runtime/runtime.ts) 第 138 行）。图片只能作为文件落在 task-space，再由模型用 `read_image` 按需读取。
+3. **视觉能力是前置条件，用户已确认 client 支持**。client 的 ACP `initialize` 当前报 `promptCapabilities.image=false`（[`summary.protocol.jsonl`](../../../../../agent-flow-client/docs/history/works/2026-11-14-acp-progress-feedback/probe/summary.protocol.jsonl) 第 2 行）；client 的 pi-ai 模型条目只写了 `{ id, name }`，没有声明 `input: ["text","image"]`（[`profile.ts`](../../../../../agent-flow-client/src/components/runtime/profile.ts) 第 47 行）。`dsh-base` 已挂载 `attachment-local`，当前最可能的直接原因是**路由未声明图片输入**。本机同一模型 id 的会话已能读图（[`vision-probe.md`](probe/vision-probe.md)），项目技能 `swift-ui-probe` 也依赖 `read_image`。**按用户裁决：client 补 `input: ["text","image"]` 并实测 `read_image`，作为实施第一步。**
 
 ### 0.3 决策速览
 
@@ -54,20 +54,20 @@ level: P1
 
 ### 1.1 启动链路（纯文本）
 
-1. UI 的「发起运行」弹窗在 [`instances.js`](../../../../agent-flow-ui/assets/js/pages/instances.js) 的 `onOk` 里组装 `{ harnessId, workspacePath, intentMarkdown, autoConfirm }`，经 [`run/data.js`](../../../../agent-flow-ui/assets/js/run/data.js) 的 `start()` 调 `POST /api/v1/workflows/{id}/runs`。
-2. 网关 [`routes/run.ts`](../../../src/components/http-gateway/routes/run.ts) 的 `startRun` 只读 JSON（`RUN_START_FIELDS` 白名单：[`fields.ts`](../../../src/components/http-gateway/fields.ts)），校验字段后调 `runService.start`。
-3. [`commands.ts`](../../../src/components/run/commands.ts) 的 `start`：校验工作流/图/专家/Harness/实例，生成 `taskSpacePath = <workspacePath>/task-spaces/<YYYYMMDD-HHmmss>`（[`validate.ts`](../../../src/components/run/validate.ts) 第 37 行），单事务插入 `workflow_run` 与首节点，随后 `advance`。
-4. [`prompt.ts`](../../../src/components/run/prompt.ts) 组装纯文本 prompt：task-space 路径、写/读 `intent.md`、`[本次进入]`、专家块；首节点追加 `[启动诉求原文]`。
-5. client 轮询取任务，`ensureTaskSpace` 只 `mkdir -p`（[`workspace.ts`](../../../../agent-flow-client/src/components/workspace/workspace.ts) 第 94–106 行），然后 `session/new`、发 prompt；`intent.md` 由首节点模型按 prompt 写入。
-6. 节点结算后继续下一个 seq 节点；run 结束时 client 把整个 task-space 打 tar.gz 上传归档（[`executor-http-v3`](../../design/contracts/executor-http-v3.md) §4.5 / `P-05`）。
+1. UI 的「发起运行」弹窗在 [`instances.js`](../../../../../agent-flow-ui/assets/js/pages/instances.js) 的 `onOk` 里组装 `{ harnessId, workspacePath, intentMarkdown, autoConfirm }`，经 [`run/data.js`](../../../../../agent-flow-ui/assets/js/run/data.js) 的 `start()` 调 `POST /api/v1/workflows/{id}/runs`。
+2. 网关 [`routes/run.ts`](../../../../src/components/http-gateway/routes/run.ts) 的 `startRun` 只读 JSON（`RUN_START_FIELDS` 白名单：[`fields.ts`](../../../../src/components/http-gateway/fields.ts)），校验字段后调 `runService.start`。
+3. [`commands.ts`](../../../../src/components/run/commands.ts) 的 `start`：校验工作流/图/专家/Harness/实例，生成 `taskSpacePath = <workspacePath>/task-spaces/<YYYYMMDD-HHmmss>`（[`validate.ts`](../../../../src/components/run/validate.ts) 第 37 行），单事务插入 `workflow_run` 与首节点，随后 `advance`。
+4. [`prompt.ts`](../../../../src/components/run/prompt.ts) 组装纯文本 prompt：task-space 路径、写/读 `intent.md`、`[本次进入]`、专家块；首节点追加 `[启动诉求原文]`。
+5. client 轮询取任务，`ensureTaskSpace` 只 `mkdir -p`（[`workspace.ts`](../../../../../agent-flow-client/src/components/workspace/workspace.ts) 第 94–106 行），然后 `session/new`、发 prompt；`intent.md` 由首节点模型按 prompt 写入。
+6. 节点结算后继续下一个 seq 节点；run 结束时 client 把整个 task-space 打 tar.gz 上传归档（[`executor-http-v3`](../../../design/contracts/executor-http-v3.md) §4.5 / `P-05`）。
 
 ### 1.2 硬约束
 
-- **服务端不访问 client 工作区**（[`REQ-0001`](../../requirements/REQ-0001-workflow-run-orchestration.md) §4）。`CMP-run` 的禁止依赖还包括「发起对 client 的网络请求」（[`run/spec.md`](../../design/components/run/spec.md) §5）。
+- **服务端不访问 client 工作区**（[`REQ-0001`](../../../requirements/REQ-0001-workflow-run-orchestration.md) §4）。`CMP-run` 的禁止依赖还包括「发起对 client 的网络请求」（[`run/spec.md`](../../../design/components/run/spec.md) §5）。
 - **task-space 路径由服务端生成、目录由 client 创建**，client 只校验路径在工作区内（`P-01` §4.1 #4）。
 - **prompt 1 MiB 上限**，`intent.md` 256 KiB；prompt 是 opaque 文本，不能塞图片字节。
 - **同一工作区同一时刻最多一个活跃 run**（`run_conflict`），所以初始资料天然按 run 隔离。
-- **归档包含整个 task-space**，`inputs/` 自动进归档；`maxArchiveBytes=512 MiB`、`maxArchiveEntries=100000`（[`http-gateway/spec.md`](../../design/components/http-gateway/spec.md) §4.3）。
+- **归档包含整个 task-space**，`inputs/` 自动进归档；`maxArchiveBytes=512 MiB`、`maxArchiveEntries=100000`（[`http-gateway/spec.md`](../../../design/components/http-gateway/spec.md) §4.3）。
 
 ### 1.3 DSH 的做法（参考，不照搬）
 
@@ -79,25 +79,25 @@ level: P1
 
 | 事实 | 证据 | 判定 |
 |---|---|---|
-| client 的 ACP `initialize` 报 `promptCapabilities.image=false` | [`summary.protocol.jsonl`](../../../../agent-flow-client/docs/history/works/2026-11-14-acp-progress-feedback/probe/summary.protocol.jsonl) | 已确认 |
-| client 的模型条目只有 `{ id, name }`，未声明 `input` | [`profile.ts`](../../../../agent-flow-client/src/components/runtime/profile.ts) 第 47 行 | 已确认 |
+| client 的 ACP `initialize` 报 `promptCapabilities.image=false` | [`summary.protocol.jsonl`](../../../../../agent-flow-client/docs/history/works/2026-11-14-acp-progress-feedback/probe/summary.protocol.jsonl) | 已确认 |
+| client 的模型条目只有 `{ id, name }`，未声明 `input` | [`profile.ts`](../../../../../agent-flow-client/src/components/runtime/profile.ts) 第 47 行 | 已确认 |
 | `read_image` 在「附件存储已挂载 + 路由声明图片输入」时才可执行 | `@deepseek-ai/dsh-tool-fs` README（`read_image` 一节） | 已确认 |
 | 本机同一模型 id 的会话可读取 PNG 并描述内容 | [`vision-probe.md`](probe/vision-probe.md) | 已确认（本会话） |
 | client 的 `hundsun-public` 路由是否与上述会话同一条、后端是否真支持图片 | 未实测 | **待验证** |
 | `read_image` 是否出现在 `--profile acp` 会话的工具目录 | 未实测；`dsh-base` 挂载 `attachment-local` 与 `tool-fs`，预期在 | **待验证** |
 
-补充：项目技能 `swift-ui-probe` 明确写「模型用 harness 的 `read_image` 直接读图判断」（[`SKILL.md`](../../../scripts/seed-skills/swift-ui-probe/SKILL.md)）。如果 client 路由始终不声明图片输入，这个技能在真实运行里会失败；本功能顺带暴露并修复这条配置缺口。
+补充：项目技能 `swift-ui-probe` 明确写「模型用 harness 的 `read_image` 直接读图判断」（[`SKILL.md`](../../../../scripts/seed-skills/swift-ui-probe/SKILL.md)）。如果 client 路由始终不声明图片输入，这个技能在真实运行里会失败；本功能顺带暴露并修复这条配置缺口。
 
 ### 1.5 可复用的原语
 
 | 原语 | 现状 | 用途 |
 |---|---|---|
-| multipart | Skill 草稿上传已用 `request.formData()`（[`skill-drafts.ts`](../../../src/components/http-gateway/routes/skill-drafts.ts)） | `POST /run-inputs` 的单文件 multipart 解析有先例 |
-| `FileStore` | `put/get/head/list/delete/move` 端口（[`ports.ts`](../../../src/core/kernel/ports.ts)） | 图片字节落 `archive.root` |
+| multipart | Skill 草稿上传已用 `request.formData()`（[`skill-drafts.ts`](../../../../src/components/http-gateway/routes/skill-drafts.ts)） | `POST /run-inputs` 的单文件 multipart 解析有先例 |
+| `FileStore` | `put/get/head/list/delete/move` 端口（[`ports.ts`](../../../../src/core/kernel/ports.ts)） | 图片字节落 `archive.root` |
 | 执行面鉴权 | `X-Executor-Protocol`、Bearer/`X-Client-Id`、`EXECUTOR_AUTH=off` 旁路 | 新执行面端点沿用 |
-| 能力自报 | `X-Observability-Url` 已在 poll 头里做加法（[`executor-http-v3`](../../design/contracts/executor-http-v3.md) §3） | `X-Executor-Capabilities` 沿用同一风格 |
-| presence | `SchedulerService.presence(clientIds)` 返回 `lastPollAt/free/running`（[`scheduler/service.ts`](../../../src/components/scheduler/service.ts)） | 启动时查 client 能力 |
-| BFF | 已转发 `multipart/form-data`，默认 25 MiB、上传超时 120 s（[`bff/index.js`](../../../../agent-flow-ui/bff/index.js)） | 逐张上传无需改超时/白名单 |
+| 能力自报 | `X-Observability-Url` 已在 poll 头里做加法（[`executor-http-v3`](../../../design/contracts/executor-http-v3.md) §3） | `X-Executor-Capabilities` 沿用同一风格 |
+| presence | `SchedulerService.presence(clientIds)` 返回 `lastPollAt/free/running`（[`scheduler/service.ts`](../../../../src/components/scheduler/service.ts)） | 启动时查 client 能力 |
+| BFF | 已转发 `multipart/form-data`，默认 25 MiB、上传超时 120 s（[`bff/index.js`](../../../../../agent-flow-ui/bff/index.js)） | 逐张上传无需改超时/白名单 |
 | UI 请求层 | `shared/http.js` 已支持 `FormData` body；上传进度需一个小的 XHR 封装 | 启动提交复用现有请求层，上传单独封装 |
 | `runId` | `TaskRequest.runId?` 已落地（文件浏览工序） | client 可按 run 拉取初始资料，不必改任务信封 |
 
@@ -187,7 +187,7 @@ agent-flow-ui              agent-flow-orchaster                 agent-flow-clien
 
 ### `D-03` 旧 client 与能力协商
 
-`X-Executor-Protocol` 是精确等于 `3` 的硬闸门（[`http-gateway/spec.md`](../../design/components/http-gateway/spec.md) §4.3）；升 `4` 会让所有旧 client 的 poll 直接 400，影响面远大于本功能。
+`X-Executor-Protocol` 是精确等于 `3` 的硬闸门（[`http-gateway/spec.md`](../../../design/components/http-gateway/spec.md) §4.3）；升 `4` 会让所有旧 client 的 poll 直接 400，影响面远大于本功能。
 
 | 方案 | 结论 |
 |---|---|
@@ -367,7 +367,7 @@ type ExecutorRunInputRef = RunInputView & {
 
 `TaskRequest.runId?` 已存在（文件浏览工序）；初始资料按 `runId` 拉取，不需要新增任务字段。这样调度器不需要理解「图片」，任务表也不需要新列。
 
-需要同步修订 [`executor-http-v3`](../../design/contracts/executor-http-v3.md) §4.1 #4 的表述：「client 只创建目录、不写目录内容」改为「client 只创建目录，并写入本 run 通过 `EXE-06/07` 声明的初始资料；`intent.md` 等其他内容仍由节点模型写」。这是本方案唯一改变 client 既有职责的点。
+需要同步修订 [`executor-http-v3`](../../../design/contracts/executor-http-v3.md) §4.1 #4 的表述：「client 只创建目录、不写目录内容」改为「client 只创建目录，并写入本 run 通过 `EXE-06/07` 声明的初始资料；`intent.md` 等其他内容仍由节点模型写」。这是本方案唯一改变 client 既有职责的点。
 
 ### 5.3 领域契约（`CMP-run`）
 
@@ -429,7 +429,7 @@ type RunService = {
 - 读取（产品/执行面）只允许 `state=bound` 且属于该 run 的 input；`staged` 不能通过 run 端点读，跨 run 的 `inputId` 一律 404。
 - `staged` 行没有过期时间；只能被 `deleteStagedInput` 或运维清理删除。
 
-依赖变化：`CMP-run` 的允许依赖增加 `CMP-scheduler.presence`（当前 [`run/spec.md`](../../design/components/run/spec.md) §5 只列 `enqueue`/`cancelInstances`/`inspect`）。这是只读调用，但属于组件契约变更，需在 P1 评审时一起确认。
+依赖变化：`CMP-run` 的允许依赖增加 `CMP-scheduler.presence`（当前 [`run/spec.md`](../../../design/components/run/spec.md) §5 只列 `enqueue`/`cancelInstances`/`inspect`）。这是只读调用，但属于组件契约变更，需在 P1 评审时一起确认。
 
 ### 5.4 数据库
 
@@ -601,7 +601,7 @@ create index run_input_staged_idx on run_input (created_at) where state = 'stage
 1. **前置验证**（client）：补模型 `input` 声明，跑一次真实 `read_image`；不通过就停。
 2. **编排**：迁移 + `stageInput`/绑定 + 网关上传/删除 + prompt + 测试（无 client 参与也能测）。
 3. **client**：能力头 + 拉取/落盘 + 测试。
-4. **UI**：提交时上传 + 进度/重试/删除 + 详情预览（UI 已实现，见 [result](../../../../agent-flow-ui/docs/history/works/2026-11-19-run-start-images/result.md)）。
+4. **UI**：提交时上传 + 进度/重试/删除 + 详情预览（UI 已实现，见 [result](../../../../../agent-flow-ui/docs/history/works/2026-11-19-run-start-images/result.md)）。
 5. **端到端**：真实截图粘贴 → 上传 → 启动 → 检查 task-space 文件 → 首节点 `read_image` 描述 → 归档包含 `inputs/`。
 
 ## 9 测试与验收
@@ -615,7 +615,7 @@ create index run_input_staged_idx on run_input (created_at) where state = 'stage
   - N1：旧 client（无 `run-inputs`）带图启动 → `409 client_unsupported`，不建 run、暂存行保持 staged。
   - 补充反例（矩阵覆盖，不单独占场景位）：未知 `inputId` → 400 且回滚；`DELETE` 已绑定点 → 409。
 - 更新 `SCN-0301` 第 4/5 步：带图启动时 prompt 与 client 写入 `inputs/` 的断言。
-- `REQ`：[`REQ-0003`](../../requirements/REQ-0003-run-start-image-inputs.md) 已建（2026-11-19），记录三项裁决；设计冻结后进入实现工序。
+- `REQ`：[`REQ-0003`](../../../requirements/REQ-0003-run-start-image-inputs.md) 已建（2026-11-19），记录三项裁决；设计冻结后进入实现工序。
 
 ### 9.2 测试矩阵
 
@@ -684,20 +684,20 @@ cd ../agent-flow-ui && npm test
 
 | 事实 | 文件 |
 |---|---|
-| task-space 生成与不变量 | [`run/spec.md`](../../design/components/run/spec.md) §2、[`validate.ts`](../../../src/components/run/validate.ts) |
-| 启动链路与 prompt | [`commands.ts`](../../../src/components/run/commands.ts)、[`prompt.ts`](../../../src/components/run/prompt.ts)、[`SCN-0301`](../../design/scenarios/workflow-orchestration/workflow-execution/run-start-and-node-advance/scenario.md) |
-| 执行面 task-space 规则 | [`executor-http-v3.md`](../../design/contracts/executor-http-v3.md) §4.1 #4 |
-| 服务端不访问工作区 | [`REQ-0001`](../../requirements/REQ-0001-workflow-run-orchestration.md) §4 |
-| 网关 multipart 先例 | [`skill-drafts.ts`](../../../src/components/http-gateway/routes/skill-drafts.ts) |
-| 执行面版本/能力头先例 | [`http-gateway/spec.md`](../../design/components/http-gateway/spec.md) §4.3、[`executor-http-v3.md`](../../design/contracts/executor-http-v3.md) §3 |
-| presence 读 | [`scheduler/service.ts`](../../../src/components/scheduler/service.ts)、[`presence.ts`](../../../src/components/scheduler/presence.ts) |
-| client 只 mkdir task-space | [`workspace.ts`](../../../../agent-flow-client/src/components/workspace/workspace.ts) 第 94–106 行 |
-| client prompt 只发文本 | [`runtime.ts`](../../../../agent-flow-client/src/components/runtime/runtime.ts) 第 138 行 |
-| client 模型条目无 `input` | [`profile.ts`](../../../../agent-flow-client/src/components/runtime/profile.ts) 第 47 行 |
-| ACP 图片能力为 false | [`summary.protocol.jsonl`](../../../../agent-flow-client/docs/history/works/2026-11-14-acp-progress-feedback/probe/summary.protocol.jsonl) 第 2 行 |
+| task-space 生成与不变量 | [`run/spec.md`](../../../design/components/run/spec.md) §2、[`validate.ts`](../../../../src/components/run/validate.ts) |
+| 启动链路与 prompt | [`commands.ts`](../../../../src/components/run/commands.ts)、[`prompt.ts`](../../../../src/components/run/prompt.ts)、[`SCN-0301`](../../../design/scenarios/workflow-orchestration/workflow-execution/run-start-and-node-advance/scenario.md) |
+| 执行面 task-space 规则 | [`executor-http-v3.md`](../../../design/contracts/executor-http-v3.md) §4.1 #4 |
+| 服务端不访问工作区 | [`REQ-0001`](../../../requirements/REQ-0001-workflow-run-orchestration.md) §4 |
+| 网关 multipart 先例 | [`skill-drafts.ts`](../../../../src/components/http-gateway/routes/skill-drafts.ts) |
+| 执行面版本/能力头先例 | [`http-gateway/spec.md`](../../../design/components/http-gateway/spec.md) §4.3、[`executor-http-v3.md`](../../../design/contracts/executor-http-v3.md) §3 |
+| presence 读 | [`scheduler/service.ts`](../../../../src/components/scheduler/service.ts)、[`presence.ts`](../../../../src/components/scheduler/presence.ts) |
+| client 只 mkdir task-space | [`workspace.ts`](../../../../../agent-flow-client/src/components/workspace/workspace.ts) 第 94–106 行 |
+| client prompt 只发文本 | [`runtime.ts`](../../../../../agent-flow-client/src/components/runtime/runtime.ts) 第 138 行 |
+| client 模型条目无 `input` | [`profile.ts`](../../../../../agent-flow-client/src/components/runtime/profile.ts) 第 47 行 |
+| ACP 图片能力为 false | [`summary.protocol.jsonl`](../../../../../agent-flow-client/docs/history/works/2026-11-14-acp-progress-feedback/probe/summary.protocol.jsonl) 第 2 行 |
 | 本机读图实测 | [`vision-probe.md`](probe/vision-probe.md) |
-| 项目技能依赖读图 | [`swift-ui-probe/SKILL.md`](../../../scripts/seed-skills/swift-ui-probe/SKILL.md) |
-| UI 发起弹窗 | [`instances.js`](../../../../agent-flow-ui/assets/js/pages/instances.js) |
-| UI 请求层支持 FormData/XHR | [`shared/http.js`](../../../../agent-flow-ui/assets/js/shared/http.js) |
-| BFF multipart/25 MiB | [`bff/index.js`](../../../../agent-flow-ui/bff/index.js) |
+| 项目技能依赖读图 | [`swift-ui-probe/SKILL.md`](../../../../scripts/seed-skills/swift-ui-probe/SKILL.md) |
+| UI 发起弹窗 | [`instances.js`](../../../../../agent-flow-ui/assets/js/pages/instances.js) |
+| UI 请求层支持 FormData/XHR | [`shared/http.js`](../../../../../agent-flow-ui/assets/js/shared/http.js) |
+| BFF multipart/25 MiB | [`bff/index.js`](../../../../../agent-flow-ui/bff/index.js) |
 | DSH 附件机制 | `@deepseek-ai/dsh-attachment`、`dsh-client-ui-attachment`、`dsh-client-file-upload`、`dsh-tool-fs`、`dsh-llm-pi-ai` 的 README（Desktop `app.asar` 内） |

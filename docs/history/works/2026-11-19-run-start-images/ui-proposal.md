@@ -1,8 +1,8 @@
 ---
 layer: works
 module: run
-status: active
-updated: 2026-11-19
+status: frozen
+updated: 2026-11-20
 procedure: 2026-11-19-run-start-images
 target: agent-flow-ui
 ---
@@ -11,7 +11,7 @@ target: agent-flow-ui
 
 > 依据：[`proposal.md`](proposal.md) 与 2026-11-19 用户裁决（client 支持图片；只支持图片）。
 >
-> **2026-11-19 UI 实施结果**：UI 已实现，上传时机为「提交时上传」（点「发起运行」后逐张上传，全部成功再启动；失败回滚 DELETE）。本文已按该口径回写；若与 UI result 冲突，以 [UI result](../../../../agent-flow-ui/docs/history/works/2026-11-19-run-start-images/result.md) 为准。后端契约不变。
+> **2026-11-19 UI 实施结果**：UI 已实现，上传时机为「提交时上传」（点「发起运行」后逐张上传，全部成功再启动；失败回滚 DELETE）。本文已按该口径回写；若与 UI result 冲突，以 [UI result](../../../../../agent-flow-ui/docs/history/works/2026-11-19-run-start-images/result.md) 为准。后端契约不变。
 > 本文给 `agent-flow-ui` 项目使用，描述 UI 需要实现的交互、状态与落点；后端契约以 [`proposal.md`](proposal.md) §5.1 为准。本文不改 UI 代码。
 
 ## 1 目标
@@ -275,8 +275,8 @@ function deleteInput(inputId) {
 ## 13 参考
 
 - 后端契约与限制：[`proposal.md`](proposal.md) §5.1、§6。
-- 现有发起弹窗：[`instances.js`](../../../../agent-flow-ui/assets/js/pages/instances.js)。
-- 现有运行数据层：[`run/data.js`](../../../../agent-flow-ui/assets/js/run/data.js)。
-- 现有请求层：[`shared/http.js`](../../../../agent-flow-ui/assets/js/shared/http.js)。
-- BFF 转发：[`bff/index.js`](../../../../agent-flow-ui/bff/index.js)。
+- 现有发起弹窗：[`instances.js`](../../../../../agent-flow-ui/assets/js/pages/instances.js)。
+- 现有运行数据层：[`run/data.js`](../../../../../agent-flow-ui/assets/js/run/data.js)。
+- 现有请求层：[`shared/http.js`](../../../../../agent-flow-ui/assets/js/shared/http.js)。
+- BFF 转发：[`bff/index.js`](../../../../../agent-flow-ui/bff/index.js)。
 - DSH 草稿附件交互参考：`@deepseek-ai/dsh-client-ui-attachment` 的 README（Desktop `app.asar` 内）。

@@ -2,7 +2,7 @@
 layer: plan
 module: global
 status: current
-updated: 2026-11-19
+updated: 2026-11-20
 ---
 
 # 路线图
@@ -26,7 +26,6 @@ updated: 2026-11-19
 - `2026-11-17-ui-observability-layer`（P1，跨项目 UI 设计/已确认）：UI 文件/会话 Tab + BFF 流式 proposal 与调测 runbook；已确认方案 A/EventSource/30s，待 UI 项目实现与场景编号。见 [`proposal.md`](../works/2026-11-17-ui-observability-layer/proposal.md)、[`debug-runbook.md`](../works/2026-11-17-ui-observability-layer/debug-runbook.md)。
 - `2026-11-17-client-ui-handoff`（P2，跨项目交接，不绑定 REQ）：client 残余修复 + UI BFF 流式/文件 Tab/会话 Tab 任务清单；无 UI 核心联调已通过（文件、运行中 session/O-11、完成后 session/SSE、confirm/end、client 停机 504）。见 [`handoff.md`](../works/2026-11-17-client-ui-handoff/handoff.md)、[`E2E 输出`](../works/2026-11-17-client-ui-handoff/probe/e2e-core-output.txt)。
 - `2026-11-17-run-file-browser`（P1，剩余 UI/scenario）：orchestrator 文件/session 产品 API 已实现；剩余 UI 文件 Tab、UI BFF 流式、`SCN-0305`/`SCN-0303` 场景登记。见 [`brief.md`](../works/2026-11-17-run-file-browser/brief.md)、[`集成结果`](../works/2026-11-17-client-observability-integration/result.md)。
-- `2026-11-19-run-start-images`（P1，设计/已裁决）：`REQ-0003` 启动运行图片初始资料；提交时上传 + client 拉取 + prompt 清单方案；编排、client、UI 均已实现（编排 451 测试通过），待真实端到端联调与场景收口。见 [`proposal.md`](../works/2026-11-19-run-start-images/proposal.md)、[`client 提案`](../works/2026-11-19-run-start-images/client-proposal.md)、[`UI 提案`](../works/2026-11-19-run-start-images/ui-proposal.md)、[`REQ-0003`](../requirements/REQ-0003-run-start-image-inputs.md)。
 - M2 只产出裁定与规格，不写实现代码；M2 是 P1，人参与切分与契约评审后才可编码。
 - 跨项目依赖：`T-RUN-09` 联调需 `agent-flow-client` 先同步 `executor-http-v3` 副本并实现 v3（task-space、`P-04`/`P-05`、归档、协议 3）。该工作不在本仓库工序表内，已在 client 仓库建立交接工序 [`2026-11-12-contract-v3-handoff`](../../../agent-flow-client/docs/works/2026-11-12-contract-v3-handoff/brief.md)。
 - 无用户旅程的技术债 / 文档活走旁路，不进 `requirements/`。
@@ -34,6 +33,7 @@ updated: 2026-11-19
 - 已知欠账：无 CI 门禁；文档校验目前只有场景索引（`docs:check`），完整文档树校验待补。
 
 ## 近期完成
+- `2026-11-19-run-start-images`（P1）：`REQ-0003` 启动运行图片初始资料；提交时上传 + client 拉取 + prompt 清单，`SCN-0307` verified、`REQ-0003` delivered，端到端验证通过。见 [`result.md`](../history/works/2026-11-19-run-start-images/result.md)、[`proposal.md`](../history/works/2026-11-19-run-start-images/proposal.md)、[`client 提案`](../history/works/2026-11-19-run-start-images/client-proposal.md)、[`UI 提案`](../history/works/2026-11-19-run-start-images/ui-proposal.md)。
 - `2026-11-18-run-asset-detach`（P1）：终态 run 脱钩，历史 run 不再阻止删除工作流/Harness/专家；快照列与 `RunDetail.graph` 落地，`OQ-30` 关闭；迁移 `0013` 已应用，432 个测试通过。见 [`result.md`](../works/2026-11-18-run-asset-detach/result.md)。
 - `2026-11-18-test-data-cleanup`（P1）：已清理 E2E + SP-TEST-01；workflow 12→4、expert 20→12、harness 9→1、run 38→27、artifact 200→182；单智能体任务保留；已备份并 quarantine。见 [`result.md`](../works/2026-11-18-test-data-cleanup/result.md)。
 - `2026-11-17-client-observability-fix-verification`（P2）：client P0/P1 修复复验通过；长 SSE 16.5s、Last-Event-ID、run_gone 410、session meta、raw Accept-Ranges 通过；残余 CF-07/09/15 转 client。见 [`result.md`](../works/2026-11-17-client-observability-fix-verification/result.md)。

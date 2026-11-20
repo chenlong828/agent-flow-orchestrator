@@ -1,8 +1,8 @@
 ---
 layer: requirements
 module: workflow-execution
-status: accepted
-updated: 2026-11-19
+status: delivered
+updated: 2026-11-20
 req: REQ-0003
 ---
 
@@ -57,4 +57,4 @@ req: REQ-0003
 
 ## 7 状态
 
-`accepted`（2026-11-19）：场景叙述可判定、非目标明确、影响场景已识别。设计已冻结；编排侧、client 侧、UI 侧均已实现（编排 451 测试通过），待真实端到端联调后转 `delivered`。验收 = `SCN-0307` 3+1 与 `SCN-0301` 新增断言通过，且约束未被违反。
+`delivered`（2026-11-20）：编排侧、client 侧、UI 侧均已实现；`SCN-0307` 已转 `verified`，`SCN-0301` 新增断言通过，端到端验证由用户 2026-11-20 确认。验收 = 影响场景全部 `verified` 且约束未被违反。
