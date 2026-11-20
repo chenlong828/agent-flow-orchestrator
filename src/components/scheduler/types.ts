@@ -24,6 +24,7 @@ export type TaskDraft = {
   instanceId: string;
   nodeId: string;
   prompt: string;
+  /** 单个任务终止上界，>0；默认由 run 配置决定（60 分钟）。 */
   timeoutMs: number;
   skillIds: string[];
   /** v3：run 的 task-space 绝对路径；必填，由上游编排传入。 */

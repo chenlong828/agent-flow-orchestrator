@@ -246,6 +246,41 @@ describe("任务派发与容量（S-01/S-04/S-05/S-06）", () => {
     ).toEqual([]);
   });
 
+  test("TC-EXD-010 一天上界在 12h 内不回队，client 静默仍回队", async () => {
+    const clientId = "node-no-timeout";
+    const otherClient = "node-no-timeout-other";
+    await bindNode(clientId);
+    await bindNode(otherClient);
+    const instanceId = await enroll(clientId);
+    const skillId = await createSkill("无超时技能");
+    const { clock, advance } = mutableClock();
+    const scheduler = schedulerWith(clock, { maxAttempts: 3 });
+
+    const enqueued = await scheduler.enqueue({
+      tasks: [{
+        instanceId,
+        taskSpacePath: taskSpaceOf(instanceId),
+        nodeId: "n1",
+        prompt: "无总超时",
+        timeoutMs: 86400000,
+        skillIds: [skillId],
+      }],
+    });
+    const taskId = enqueued.taskIds[0]!;
+    expect((await poll(scheduler, clientId, 1)).tasks[0]).toMatchObject({ taskId, attempt: 1, timeoutMs: 86400000 });
+
+    // 12 小时后 client 仍活着：一天上界未到，不判过期，也不重新入队。
+    advance(12 * 60 * 60 * 1000);
+    const resent = await poll(scheduler, clientId, 1);
+    expect(resent.tasks[0]).toMatchObject({ taskId, attempt: 1 });
+    expect(await scheduler.inspect(taskId)).toMatchObject({ state: "dispatched", attempt: 1 });
+
+    // client 停止 poll 后，仍由静默判定回队（不依赖总超时）。
+    advance(120000 + 1);
+    await poll(scheduler, otherClient, 0);
+    expect(await scheduler.inspect(taskId)).toMatchObject({ state: "queued", attempt: 2 });
+  });
+
   test("TC-EXD-009 结果与确认两个契约一起冻结，重派 attempt+1 原样下发（S-05）", async () => {
     const clientId = "node-bundle";
     await bindNode(clientId);

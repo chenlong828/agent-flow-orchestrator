@@ -69,6 +69,16 @@ describe("TaskDraft.confirmation 校验", () => {
     );
   });
 
+  test("timeoutMs 上限一天，0/负值拒绝", () => {
+    expect(validateDraft({ ...baseDraft, timeoutMs: 86400000 }).timeoutMs).toBe(86400000);
+    expect(() => validateDraft({ ...baseDraft, timeoutMs: 0 })).toThrow(
+      "字段 timeoutMs 不合法：必须是 1–86400000 的整数",
+    );
+    expect(() => validateDraft({ ...baseDraft, timeoutMs: -1 })).toThrow(
+      "字段 timeoutMs 不合法：必须是 1–86400000 的整数",
+    );
+  });
+
   test("没有 confirmation 的旧任务保持原形状", () => {
     const draft = validateDraft({ ...baseDraft, resultSignal });
     expect(draft.confirmation).toBeUndefined();

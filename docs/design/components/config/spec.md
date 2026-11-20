@@ -102,7 +102,7 @@ max_attempts = 3
 retry_delay_ms = 5000
 
 [run]
-default_timeout_ms = 1800000
+default_timeout_ms = 3600000
 max_node_visits = 5
 
 [archive]
@@ -110,7 +110,7 @@ root = ".local/archive"
 ```
 
 - 只允许 `server`、`app`、`log`、`executor`、`run`、`archive` 六个顶层分节；未知分节/键报错。
-- `server.host`、`app.actor`、`log.level`、`archive.root` 为字符串；`server.port` 为 1–65535 的整数；`run.default_timeout_ms` 为 1000–86400000 的整数；`run.max_node_visits` 为 1–20 的整数。
+- `server.host`、`app.actor`、`log.level`、`archive.root` 为字符串；`server.port` 为 1–65535 的整数；`run.default_timeout_ms` 为 1000–86400000 的整数（默认 60 分钟；本机部署 `config/local.toml` 可覆盖为 86400000，即一天）；`run.max_node_visits` 为 1–20 的整数。
 - `archive.root` 必须是相对或绝对路径字符串，非空；为空时按未设置处理，回退 `.local/archive`。目录在首次归档时创建，不在启动期创建。
 - `run.default_timeout_ms` 与 `run.max_node_visits` 只约束运行编排的节点任务；与 `[executor]` 的重派参数正交。
 - `local.toml` 可以是部分文件，只覆盖需要改变的值。

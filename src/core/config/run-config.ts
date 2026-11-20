@@ -24,7 +24,7 @@ export type ArchiveFileConfig = {
   root?: string;
 };
 
-const DEFAULT_RUN_TIMEOUT_MS = 1800000;
+const DEFAULT_RUN_TIMEOUT_MS = 3600000;
 const DEFAULT_RUN_MAX_NODE_VISITS = 5;
 const DEFAULT_RUN_MAX_INPUT_FILES = 8;
 const DEFAULT_RUN_MAX_INPUT_FILE_BYTES = 8 * 1024 * 1024;

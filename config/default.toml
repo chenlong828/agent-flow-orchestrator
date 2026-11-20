@@ -16,7 +16,8 @@ max_attempts = 3
 retry_delay_ms = 5000
 
 [run]
-default_timeout_ms = 1800000
+# 单个任务终止上界；默认 60 分钟；本机部署可在 local.toml 覆盖为 86400000（一天）
+default_timeout_ms = 3600000
 max_node_visits = 5
 max_input_files = 8
 max_input_file_bytes = 8388608

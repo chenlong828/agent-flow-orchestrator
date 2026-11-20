@@ -392,7 +392,7 @@ waiting_resume ──cancel / 无 sessionId──▶ failed(cancelled / timeout)
 - 不注入上游节点的消息正文；跨节点上下文靠 task-space 文件。
 - `confirm` 不组装 prompt、不入队。
 - 组装结果超过 `maxPromptBytes` → 启动/推进失败（`PayloadTooLargeError`），不截断。
-- 节点超时取配置 `run.default_timeout_ms`（默认 1800000），本期不支持按节点配置覆盖（待定）。
+- 节点超时取配置 `run.default_timeout_ms`（默认 3600000，即 60 分钟；本机部署可覆盖为 86400000），本期不支持按节点配置覆盖（待定）。
 
 ### 4.5 判定与回退
 
@@ -503,7 +503,7 @@ waiting_resume ──cancel / 无 sessionId──▶ failed(cancelled / timeout)
 
 ## 8 待定
 
-- 节点级超时覆盖（当前统一取 `run.default_timeout_ms`）。
+- 节点级超时覆盖（当前统一取 `run.default_timeout_ms`，默认 60 分钟）。
 - 超时续跑的 TTL / 次数上限（当前不做；等待期靠人工续跑或取消）。
 - 失败后「从当前节点原地重试」（`OQ-28`）。
 - `split`/`fanout` 的执行语义（第二期；`OQ-26`）。

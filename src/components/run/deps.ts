@@ -25,7 +25,7 @@ export type RunDeps = {
   /** client 观测面只读端口；由 CMP-observability-client 适配器实现。 */
   clientFiles?: ClientRunFiles;
   clientSessions?: ClientSessionObservability;
-  /** 节点任务默认超时（毫秒）。 */
+  /** 节点任务默认超时（毫秒），默认 60 分钟。 */
   defaultTimeoutMs: number;
   /** 单节点最大重访轮次。 */
   maxNodeVisits: number;
