@@ -36,13 +36,13 @@ afterAll(async () => {
 });
 
 describe("演示种子", () => {
-  test("首轮写入 15 个 Skill / 13 个专家 / 3 条流程与 53 条技能装配边，不预置 Harness 与工具", async () => {
+  test("首轮写入 15 个 Skill / 15 个专家 / 4 条流程与 60 条技能装配边，不预置 Harness 与工具", async () => {
     const result = await seedAll(db, store);
     expect(result).toEqual({
       skills: 15,
-      experts: 13,
-      workflows: 3,
-      expertSkills: 53,
+      experts: 15,
+      workflows: 4,
+      expertSkills: 60,
     });
     const counts = await db.one<{
       harnesses: number;
@@ -66,8 +66,8 @@ describe("演示种子", () => {
       harnesses: 0,
       tools: 0,
       skills: 15,
-      experts: 13,
-      workflows: 3,
+      experts: 15,
+      workflows: 4,
       toolEdges: 0,
       missingPackages: 0,
     });
@@ -107,7 +107,7 @@ describe("演示种子", () => {
         (select count(*)::int from workflow) as workflows,
         (select count(*)::int from expert_skill) as "skillEdges"`,
     );
-    expect(counts).toEqual({ skills: 15, experts: 13, workflows: 3, skillEdges: 53 });
+    expect(counts).toEqual({ skills: 15, experts: 15, workflows: 4, skillEdges: 60 });
     expect(await store.list("packages/")).toHaveLength(15);
 
     const requirements = await db.one<{ version: string; tags: number }>(
@@ -210,5 +210,43 @@ describe("演示种子", () => {
     expect(
       impl!.graph.edges.filter((edge) => edge.kind === "rollback").map((edge) => `${edge.from}->${edge.to}`),
     ).toEqual(["n4->n3"]);
+
+    const defect = await db.one<{
+      graph: {
+        nodes: { id: string; type: string; expertId: string | null }[];
+        edges: { from: string; to: string; kind: string }[];
+      };
+    }>(
+      `select d.graph from workflow_definition d
+       join workflow w on w.id = d.workflow_id
+       where w.name = '故障修复流程'`,
+    );
+    expect(defect).not.toBeNull();
+    expect(defect!.graph.nodes.map((node) => node.type)).toEqual([
+      "start",
+      "agent",
+      "agent",
+      "confirm",
+      "agent",
+      "agent",
+      "review",
+      "confirm",
+      "end",
+    ]);
+    expect(defect!.graph.nodes).toHaveLength(9);
+    expect(defect!.graph.nodes.filter((node) => node.expertId === null).map((node) => node.id)).toEqual([
+      "n4",
+      "n8",
+    ]);
+    expect(
+      defect!.graph.edges.filter((edge) => edge.kind === "rollback").map((edge) => `${edge.from}->${edge.to}`),
+    ).toEqual(["n4->n2", "n7->n5", "n8->n5"]);
+
+    const defectRefs = await db.query(
+      `select 1 from workflow_expert_ref r
+       join workflow w on w.id = r.workflow_id
+       where w.name = '故障修复流程'`,
+    );
+    expect(defectRefs).toHaveLength(7);
   });
 });

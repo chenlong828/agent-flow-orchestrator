@@ -166,6 +166,28 @@ const EXPERTS: ExpertSeed[] = [
     refs: [], enabled: true,
   },
   {
+    id: "bug-reproducer", name: "故障复现专家", color: "#d97706",
+    role: "在现有环境复现故障，留下可复核的复现报告",
+    persona: ["按步骤", "证据优先"],
+    skills: ["dev-execution-spec", "doc-layout-spec", "af-flow-rule", "swift-ui-probe"],
+    duty: "读 intent/index/brief，按用户描述在现有环境复现故障；记录环境/步骤/输入/期望/实际/复现率与截图日志；写 repro.md（回退 reproN.md）；不改代码、不定位根因、不修。",
+    skillOrder: "开发执行纪律 → 文档布局",
+    verifyOrder: "按描述可复现 → 环境/步骤/输入/期望/实际齐全 → 证据可复核 → 未改代码",
+    notes: "先复现再交给定位；不改代码；不猜根因；复现不了标阻塞并写缺什么；不把真实邮件/账号/个人信息写进证据。",
+    refs: [], enabled: true,
+  },
+  {
+    id: "bug-locator", name: "故障定位专家", color: "#7c2d12",
+    role: "把复现结果定位到代码缺陷位置与根因",
+    persona: ["刨根问底", "证据导向"],
+    skills: ["dev-execution-spec", "doc-layout-spec", "af-flow-rule"],
+    duty: "读 repro.md、项目文档与代码，定位缺陷文件/符号/行、根因链、修复边界与回归面；写 locate.md（回退 locateN.md）；不改代码、不修。",
+    skillOrder: "开发执行纪律 → 文档布局",
+    verifyOrder: "复现报告已读 → 代码位置明确（file#symbol/行）→ 根因有证据 → 修复边界/回归面清楚 → 未改代码",
+    notes: "只定位不修；根因要有代码/证据；发现是新结果/新场景，标出并建议转需求分析场景 workflow；不扩大范围。",
+    refs: [], enabled: true,
+  },
+  {
     id: "summarizer", name: "收尾专家", color: "#475569",
     role: "汇总本次运行产物，给出可追溯的最终结论",
     persona: ["克制"],
@@ -287,6 +309,37 @@ function implementFlowGraph(): WorkflowGraph {
   };
 }
 
+/** 缺陷修复流程：启动 → 故障复现 → 故障定位与报告 → 人工确认（问题定位）→ 代码修复 → 测试和验证 → 代码评审 → 人工确认（修复记录与实际测试）→ 收尾。 */
+function defectFlowGraph(): WorkflowGraph {
+  return {
+    stages: [],
+    nodes: [
+      flowNode("n1", "启动", "start", "start-node", 0, 0),
+      flowNode("n2", "故障复现", "agent", "bug-reproducer", 160, 0),
+      flowNode("n3", "故障定位与报告", "agent", "bug-locator", 320, 0),
+      flowNode("n4", "人工确认：问题定位", "confirm", null, 480, 0),
+      flowNode("n5", "代码修复", "agent", "implementer", 640, 0),
+      flowNode("n6", "测试和验证", "agent", "test-verifier", 800, 0),
+      flowNode("n7", "代码评审", "review", "code-reviewer", 960, 0),
+      flowNode("n8", "人工确认：修复记录与实际测试", "confirm", null, 1120, 0),
+      flowNode("n9", "收尾", "end", "summarizer", 1280, 0),
+    ],
+    edges: [
+      { id: "e1", from: "n1", to: "n2", kind: "seq" },
+      { id: "e2", from: "n2", to: "n3", kind: "seq" },
+      { id: "e3", from: "n3", to: "n4", kind: "seq" },
+      { id: "e4", from: "n4", to: "n5", kind: "seq" },
+      { id: "e5", from: "n5", to: "n6", kind: "seq" },
+      { id: "e6", from: "n6", to: "n7", kind: "seq" },
+      { id: "e7", from: "n7", to: "n8", kind: "seq" },
+      { id: "e8", from: "n8", to: "n9", kind: "seq" },
+      { id: "e9", from: "n4", to: "n2", kind: "rollback" },
+      { id: "e10", from: "n7", to: "n5", kind: "rollback" },
+      { id: "e11", from: "n8", to: "n5", kind: "rollback" },
+    ],
+  };
+}
+
 /** 工作区接入流程：扫描 → 确认范围 → 初始化/校准 → 确认配置 → 收尾提交。 */
 function workspaceFlowGraph(): WorkflowGraph {
   return {
@@ -322,6 +375,13 @@ const WORKFLOWS: WorkflowSeed[] = [
     type: "研发",
     description: "实现阶段：启动 → 人工审核（P1 门）→ 开发 → 代码评审 → 收尾；代码评审回退到开发",
     graph: implementFlowGraph(),
+  },
+  {
+    id: "defect-flow-01",
+    name: "故障修复流程",
+    type: "研发",
+    description: "故障修复：启动 → 故障复现 → 故障定位与报告 → 人工确认（问题定位）→ 代码修复 → 测试和验证 → 代码评审 → 人工确认（修复记录与实际测试）→ 收尾；人工确认与代码评审回退到对应修复/定位节点",
+    graph: defectFlowGraph(),
   },
   {
     id: "workspace-flow-01",
