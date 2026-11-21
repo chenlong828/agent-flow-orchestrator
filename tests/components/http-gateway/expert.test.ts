@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import type { WorkflowGraph } from "../../../src/components/workflow/index.ts";
 import { closeTestDb, resetBusinessData } from "../../helpers/test-db.ts";
 import { call, createTestContext, withRevision, type TestContext } from "../../helpers/app.ts";
 
@@ -25,6 +26,17 @@ async function createExpert(name = "方案设计专家") {
   const response = await call(ctx.app, "POST", "/api/v1/experts", { body: expertBody(name) });
   expect(response.status).toBe(201);
   return response.body as Record<string, any>;
+}
+
+function graphForExpert(expertId: string): WorkflowGraph {
+  return {
+    stages: [{ id: "s1", name: "阶段" }],
+    nodes: [
+      { id: "n1", type: "start", name: "开始", stageId: "s1", expertId },
+      { id: "n2", type: "end", name: "结束", stageId: "s1", expertId },
+    ],
+    edges: [{ id: "e1", from: "n1", to: "n2", kind: "seq" }],
+  };
 }
 
 beforeAll(async () => {
@@ -144,7 +156,7 @@ describe("专家 HTTP 契约", () => {
     expect(list.body.items[0].skills).toEqual([]);
   });
 
-  test("TC-EXP-002 GET 列表返回前 3 个 Skill 预览，按装配顺序", async () => {
+  test("TC-EXP-002 GET 列表返回前 3 个 Skill 预览，并可按 workflowId 过滤", async () => {
     const created = await createExpert("预览专家");
     await ctx.expertService.setSkills(created.id, 1, [...skillIds].reverse());
     const list = await call(ctx.app, "GET", "/api/v1/experts?q=预览专家");
@@ -153,6 +165,51 @@ describe("专家 HTTP 契约", () => {
       { id: skillIds[0], name: "CRES 技能" },
     ]);
     expect(list.body.items[0].skillCount).toBe(2);
+
+    const beta = await createExpert("workflow-beta");
+    const unbound = await createExpert("unbound-gamma");
+    const workflowA = await ctx.workflowService.create({
+      name: "筛选流程 A",
+      type: "研发",
+      graph: graphForExpert(created.id),
+    });
+    const workflowB = await ctx.workflowService.create({
+      name: "筛选流程 B",
+      type: "研发",
+      graph: graphForExpert(beta.id),
+    });
+
+    const single = await call(
+      ctx.app,
+      "GET",
+      `/api/v1/experts?workflowId=${workflowA.id}&sort=name:asc`,
+    );
+    expect(single.status).toBe(200);
+    expect(single.body.total).toBe(1);
+    expect(single.body.items.map((item: any) => item.name)).toEqual(["预览专家"]);
+    expect(single.body.items[0].refCount).toBe(1);
+
+    const union = await call(
+      ctx.app,
+      "GET",
+      `/api/v1/experts?workflowId=${workflowA.id}&workflowId=${workflowB.id}&workflowId=${workflowA.id}`,
+    );
+    expect(union.body.total).toBe(2);
+    expect(union.body.items.map((item: any) => item.name).sort()).toEqual(
+      ["预览专家", "workflow-beta"].sort(),
+    );
+
+    const all = await call(ctx.app, "GET", "/api/v1/experts");
+    expect(all.body.total).toBe(3);
+    expect(all.body.items.map((item: any) => item.name)).toContain(unbound.name);
+
+    const missing = await call(
+      ctx.app,
+      "GET",
+      "/api/v1/experts?workflowId=0191f2f0-0000-7000-8000-000000000000",
+    );
+    expect(missing.status).toBe(200);
+    expect(missing.body).toEqual({ items: [], total: 0, limit: 50, offset: 0 });
   });
 
   test("GET 详情返回解析后的 Skill/工具摘要；不存在 404", async () => {

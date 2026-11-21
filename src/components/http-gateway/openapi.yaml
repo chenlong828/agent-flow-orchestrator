@@ -1112,9 +1112,20 @@ paths:
       operationId: listExperts
       x-api-id: API-22
       x-component-method: catalog.listExperts
-      description: 按名称、启停状态筛选；支持分页与排序。
+      description: 按名称、启停状态与工作流筛选；支持分页与排序。
       parameters:
       - "$ref": "#/components/parameters/Q"
+      - name: workflowId
+        in: query
+        required: false
+        description: 只返回这些工作流节点绑定过的专家；可重复传多个，多个工作流取并集。不传时返回全部专家。
+        style: form
+        explode: true
+        schema:
+          type: array
+          items:
+            type: string
+            format: uuid
       - name: enabled
         in: query
         required: false

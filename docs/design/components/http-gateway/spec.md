@@ -531,7 +531,7 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 **`ExpertToolSummary`**：`{id,name,kind,status}`。
 **`ExpertRef`**：`{label,refType,path?: string|null}`；`path` 可省略或为 null。
 
-**查询参数**：`q`、`enabled`、`limit`、`offset`、`sort`（`name`、`updatedAt`）。
+**查询参数**：`q`、`enabled`、`workflowId`、`limit`、`offset`、`sort`（`name`、`updatedAt`）。
 
 **创建/更新请求**：
 
@@ -554,6 +554,8 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 - `PATCH /experts/{id}` 是聚合部分更新：省略字段不变，数组字段传入即整体替换，空数组清空；一次事务、一次递增 `revision`。独立装配端点 `API-28`/`API-29` 保留。
 - `API-24` / `API-28` / `API-30` 的 Skill 装配带有入口断言：同一专家内 Skill 的系统标识（`slug`，客户端据此建技能目录）重复时返回 `400 validation_error`，`details.field` 分别为 `skillIds` / `items` / `skillIds`，整批不写、`revision` 不变。
 - `GET /experts` 的 `skills` 只返回前 3 个 `{id,name}`，避免把详情摘要塞进列表；`GET /experts/{id}` 返回完整装配摘要。
+- `GET /experts` 的 `workflowId` 可重复传，多个工作流取并集；只返回这些工作流节点绑定过的专家，同一专家只出现一次。未绑定任何流程的专家只在未传 `workflowId` 时出现；格式合法但不存在的 `workflowId` 返回空列表，不返回 404。
+- `workflowId` 必须是 UUID；非法值返回 `400 validation_error`，`details.field="workflowId"`；重复的同一 ID 去重后按一次处理。`refCount` 仍按全部工作流计数，不随筛选收窄。
 - `skillCount` / `toolCount` 由装配关系派生。
 
 **装配请求/响应**：
@@ -775,7 +777,7 @@ type PollRequest = {
 
 外部 UI 夹具与契约字段不同（如 `k`→`key`、`desc`→`description`、`harness`→`harnessId`/`harnessName`、`usedBy`→`usedByCount`、`CLI/MCP/脚本`→`cli/mcp/script`、中文状态→英文代码）；若接入，由该项目适配层映射，不把 `MOCK` 形状带进契约。
 
-B1/B3 不提供的运行时字段：Harness 当前任务数/运行中任务、工具执行历史/成功率、专家工作流节点引用明细、Skill 执行统计。外部 UI 若展示这些字段，由该项目自行标注「未接入」，本仓库不伪造；`lastHeartbeatAt` / `lastDebugAt` 只展示种子值或空值。
+B1/B3 不提供的运行时字段：Harness 当前任务数/运行中任务、工具执行历史/成功率、专家工作流节点引用明细（列表可按 `workflowId` 过滤，但不返回节点名/顺序）、Skill 执行统计。外部 UI 若展示这些字段，由该项目自行标注「未接入」，本仓库不伪造；`lastHeartbeatAt` / `lastDebugAt` 只展示种子值或空值。
 
 B1/B3 不提供的页面动作：Harness 连接测试/心跳刷新、工具调试/标记可用、Skill 版本历史/回滚、专家绑定工作流/节点引用。外部 UI 若保留这些按钮，只做展示，不接本仓库 API。
 

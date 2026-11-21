@@ -85,9 +85,11 @@ async function listRoots(
   tx: Db,
   query: ExpertQuery,
 ): Promise<{ rows: ExpertRootRow[]; total: number }> {
+  if (query.ids !== undefined && query.ids.length === 0) return { rows: [], total: 0 };
   const { where, params } = buildWhere(query, [
     { key: "q", column: "e.name", like: true },
     { key: "enabled", column: "e.enabled" },
+    { key: "ids", column: "e.id", any: true, cast: "uuid[]" },
   ]);
   const countRow = await tx.one<{ total: number }>(
     `select count(*)::int as total from expert e ${where}`,

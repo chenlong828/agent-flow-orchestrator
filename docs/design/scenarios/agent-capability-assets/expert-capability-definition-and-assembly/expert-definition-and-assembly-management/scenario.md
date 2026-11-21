@@ -1,8 +1,8 @@
 ---
 layer: design
 module: agent-capability-assets
-status: designed
-updated: 2026-11-12
+status: verified
+updated: 2026-11-21
 flow: FLOW-EXP-ASSEMBLY-001
 scenario: SCN-0001
 domain: 智能体能力资产
@@ -52,7 +52,7 @@ externalRefs:
 
 外部客户端在「智能体能力资产」中定义专家，并把 Skill、工具作为可复用能力装配到专家上。该场景支撑「专家能力定义与装配」价值流：专家能被创建、检索并一次保存装配，列表能直接支撑选择与导航。
 
-本场景只覆盖当前 B1 已实现的子流程；删除、引用保护、完整 CRUD 尚未全部纳入本场景的 3 正 1 反，因此状态为 `designed`，不是 `verified`。
+本场景覆盖创建、列表（含按工作流过滤）与聚合更新的 3 正 1 反；删除、引用保护、启停等管理操作仍按第 7 节覆盖边界不纳入本场景。`R1`～`N1` 全部通过，状态为 `verified`。
 
 ## 2 入口
 
@@ -67,13 +67,14 @@ externalRefs:
 流程定义：`FLOW-EXP-ASSEMBLY-001`。
 
 1. 客户端调用 `POST /api/v1/experts`，一次提交专家字段、`skillIds` 和 `toolIds`；服务端在同一事务创建专家与装配，返回 `201` 和初始 `revision=1`。
-2. 客户端调用 `GET /api/v1/experts?q=...`；列表项直接返回按装配顺序的前 3 个 `{id,name}` Skill 预览，不要求逐条拉详情。
+2. 客户端调用 `GET /api/v1/experts?q=...`；列表项直接返回按装配顺序的前 3 个 `{id,name}` Skill 预览，不要求逐条拉详情。带 `workflowId`（可重复）时只返回这些工作流节点绑定过的专家，多个工作流取并集；未绑定专家只在未传时出现。
 3. 客户端携带 `If-Match` 调用 `PATCH /api/v1/experts/{id}`，提交需要修改的字段和/或装配数组；服务端在同一事务更新，只递增一次 `revision`。
 4. 流程结束时调用 `DELETE /api/v1/experts/{id}` 清理测试数据；删除不属于本试点 3 正 1 反的验收断言。
 
 ## 4 失败路径
 
 - 创建时 `skillIds` 或 `toolIds` 指向不存在的目标：整批失败，专家根不留下；对应 `N1`。
+- 列表的 `workflowId` 不是 UUID：400 `validation_error`，`details.field="workflowId"`；格式合法但不存在的工作流返回空列表。
 - 创建/聚合更新/独立装配提交的多个 Skill 系统标识（`slug`）重复：400 `validation_error`，整批不写、`revision` 不变；由领域测试覆盖，不占用 3+1 映射。
 - `PATCH` 缺少 `If-Match`：返回 `428`；旧 revision 返回 `409`。
 - 列表或详情资源不存在：返回 `404`；这些错误路径不在本试点 3 正 1 反内，后续补测。
@@ -95,13 +96,14 @@ externalRefs:
 | 角色 | 测试 ID | 断言 |
 |---|---|---|
 | R1 | `TC-EXP-001` | 创建专家时带有序装配，创建与装配一次返回 |
-| R2 | `TC-EXP-002` | 列表按装配顺序返回前 3 个 Skill 预览 |
+| R2 | `TC-EXP-002` | 列表按装配顺序返回前 3 个 Skill 预览；按一个或多个 `workflowId` 过滤时只返回流程绑定的专家，多个取并集，未绑定专家只在全量出现 |
 | R3 | `TC-EXP-003` | 聚合 PATCH 只改提交字段并一次递增 `revision` |
 | N1 | `TC-EXP-004` | 装配目标不存在时返回 400，专家根回滚 |
 
 ## 7 覆盖边界
 
-- 当前场景覆盖创建、列表和聚合更新；删除、引用保护、启停等子流程尚未进入本场景的 3+1。删除保护的新规则（未终态 run 阻止、终态 run 不阻止）由 [`2026-11-18-run-asset-detach`](../../../../../works/2026-11-18-run-asset-detach/result.md) 覆盖，契约见 [`expert/spec.md`](../../../../components/expert/spec.md)。
+- 当前场景覆盖创建、列表（含按工作流过滤）、聚合更新；删除、引用保护、启停等子流程尚未进入本场景的 3+1。删除保护的新规则（未终态 run 阻止、终态 run 不阻止）由 [`2026-11-18-run-asset-detach`](../../../../../works/2026-11-18-run-asset-detach/result.md) 覆盖，契约见 [`expert/spec.md`](../../../../components/expert/spec.md)。
+- 按工作流过滤只返回专家列表，不返回节点名/节点类型/节点顺序；节点明细与流程步骤视图不在本场景范围。
 - 同一专家内 Skill `slug` 重复的入口断言由 `tests/components/expert/service.test.ts` 覆盖，未映射到 3+1 测试 ID。
 - CRUD 是运行序步骤，不拆成多个业务场景；后续只有在某个子流程形成独立流程定义和独立场景集合时，才评估升层。
 - 索引中引用的是文档章节、代码导出符号、测试 ID 和 OpenAPI operationId，不使用行号。

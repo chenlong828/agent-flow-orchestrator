@@ -124,5 +124,7 @@ export type WorkflowRead = {
   list(query: WorkflowQuery): Promise<Page<WorkflowSummary>>;
   get(id: string): Promise<WorkflowDetail>;
   listByExpert(expertId: string): Promise<WorkflowReference[]>;
+  /** 这些工作流节点绑定过的专家 ID，去重；多个工作流取并集。 */
+  listExpertIdsByWorkflows(workflowIds: string[]): Promise<string[]>;
   countByExperts(expertIds: string[]): Promise<Record<string, number>>;
 };

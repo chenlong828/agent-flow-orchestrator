@@ -67,6 +67,21 @@ describe("OpenAPI 契约结构", () => {
     }
   });
 
+  test("专家列表支持可重复 workflowId 过滤", () => {
+    const operation = spec.paths["/api/v1/experts"].get;
+    const parameter = operation.parameters.find((item: any) => item.name === "workflowId");
+    expect(parameter).toMatchObject({
+      in: "query",
+      required: false,
+      style: "form",
+      explode: true,
+      schema: {
+        type: "array",
+        items: { type: "string", format: "uuid" },
+      },
+    });
+  });
+
   test("核心 DTO 字段都带说明", () => {
     const core = [
       "HarnessListItem",

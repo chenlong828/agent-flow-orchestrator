@@ -200,6 +200,7 @@ describe("B1 公共契约", () => {
       { path: "/api/v1/skills?sort=version:up", field: "sort" },
       { path: "/api/v1/skills?offset=-1", field: "offset" },
       { path: "/api/v1/experts?enabled=falsey", field: "enabled" },
+      { path: "/api/v1/experts?workflowId=not-a-uuid", field: "workflowId" },
       { path: "/api/v1/experts?sort=createdAt:asc", field: "sort" },
     ];
 

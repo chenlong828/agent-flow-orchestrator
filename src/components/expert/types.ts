@@ -86,6 +86,8 @@ export type ExpertDetail = ExpertSummary & {
 export type ExpertQuery = {
   q?: string;
   enabled?: boolean;
+  /** 只在这些专家 ID 内查询；供 catalog 按工作流过滤时传入。空数组返回空页。 */
+  ids?: string[];
   page: PageQuery;
   sort?: "name" | "-name" | "updatedAt" | "-updatedAt";
 };

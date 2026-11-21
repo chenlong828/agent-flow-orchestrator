@@ -125,6 +125,8 @@ type ExpertDetail = ExpertSummary & {
 type ExpertQuery = {
   q?: string;
   enabled?: boolean;
+  /** 只在这些专家 ID 内查询；供 catalog 按工作流过滤时传入。空数组返回空页。 */
+  ids?: string[];
   page: PageQuery;
   sort?: "name" | "-name" | "updatedAt" | "-updatedAt";
 };
@@ -145,7 +147,7 @@ type ExpertReference = { id: string; name: string };
 | `delete` | 删除专家 | `id`、`revision` | `void` | `NotFoundError`、`RevisionConflictError`、`ReferencedError` | 删除前查工作流与未终态 run 引用；外键 `RESTRICT` 兜底 |
 | `setSkills` | 整体替换 Skill 装配 | `id`、`revision`、`skillIds[]` | `{ revision }` | `NotFoundError`、`RevisionConflictError`、`ValidationError`、`SkillNotFoundError` | 单事务；顺序即位置；重复（ID/slug）/不存在整批失败 |
 | `setTools` | 整体替换工具装配 | `id`、`revision`、`toolIds[]` | `{ revision }` | `NotFoundError`、`RevisionConflictError`、`ValidationError`、`ToolNotFoundError` | 单事务；顺序即位置；重复/不存在整批失败 |
-| `list` | 列表查询 | `ExpertQuery` | `Page<ExpertSummary>` | `ValidationError` | 读；含有序 `skillIds` |
+| `list` | 列表查询 | `ExpertQuery` | `Page<ExpertSummary>` | `ValidationError` | 读；含有序 `skillIds`；`ids` 在 SQL 层过滤 |
 | `get` | 详情查询 | `id` | `ExpertDetail` | `NotFoundError` | 读 |
 | `listExpertsUsingSkill` | 查询引用 Skill 的专家 | `skillId` | `ExpertReference[]` | 无 | 读，供 catalog/引用检查 |
 | `listExpertsUsingTool` | 查询引用工具的专家 | `toolId` | `ExpertReference[]` | 无 | 读，供 catalog/引用检查 |
@@ -169,6 +171,7 @@ type ExpertReference = { id: string; name: string };
 - 装配：整体替换 Skill/工具；重复目标（ID 或 slug）/不存在目标；`create` / `updateAggregate` 任一步失败整批回滚；`revision` 只递增一次。
 - 装配入口断言：同一专家内 Skill `slug` 重复时 `create` / `updateAggregate` / `setSkills` 均返回 `ValidationError`，装配与 `revision` 不变。
 - 读契约：列表筛选、列表含有序 `skillIds`、详情、`listExpertsUsingSkill/Tool`、`statuses`；`refCount` 与工作流引用计数一致。
+- 列表候选集：`ids` 指定时只返回这些 ID 的专家，分页与 `total` 按过滤后集合计算；`ids=[]` 返回空页。`CMP-expert` 不感知工作流，候选集由 `CMP-catalog` 传入。
 - 删除：被工作流或未终态 run 引用返回 `ReferencedError`，引用项 `type="workflow"`/`type="run"`；无引用 204。
 - 契约：对应 REST 端点 3 正 1 反在 `http-gateway` 规格中列明；`PATCH /experts/{id}` 覆盖省略不变、数组替换、空数组清空与旧版本冲突。
 

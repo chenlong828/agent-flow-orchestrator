@@ -3,6 +3,7 @@ import {
   DEFAULT_PAGE_LIMIT,
   MAX_PAGE_LIMIT,
   ValidationError,
+  buildWhere,
   normalizePageQuery,
 } from "../../src/core/kernel/index.ts";
 import {
@@ -30,6 +31,17 @@ describe("分页规范化", () => {
       expect(error).toBeInstanceOf(ValidationError);
       expect((error as ValidationError).details?.field).toBe("limit");
     }
+  });
+});
+
+describe("条件构造", () => {
+  test("any 过滤支持数组与类型转换，空数组不产生条件", () => {
+    const field = { key: "ids", column: "e.id", any: true, cast: "uuid[]" } as const;
+    expect(buildWhere({ ids: ["a", "b"] }, [field])).toEqual({
+      where: "where e.id = any($1::uuid[])",
+      params: [["a", "b"]],
+    });
+    expect(buildWhere({ ids: [] }, [field])).toEqual({ where: "", params: [] });
   });
 });
 

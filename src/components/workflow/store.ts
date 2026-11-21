@@ -209,6 +209,18 @@ async function countByExperts(tx: Db, expertIds: string[]): Promise<Record<strin
   return Object.fromEntries(rows.map((row) => [row.expert_id, row.ref_count]));
 }
 
+async function listExpertIdsByWorkflows(tx: Db, workflowIds: string[]): Promise<string[]> {
+  if (workflowIds.length === 0) return [];
+  const rows = await tx.query<{ expert_id: string }>(
+    `select distinct expert_id
+         from workflow_expert_ref
+         where workflow_id = any($1::uuid[])
+         order by expert_id asc`,
+    [workflowIds],
+  );
+  return rows.map((row) => row.expert_id);
+}
+
 export type WorkflowStore = ReturnType<typeof createWorkflowStore>;
 
 export function createWorkflowStore() {
@@ -226,5 +238,6 @@ export function createWorkflowStore() {
     nameExists,
     listByExpert,
     countByExperts,
+    listExpertIdsByWorkflows,
   };
 }

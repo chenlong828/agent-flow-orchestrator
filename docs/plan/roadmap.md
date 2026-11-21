@@ -2,7 +2,7 @@
 layer: plan
 module: global
 status: current
-updated: 2026-11-20
+updated: 2026-11-21
 ---
 
 # 路线图
@@ -33,6 +33,7 @@ updated: 2026-11-20
 - 已知欠账：无 CI 门禁；文档校验目前只有场景索引（`docs:check`），完整文档树校验待补。
 
 ## 近期完成
+- `2026-11-21-expert-workflow-filter`（P2）：`GET /experts` 增加可重复 `workflowId` 过滤，专家管理页可按流程查询；`REQ-0004` delivered，`SCN-0001` verified，455 pass / 1 skip。见 [`result.md`](../works/2026-11-21-expert-workflow-filter/result.md)。
 - `2026-11-19-run-start-images`（P1）：`REQ-0003` 启动运行图片初始资料；提交时上传 + client 拉取 + prompt 清单，`SCN-0307` verified、`REQ-0003` delivered，端到端验证通过。见 [`result.md`](../history/works/2026-11-19-run-start-images/result.md)、[`proposal.md`](../history/works/2026-11-19-run-start-images/proposal.md)、[`client 提案`](../history/works/2026-11-19-run-start-images/client-proposal.md)、[`UI 提案`](../history/works/2026-11-19-run-start-images/ui-proposal.md)。
 - `2026-11-18-run-asset-detach`（P1）：终态 run 脱钩，历史 run 不再阻止删除工作流/Harness/专家；快照列与 `RunDetail.graph` 落地，`OQ-30` 关闭；迁移 `0013` 已应用，432 个测试通过。见 [`result.md`](../works/2026-11-18-run-asset-detach/result.md)。
 - `2026-11-18-test-data-cleanup`（P1）：已清理 E2E + SP-TEST-01；workflow 12→4、expert 20→12、harness 9→1、run 38→27、artifact 200→182；单智能体任务保留；已备份并 quarantine。见 [`result.md`](../works/2026-11-18-test-data-cleanup/result.md)。

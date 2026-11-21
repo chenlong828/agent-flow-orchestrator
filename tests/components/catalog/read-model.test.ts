@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { NotFoundError, normalizePageQuery } from "../../../src/core/kernel/index.ts";
+import type { WorkflowGraph } from "../../../src/components/workflow/index.ts";
 import { closeTestDb, resetBusinessData } from "../../helpers/test-db.ts";
 import { createTestContext, type TestContext } from "../../helpers/app.ts";
 
@@ -57,6 +58,17 @@ async function createExpert(name = "catalog-expert") {
     role: "目录专家",
     persona: ["全局观"],
   });
+}
+
+function graphForExpert(expertId: string): WorkflowGraph {
+  return {
+    stages: [{ id: "s1", name: "阶段" }],
+    nodes: [
+      { id: "n1", type: "start", name: "开始", stageId: "s1", expertId },
+      { id: "n2", type: "end", name: "结束", stageId: "s1", expertId },
+    ],
+    edges: [{ id: "e1", from: "n1", to: "n2", kind: "seq" }],
+  };
 }
 
 beforeAll(async () => {
@@ -179,6 +191,53 @@ describe("catalog 只读组合", () => {
     ]);
     expect(detail.refs).toEqual([]);
     expect(detail.refCount).toBe(0);
+  });
+
+  test("专家列表按工作流过滤：单个、并集、未绑定专家与空集", async () => {
+    const alpha = await createExpert("expert-a");
+    const beta = await createExpert("expert-b");
+    await createExpert("expert-c");
+    const workflowA = await ctx.workflowService.create({
+      name: "流程 A",
+      type: "研发",
+      graph: graphForExpert(alpha.id),
+    });
+    const workflowB = await ctx.workflowService.create({
+      name: "流程 B",
+      type: "研发",
+      graph: graphForExpert(beta.id),
+    });
+
+    const single = await ctx.catalog.listExperts({
+      page: normalizePageQuery(),
+      workflowIds: [workflowA.id],
+    });
+    expect(single.items.map((expert) => expert.name)).toEqual(["expert-a"]);
+    expect(single.total).toBe(1);
+
+    const union = await ctx.catalog.listExperts({
+      page: normalizePageQuery(),
+      workflowIds: [workflowA.id, workflowB.id, workflowA.id],
+      sort: "name",
+    });
+    expect(union.items.map((expert) => expert.name)).toEqual(["expert-a", "expert-b"]);
+    expect(union.total).toBe(2);
+
+    const all = await ctx.catalog.listExperts({ page: normalizePageQuery() });
+    expect(all.total).toBe(3);
+
+    const empty = await ctx.catalog.listExperts({
+      page: normalizePageQuery(),
+      workflowIds: [MISSING_ID],
+    });
+    expect(empty).toEqual({ items: [], total: 0, limit: 50, offset: 0 });
+
+    const narrowed = await ctx.catalog.listExperts({
+      page: normalizePageQuery(),
+      workflowIds: [workflowA.id],
+      q: "expert-b",
+    });
+    expect(narrowed).toEqual({ items: [], total: 0, limit: 50, offset: 0 });
   });
 
   test("引用投影对三类资产返回同源摘要，无引用返回空数组", async () => {

@@ -1,10 +1,11 @@
 import type { Page, Reference } from "../../core/kernel/index.ts";
-import type { ExpertQuery, ExpertSummary } from "../expert/index.ts";
+import type { ExpertSummary } from "../expert/index.ts";
 import { toReferences } from "./context.ts";
 import type {
   CatalogDeps,
   ExpertDetailView,
   ExpertListItem,
+  ExpertListQuery,
   ExpertSkillPreviewView,
   ExpertSkillSummaryView,
   ExpertToolSummaryView,
@@ -86,9 +87,24 @@ async function toolSummaries(
 
 export async function listExperts(
   ctx: CatalogDeps,
-  query: ExpertQuery,
+  query: ExpertListQuery,
 ): Promise<Page<ExpertListItem>> {
-  const page = await ctx.expertRead.list(query);
+  const { workflowIds, ...filters } = query;
+  const expertIds =
+    workflowIds === undefined || workflowIds.length === 0
+      ? undefined
+      : await ctx.workflowRead.listExpertIdsByWorkflows(workflowIds);
+  if (expertIds !== undefined && expertIds.length === 0) {
+    return {
+      items: [],
+      total: 0,
+      limit: query.page.limit,
+      offset: query.page.offset,
+    };
+  }
+  const page = await ctx.expertRead.list(
+    expertIds === undefined ? filters : { ...filters, ids: expertIds },
+  );
   const counts = await ctx.workflowRead.countByExperts(page.items.map((expert) => expert.id));
   const items: ExpertListItem[] = [];
   for (const expert of page.items) {

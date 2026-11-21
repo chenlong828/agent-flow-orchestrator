@@ -71,6 +71,10 @@ export function createWorkflowRead(deps: { db: Db }): WorkflowRead {
       return store.listByExpert(db, expertId);
     },
 
+    async listExpertIdsByWorkflows(workflowIds: string[]): Promise<string[]> {
+      return store.listExpertIdsByWorkflows(db, workflowIds);
+    },
+
     async countByExperts(expertIds: string[]): Promise<Record<string, number>> {
       return store.countByExperts(db, expertIds);
     },

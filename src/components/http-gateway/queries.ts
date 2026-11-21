@@ -55,10 +55,19 @@ export function parseSkillListQuery(url: URL) {
   };
 }
 
+function parseWorkflowIds(url: URL): string[] | undefined {
+  const values = url.searchParams.getAll("workflowId");
+  if (values.length === 0) return undefined;
+  const unique = new Set<string>();
+  for (const value of values) unique.add(assertUuid(value, "workflowId"));
+  return [...unique];
+}
+
 export function parseExpertListQuery(url: URL) {
   return {
     q: queryValue(url, "q"),
     enabled: parseBooleanQuery(url, "enabled"),
+    workflowIds: parseWorkflowIds(url),
     page: parsePageQuery(url),
     sort: parseSortQuery(url, EXPERT_SORT),
   };

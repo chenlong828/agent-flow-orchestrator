@@ -108,6 +108,13 @@ describe("工作流定义写入", () => {
     expect(detail.stageCount).toBe(1);
     expect(detail.graph.nodes.find((node) => node.id === "n4")?.expertId).toBe(expertId);
     expect(await ctx.workflowRead.countByExperts([expertId])).toEqual({ [expertId]: 1 });
+    expect(await ctx.workflowRead.listExpertIdsByWorkflows([id])).toEqual([expertId]);
+    expect(await ctx.workflowRead.listExpertIdsByWorkflows([])).toEqual([]);
+    expect(
+      await ctx.workflowRead.listExpertIdsByWorkflows([
+        "0191f2f0-0000-7000-8000-000000000000",
+      ]),
+    ).toEqual([]);
   });
 
   test("layout/viewport 透明：zoom=0 与任意字段保存/回读/DSL 往返/复制都保留", async () => {

@@ -152,6 +152,11 @@ export type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
   createdAt: string;
 };
 
+/** 专家列表查询：在专家领域筛选之上增加按工作流过滤（多个取并集）。 */
+export type ExpertListQuery = Omit<ExpertQuery, "ids"> & {
+  workflowIds?: string[];
+};
+
 export type CatalogRead = {
   listHarnesses(query: HarnessQuery): Promise<Page<HarnessListItem>>;
   getHarness(id: string): Promise<HarnessDetailView>;
@@ -167,7 +172,7 @@ export type CatalogRead = {
   listSkillCategories(): Promise<SkillCategoryView[]>;
   listExpertsUsingSkill(skillId: string): Promise<Reference[]>;
 
-  listExperts(query: ExpertQuery): Promise<Page<ExpertListItem>>;
+  listExperts(query: ExpertListQuery): Promise<Page<ExpertListItem>>;
   getExpert(id: string): Promise<ExpertDetailView>;
   listExpertsUsingTool(toolId: string): Promise<Reference[]>;
 

@@ -66,11 +66,14 @@ type WorkflowRead = {
   list(query: WorkflowQuery): Promise<Page<WorkflowSummary>>;
   get(id: string): Promise<WorkflowDetail>;
   listByExpert(expertId: string): Promise<WorkflowReference[]>;
+  /** 这些工作流节点绑定过的专家 ID，去重；多个工作流取并集。 */
+  listExpertIdsByWorkflows(workflowIds: string[]): Promise<string[]>;
   countByExperts(expertIds: string[]): Promise<Record<string, number>>;
 };
 ```
 
-- `WorkflowRead` 供 `catalog` 组合列表/详情、专家删除引用检查与 `refCount`。
+- `WorkflowRead` 供 `catalog` 组合列表/详情、专家删除引用检查、`refCount` 与专家列表按工作流过滤。
+- `listExpertIdsByWorkflows` 只读 `workflow_expert_ref`，不解析 `graph`；`workflow_expert_ref` 是可重建投影，避免与图 JSON 的口径分叉。
 - `WorkflowRead` 不暴露 store、SQL 行或 HTTP DTO。
 - REST 端点与 DTO 见 [`CMP-http-gateway` 规格](../http-gateway/spec.md)。
 - DSL v1 的机器可读结构资产：[`dsl.schema.json`](../../../../src/components/workflow/dsl.schema.json)；服务端运行时以 `graph.ts` 为校验源，schema 供外部编辑器/导入工具消费。
@@ -136,6 +139,7 @@ bunx tsc --noEmit
 - 图形状/拓扑/绑定用例，`layout`/`viewport` 透明透传；
 - 创建必须带图、空图拒绝、保存事务与 revision 冲突；
 - 专家引用重建、复制、导入/导出；
+- 专家引用投影：`listByExpert` 与 `listExpertIdsByWorkflows` 返回去重集合；空入参与未知工作流返回空数组；
 - DSL 导出/导入与 schema 一致，缺失专家清空后保存 400。
 
 ## 7 预算

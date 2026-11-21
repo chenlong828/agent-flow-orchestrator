@@ -37,6 +37,11 @@ type ReferencePage = {
   items: Reference[];
 };
 
+/** 专家列表查询：在专家领域查询上增加按工作流过滤；多个工作流取并集。 */
+type ExpertListQuery = Omit<ExpertQuery, "ids"> & {
+  workflowIds?: string[];
+};
+
 type CatalogRead = {
   listHarnesses(query: HarnessQuery): Promise<Page<HarnessListItem>>;
   getHarness(id: string): Promise<HarnessDetailView>;
@@ -52,7 +57,7 @@ type CatalogRead = {
   listSkillCategories(): Promise<SkillCategoryView[]>;
   listExpertsUsingSkill(skillId: string): Promise<Reference[]>;
 
-  listExperts(query: ExpertQuery): Promise<Page<ExpertListItem>>;
+  listExperts(query: ExpertListQuery): Promise<Page<ExpertListItem>>;
   getExpert(id: string): Promise<ExpertDetailView>;
   listExpertsUsingTool(toolId: string): Promise<Reference[]>;
 
@@ -219,7 +224,7 @@ type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
 | `getSkillPackage` | Skill 整包下载 | `id` | `SkillPackage` | `NotFoundError`、`PackageUnavailableError` | `SkillRead.getPackage`（原样透传，不读入内存） |
 | `listSkillCategories` | 分类参考数据 | 无 | `SkillCategoryView[]` | 无 | `SkillRead.listCategories` |
 | `listExpertsUsingSkill` | Skill 的引用专家 | `skillId` | `Reference[]` | 无 | `ExpertRead.listExpertsUsingSkill` |
-| `listExperts` | 专家列表 | `ExpertQuery` | `Page<ExpertListItem>` | `ValidationError` | `ExpertRead.list` + `SkillRead.getSummary`（前 3 个预览） |
+| `listExperts` | 专家列表 | `ExpertListQuery` | `Page<ExpertListItem>` | `ValidationError` | `ExpertRead.list` + `SkillRead.getSummary`（前 3 个预览）+ `WorkflowRead.listExpertIdsByWorkflows`（有 `workflowIds` 时） |
 | `getExpert` | 专家详情 | `id` | `ExpertDetailView` | `NotFoundError` | `ExpertRead.get` + `SkillRead.getSummary` + `ToolRead.getSummary` |
 | `listExpertsUsingTool` | 工具的引用专家 | `toolId` | `Reference[]` | 无 | `ExpertRead.listExpertsUsingTool` |
 | `listWorkflows` | 工作流列表 | `WorkflowQuery` | `Page<WorkflowSummary>` | `ValidationError` | `WorkflowRead.list` |
@@ -239,7 +244,7 @@ type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
 | Skill 列表/详情 | `SkillRead`（列表摘要含 `description`；详情含 `body`/`files`）+ `ExpertRead.listExpertsUsingSkill` |
 | Skill 编排文档 | `SkillRead.getDocument`（原样透传；不做跨资产组合） |
 | Skill 整包下载 | `SkillRead.getPackage`（原样透传；不解析 zip） |
-| 专家列表/详情 | `ExpertRead`（列表含 `skillIds`）+ `SkillRead.getSummary` + `ToolRead.getSummary` |
+| 专家列表/详情 | `ExpertRead`（列表含 `skillIds`）+ `SkillRead.getSummary` + `ToolRead.getSummary` + `WorkflowRead.listExpertIdsByWorkflows`（按流程过滤时） |
 | 分类列表 | `SkillRead.listCategories` |
 | 工作流列表/详情 | `WorkflowRead.list` / `WorkflowRead.get` |
 | 引用查询 | `ToolRead.listByHarness` / `ExpertRead.listExpertsUsing*` / `WorkflowRead.listByExpert` |
@@ -262,6 +267,7 @@ type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
 - 引用：Harness 被工具引用、工具/Skill 被专家引用；删除前引用列表与详情一致。
 - 端口：`ReferenceGuard` 对 Harness/工具/Skill/专家/工作流分别返回定义侧引用；专家引用项 `type="workflow"`，工作流返回 `[]`；未终态 run 由组合根叠加，不在本组件读 run 表。
 - 工作流：列表/详情透传；专家 `refCount` 与 `WorkflowRead.countByExperts` 一致。
+- 专家按流程过滤：`workflowIds` 非空时先取去重专家 ID 集再查专家列表；多个流程取并集；ID 集为空直接返回空分页信封，保留请求的 `limit`/`offset`；未传时行为与全量列表一致。
 - 架构：无写操作、无 SQL、无 store 导入。
 - 契约：对应 REST 读端点的 3 正 1 反在 `http-gateway` 规格中列明。
 
@@ -275,4 +281,5 @@ type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
 
 - 列表/详情按多次只读查询组合，未引入统一只读事务；单次请求内各查询之间不保证同一快照。
 - 专家详情与列表的 Skill 摘要在 catalog 内逐项解析；列表最多 3 个预览，详情为完整装配；B1/B3 接受当前读放大，不提前加缓存。若后续列表规模明显增长，再评估领域读契约合并或批量摘要读。
+- 专家列表按流程过滤会多一次 `workflow_expert_ref` 读；当前数据规模接受，批量/join 优化按 `OQ-7` 待定。
 - 剩余风险：跨表读一致性由调用方按业务容忍度处理；当前未出现需要强一致的读路径。
