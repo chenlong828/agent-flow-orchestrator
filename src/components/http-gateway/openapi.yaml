@@ -3570,16 +3570,19 @@ components:
         properties:
           duty:
             type: string
-            description: 主要职责/工作内容
+            description: 职责范围，Markdown；原职责、技能配合顺序、重点验证顺序与任务解读已合并至此
           skillOrder:
             type: string
-            description: Skill 配合顺序说明
+            deprecated: true
+            description: 过渡期保留字段：已并入 duty，恒为空且忽略写入；UI 改造后移除
           verifyOrder:
             type: string
-            description: 验证顺序说明
+            deprecated: true
+            description: 过渡期保留字段：已并入 duty，恒为空且忽略写入；UI 改造后移除
           notes:
             type: string
-            description: 任务解读/备注
+            deprecated: true
+            description: 过渡期保留字段：已并入 duty，恒为空且忽略写入；UI 改造后移除
           skills:
             type: array
             items:
@@ -3589,17 +3592,17 @@ components:
             type: array
             items:
               "$ref": "#/components/schemas/ExpertToolSummary"
-            description: 装配工具摘要
+            description: 过渡期恒为空数组；工具装配已停用，UI 改造后移除
           refs:
             type: array
             items:
               "$ref": "#/components/schemas/ExpertRef"
-            description: 引用，B1 无引用方
+            description: 过渡期恒为空数组；参考知识已停用，UI 改造后移除
           createdAt:
             type: string
             format: date-time
             description: 创建时间，ISO-8601 UTC
-      description: 专家详情；共享字段加五区、完整装配摘要与引用。
+      description: 专家详情；共享字段、完整 Skill 摘要与创建时间；工具与参考知识的过渡字段恒为空。
     ExpertCreate:
       type: object
       required:
@@ -3632,16 +3635,19 @@ components:
           description: 性格/视角标签，有序
         duty:
           type: string
-          description: 主要职责/工作内容
+          description: 职责范围，Markdown；原职责、技能配合顺序、重点验证顺序与任务解读已合并至此
         skillOrder:
           type: string
-          description: Skill 配合顺序说明
+          deprecated: true
+          description: 过渡期保留字段：已并入 duty，恒为空且忽略写入；UI 改造后移除
         verifyOrder:
           type: string
-          description: 验证顺序说明
+          deprecated: true
+          description: 过渡期保留字段：已并入 duty，恒为空且忽略写入；UI 改造后移除
         notes:
           type: string
-          description: 任务解读/备注
+          deprecated: true
+          description: 过渡期保留字段：已并入 duty，恒为空且忽略写入；UI 改造后移除
         refs:
           type: array
           items:
@@ -3661,7 +3667,7 @@ components:
             type: string
             format: uuid
           description: 创建时可选的有序工具 ID；与专家根同事务写入
-      description: 创建专家请求；可带初始有序装配，也可省略后走独立装配端点。
+      description: 创建专家请求；可带初始有序 Skill 装配。工具装配与参考知识为过渡字段，接受但忽略。
     ExpertUpdate:
       type: object
       required:
@@ -3690,22 +3696,25 @@ components:
           description: 性格/视角标签，有序
         duty:
           type: string
-          description: 主要职责/工作内容
+          description: 职责范围，Markdown；原职责、技能配合顺序、重点验证顺序与任务解读已合并至此
         skillOrder:
           type: string
-          description: Skill 配合顺序说明
+          deprecated: true
+          description: 过渡期保留字段：已并入 duty，恒为空且忽略写入；UI 改造后移除
         verifyOrder:
           type: string
-          description: 验证顺序说明
+          deprecated: true
+          description: 过渡期保留字段：已并入 duty，恒为空且忽略写入；UI 改造后移除
         notes:
           type: string
-          description: 任务解读/备注
+          deprecated: true
+          description: 过渡期保留字段：已并入 duty，恒为空且忽略写入；UI 改造后移除
         refs:
           type: array
           items:
             "$ref": "#/components/schemas/ExpertRef"
           description: 引用，有序
-      description: 全量更新专家请求；不接收 skills/tools/enabled。
+      description: 全量更新专家请求；不接收 skills/tools/enabled；过渡字段接受但忽略。
     ExpertAggregatePatch:
       type: object
       minProperties: 1
@@ -3731,16 +3740,19 @@ components:
           description: 性格/视角标签，有序；传入即整体替换
         duty:
           type: string
-          description: 主要职责/工作内容
+          description: 职责范围，Markdown；原职责、技能配合顺序、重点验证顺序与任务解读已合并至此
         skillOrder:
           type: string
-          description: Skill 配合顺序说明
+          deprecated: true
+          description: 过渡期保留字段：已并入 duty，恒为空且忽略写入；UI 改造后移除
         verifyOrder:
           type: string
-          description: 验证顺序说明
+          deprecated: true
+          description: 过渡期保留字段：已并入 duty，恒为空且忽略写入；UI 改造后移除
         notes:
           type: string
-          description: 任务解读/备注
+          deprecated: true
+          description: 过渡期保留字段：已并入 duty，恒为空且忽略写入；UI 改造后移除
         refs:
           type: array
           items:

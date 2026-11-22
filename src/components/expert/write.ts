@@ -12,7 +12,7 @@ import {
   isUniqueViolation,
   type Db,
 } from "../../core/platform/index.ts";
-import { SkillNotFoundError, ToolNotFoundError } from "./errors.ts";
+import { SkillNotFoundError } from "./errors.ts";
 import {
   enabledFrom,
   normalizeIds,
@@ -40,9 +40,6 @@ type RootValues = {
   color: string;
   role: string;
   duty: string;
-  skillOrder: string;
-  verifyOrder: string;
-  notes: string;
 };
 
 type RootUpdate = {
@@ -59,9 +56,6 @@ function valuesFromWrite(write: NormalizedWrite): RootValues {
     color: write.color,
     role: write.role,
     duty: write.duty,
-    skillOrder: write.skillOrder,
-    verifyOrder: write.verifyOrder,
-    notes: write.notes,
   };
 }
 
@@ -71,9 +65,6 @@ function valuesFromPatch(current: ExpertRootRow, patch: NormalizedPatch): RootVa
     color: patch.color ?? current.color,
     role: patch.role ?? current.role,
     duty: patch.duty ?? current.duty,
-    skillOrder: patch.skillOrder ?? current.skill_order,
-    verifyOrder: patch.verifyOrder ?? current.verify_order,
-    notes: patch.notes ?? current.notes,
   };
 }
 
@@ -143,23 +134,6 @@ async function assertSkillSlugsUnique(
   }
 }
 
-async function replaceTools(
-  store: ExpertStore,
-  tx: Db,
-  expertId: string,
-  toolIds: string[],
-  field = "items",
-): Promise<void> {
-  await store.clearToolLinks(tx, expertId);
-  for (const [position, toolId] of toolIds.entries()) {
-    try {
-      await store.insertToolLink(tx, expertId, toolId, position);
-    } catch (error) {
-      if (isForeignKeyViolation(error)) throw new ToolNotFoundError(toolId, field);
-      throw error;
-    }
-  }
-}
 
 async function applyPatchLinks(
   store: ExpertStore,
@@ -170,14 +144,8 @@ async function applyPatchLinks(
   if (patch.persona !== undefined) {
     await store.replacePersona(tx, id, patch.persona);
   }
-  if (patch.refs !== undefined) {
-    await store.replaceRefs(tx, id, patch.refs);
-  }
   if (patch.skillIds !== undefined) {
     await replaceSkills(store, tx, id, patch.skillIds, "skillIds");
-  }
-  if (patch.toolIds !== undefined) {
-    await replaceTools(store, tx, id, patch.toolIds, "toolIds");
   }
 }
 
@@ -189,7 +157,7 @@ export async function createExpert(
   const normalized = normalizeWrite(input);
   const enabled = enabledFrom(input);
   const skillIds = input.skillIds === undefined ? [] : normalizeIds(input.skillIds, "skillIds");
-  const toolIds = input.toolIds === undefined ? [] : normalizeIds(input.toolIds, "toolIds");
+  if (input.toolIds !== undefined) normalizeIds(input.toolIds, "toolIds");
   await assertSkillSlugsUnique(ctx, skillIds, "skillIds");
   const id = ctx.ids.next();
   const now = ctx.clock.now();
@@ -203,17 +171,12 @@ export async function createExpert(
         role: normalized.role,
         enabled,
         duty: normalized.duty,
-        skillOrder: normalized.skillOrder,
-        verifyOrder: normalized.verifyOrder,
-        notes: normalized.notes,
         now,
         actor: actorValue,
       };
       await ctx.store.insertRoot(tx, write);
       await ctx.store.replacePersona(tx, id, normalized.persona);
-      await ctx.store.replaceRefs(tx, id, normalized.refs);
       await replaceSkills(ctx.store, tx, id, skillIds, "skillIds");
-      await replaceTools(ctx.store, tx, id, toolIds, "toolIds");
     });
   } catch (error) {
     if (isUniqueViolation(error)) throw new NameConflictError(normalized.name);
@@ -242,7 +205,6 @@ export async function updateExpert(
         values: () => valuesFromWrite(normalized),
       });
       await ctx.store.replacePersona(tx, id, normalized.persona);
-      await ctx.store.replaceRefs(tx, id, normalized.refs);
       return { id, revision: revision + 1 };
     });
   } catch (error) {
@@ -386,8 +348,9 @@ export async function setExpertTools(
   toolIds: string[],
   requestActor?: string,
 ): Promise<{ revision: number }> {
+  // 过渡期：工具装配已停用，只接受请求并推进 revision，不落库；UI 改造后删端点。
   return setExpertLinks(ctx, id, revision, toolIds, {
     requestActor,
-    replace: (tx, targetId, ids) => replaceTools(ctx.store, tx, targetId, ids),
+    replace: async () => {},
   });
 }

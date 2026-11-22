@@ -28,11 +28,16 @@ type ExpertCreatePatch = {
   enabled?: boolean;
   persona?: string[];
   duty?: string;
+  /** @deprecated 已并入 duty；过渡期只校验类型、不落库。 */
   skillOrder?: string;
+  /** @deprecated 已并入 duty；过渡期只校验类型、不落库。 */
   verifyOrder?: string;
+  /** @deprecated 已并入 duty；过渡期只校验类型、不落库。 */
   notes?: string;
+  /** @deprecated 参考知识已停用；过渡期只校验类型、不落库。 */
   refs?: ExpertRefInput[];
   skillIds?: string[];
+  /** @deprecated 工具装配已停用；过渡期只校验类型、不落库。 */
   toolIds?: string[];
 };
 
@@ -65,11 +70,16 @@ export type ExpertSummary = {
   role: string;
   enabled: boolean;
   persona: string[];
+  /** 职责范围，Markdown；集成原职责、技能配合顺序、重点验证顺序与任务解读。 */
   duty: string;
+  /** @deprecated 已并入 duty；过渡期恒为空，UI 改造后移除。 */
   skillOrder: string;
+  /** @deprecated 已并入 duty；过渡期恒为空，UI 改造后移除。 */
   verifyOrder: string;
+  /** @deprecated 已并入 duty；过渡期恒为空，UI 改造后移除。 */
   notes: string;
   skillCount: number;
+  /** @deprecated 工具装配已停用；过渡期恒为 0，UI 改造后移除。 */
   toolCount: number;
   refCount: number;
   skillIds: string[];
@@ -78,7 +88,9 @@ export type ExpertSummary = {
 };
 
 export type ExpertDetail = ExpertSummary & {
+  /** @deprecated 工具装配已停用；过渡期恒为空数组，UI 改造后移除。 */
   toolIds: string[];
+  /** @deprecated 参考知识已停用；过渡期恒为空数组，UI 改造后移除。 */
   refs: ExpertRefInput[];
   createdAt: string;
 };

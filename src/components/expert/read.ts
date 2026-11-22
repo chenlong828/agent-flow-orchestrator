@@ -5,7 +5,6 @@ import type {
   ExpertDetail,
   ExpertQuery,
   ExpertRead,
-  ExpertRefInput,
   ExpertReference,
   ExpertSummary,
 } from "./types.ts";
@@ -19,11 +18,12 @@ function toSummary(row: ExpertRootRow, persona: string[], skillIds: string[]): E
     enabled: row.enabled,
     persona,
     duty: row.duty,
-    skillOrder: row.skill_order,
-    verifyOrder: row.verify_order,
-    notes: row.notes,
+    // 过渡期：已并入 duty / 已停用的字段恒为空，UI 改造后移除。
+    skillOrder: "",
+    verifyOrder: "",
+    notes: "",
     skillCount: row.skill_count,
-    toolCount: row.tool_count,
+    toolCount: 0,
     refCount: 0,
     skillIds,
     revision: row.revision,
@@ -49,23 +49,16 @@ export function createExpertRead(deps: { db: Db }): ExpertRead {
     },
 
     async get(id): Promise<ExpertDetail> {
-      const [row, persona, refs, skillIds, toolIds] = await Promise.all([
+      const [row, persona, skillIds] = await Promise.all([
         expertStore.findRoot(db, id),
         expertStore.personaFor(db, id),
-        expertStore.refsFor(db, id),
         expertStore.skillIdsFor(db, id),
-        expertStore.toolIdsFor(db, id),
       ]);
       if (row === null) throw new NotFoundError("专家", id);
-      const refsInput: ExpertRefInput[] = refs.map((ref) => ({
-        label: ref.label,
-        refType: ref.ref_type,
-        path: ref.path ?? undefined,
-      }));
       return {
         ...toSummary(row, persona, skillIds),
-        toolIds,
-        refs: refsInput,
+        toolIds: [],
+        refs: [],
         createdAt: toIso(row.created_at),
       };
     },

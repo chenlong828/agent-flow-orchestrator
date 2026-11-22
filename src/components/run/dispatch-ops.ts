@@ -43,8 +43,6 @@ async function dispatchNode(
       role: expert.role,
       persona: expert.persona,
       duty: expert.duty,
-      verifyOrder: expert.verifyOrder,
-      notes: expert.notes,
     },
     taskSpacePath: run.task_space_path,
     ...(initialInputs.length === 0

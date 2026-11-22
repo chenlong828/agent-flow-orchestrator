@@ -164,38 +164,16 @@ describe("工具 HTTP 契约", () => {
     expect(missingHarness.body.error.details.field).toBe("harnessId");
   });
 
-  test("DELETE 204；重复 404；被专家引用 409 带列表", async () => {
+  test("DELETE 204；重复 404；工具装配停用后专家不再阻塞删除", async () => {
     const created = await createTool();
-    const skill = await ctx.skillService.create({
-      name: "CRES 技能",
-      categoryCode: "coding",
-      description: "s",
-      sections: {
-        overview: "o",
-        steps: "s",
-        examples: "e",
-        scripts: "sc",
-        verification: "v",
-      },
-    });
     const expert = await ctx.expertService.create({
       name: "方案设计专家",
       color: "#7c3aed",
       role: "设计",
     });
+    // 过渡期工具装配接受但忽略，不再建立引用，因此不阻塞删除。
     await ctx.expertService.setTools(expert.id, 1, [created.id]);
-    await ctx.expertService.setSkills(expert.id, 2, [skill.id]);
 
-    const blocked = await call(ctx.app, "DELETE", `/api/v1/tools/${created.id}`, {
-      headers: withRevision(1),
-    });
-    expect(blocked.status).toBe(409);
-    expect(blocked.body.error.code).toBe("referenced");
-    expect(blocked.body.error.details.references).toEqual([
-      { type: "expert", id: expert.id, name: "方案设计专家" },
-    ]);
-
-    await ctx.expertService.setTools(expert.id, 3, []);
     const deleted = await call(ctx.app, "DELETE", `/api/v1/tools/${created.id}`, {
       headers: withRevision(1),
     });
@@ -262,13 +240,13 @@ describe("工具 HTTP 契约", () => {
     expect(byHarness.body.total).toBe(1);
     expect(byHarness.body.items[0]).toMatchObject({
       name: "counted",
-      usedByCount: 1,
+      usedByCount: 0,
       paramCount: 2,
       harnessName: "build-01",
     });
   });
 
-  test("API-09 详情 usedByCount 随专家装配变化", async () => {
+  test("API-09 详情 usedByCount 在工具装配停用后恒为 0", async () => {
     const created = await createTool("detail-tool");
     const expert = await ctx.expertService.create({
       name: "详情专家",
@@ -278,7 +256,7 @@ describe("工具 HTTP 契约", () => {
     await ctx.expertService.setTools(expert.id, 1, [created.id]);
 
     const bound = await call(ctx.app, "GET", `/api/v1/tools/${created.id}`);
-    expect(bound.body.usedByCount).toBe(1);
+    expect(bound.body.usedByCount).toBe(0);
     expect(bound.body.params).toEqual([
       { key: "path", type: "string", description: "目标路径" },
       { key: "depth", type: "int", description: "" },
@@ -411,7 +389,7 @@ describe("工具 HTTP 契约", () => {
     expect(rows.length).toBe(0);
   });
 
-  test("API-13 引用页返回多个专家；资产不存在 404", async () => {
+  test("API-13 工具引用页在装配停用后恒为空；资产不存在 404", async () => {
     const created = await createTool("multi-ref");
     for (const name of ["专家乙", "专家甲"]) {
       const expert = await ctx.expertService.create({
@@ -424,12 +402,8 @@ describe("工具 HTTP 契约", () => {
 
     const references = await call(ctx.app, "GET", `/api/v1/tools/${created.id}/references`);
     expect(references.status).toBe(200);
-    expect(references.body.total).toBe(2);
-    expect(references.body.items.every((item: any) => item.type === "expert")).toBe(true);
-    expect(references.body.items.map((item: any) => item.name).sort()).toEqual([
-      "专家乙",
-      "专家甲",
-    ]);
+    expect(references.body.total).toBe(0);
+    expect(references.body.items).toEqual([]);
 
     const missing = await call(
       ctx.app,

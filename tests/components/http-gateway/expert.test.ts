@@ -89,7 +89,7 @@ afterAll(async () => {
 });
 
 describe("专家 HTTP 契约", () => {
-  test("POST 201、Location、五区与人设/引用完整返回", async () => {
+  test("POST 201、Location、职责范围与人设完整返回，弃用字段为空", async () => {
     const response = await call(ctx.app, "POST", "/api/v1/experts", {
       body: expertBody(),
       headers: { "x-actor": "bob" },
@@ -104,11 +104,12 @@ describe("专家 HTTP 契约", () => {
       skillCount: 0,
       toolCount: 0,
       refCount: 0,
+      skillOrder: "",
+      verifyOrder: "",
+      notes: "",
+      refs: [],
       revision: 1,
     });
-    expect(response.body.refs).toEqual([
-      { label: "架构设计红线的 Brief", refType: "经验", path: null },
-    ]);
   });
 
   test("TC-EXP-001 POST 可带有序装配，创建与装配一次返回", async () => {
@@ -122,9 +123,9 @@ describe("专家 HTTP 契约", () => {
     expect(response.status).toBe(201);
     expect(response.body.revision).toBe(1);
     expect(response.body.skills.map((skill: any) => skill.id)).toEqual([...skillIds].reverse());
-    expect(response.body.tools.map((tool: any) => tool.id)).toEqual(toolIds);
+    expect(response.body.tools).toEqual([]);
     expect(response.body.skillCount).toBe(2);
-    expect(response.body.toolCount).toBe(2);
+    expect(response.body.toolCount).toBe(0);
   });
 
   test("TC-EXP-004 POST 装配目标不存在返回 400，专家根回滚", async () => {
@@ -223,9 +224,8 @@ describe("专家 HTTP 契约", () => {
       "调用链分析",
     ]);
     expect(detail.body.skills[0].categoryLabel).toBe("编码");
-    expect(detail.body.tools).toEqual([
-      { id: toolIds[1], name: "dsl-search", kind: "mcp", status: "unverified" },
-    ]);
+    expect(detail.body.tools).toEqual([]);
+    expect(detail.body.toolCount).toBe(0);
 
     const missing = await call(
       ctx.app,
@@ -277,7 +277,8 @@ describe("专家 HTTP 契约", () => {
     expect(updated.body.duty).toBe("只改职责");
     expect(updated.body.revision).toBe(3);
     expect(updated.body.skills.map((skill: any) => skill.id)).toEqual([...skillIds].reverse());
-    expect(updated.body.tools.map((tool: any) => tool.id)).toEqual(toolIds);
+    expect(updated.body.tools).toEqual([]);
+    expect(updated.body.toolCount).toBe(0);
 
     const missing = await call(ctx.app, "PATCH", `/api/v1/experts/${created.id}`, {
       body: { duty: "没有版本" },
@@ -384,21 +385,22 @@ describe("专家 HTTP 契约", () => {
     expect(unchanged.body.skills.map((skill: any) => skill.id)).toEqual(skillIds);
   });
 
-  test("PUT /experts/{id}/tools 200 整体替换；缺 If-Match 428", async () => {
+  test("PUT /experts/{id}/tools 过渡期接受但恒为空；缺 If-Match 428", async () => {
     const created = await createExpert();
     const first = await call(ctx.app, "PUT", `/api/v1/experts/${created.id}/tools`, {
       body: { items: toolIds.map((toolId) => ({ toolId })) },
       headers: withRevision(1),
     });
     expect(first.status).toBe(200);
-    expect(first.body.tools.map((tool: any) => tool.id)).toEqual(toolIds);
+    expect(first.body.tools).toEqual([]);
+    expect(first.body.toolCount).toBe(0);
 
     const replace = await call(ctx.app, "PUT", `/api/v1/experts/${created.id}/tools`, {
       body: { items: [{ toolId: toolIds[1] }] },
       headers: withRevision(2),
     });
     expect(replace.status).toBe(200);
-    expect(replace.body.tools.map((tool: any) => tool.id)).toEqual([toolIds[1]]);
+    expect(replace.body.tools).toEqual([]);
 
     const missingPrecondition = await call(
       ctx.app,
@@ -465,7 +467,7 @@ describe("专家 HTTP 契约", () => {
     expect(page.body.items.map((item: any) => item.name)).toEqual(["beta"]);
   });
 
-  test("API-23 详情返回五区完整字段与空装配", async () => {
+  test("API-23 详情返回职责范围与空装配，弃用字段为空", async () => {
     const created = await createExpert("detail-expert");
     const detail = await call(ctx.app, "GET", `/api/v1/experts/${created.id}`);
     expect(detail.status).toBe(200);
@@ -476,19 +478,17 @@ describe("专家 HTTP 契约", () => {
       enabled: true,
       persona: ["全局观", "谨慎"],
       duty: "输出技术方案与任务拆分",
-      skillOrder: "先检索现状，再设计",
-      verifyOrder: "完整性对照",
-      notes: "优先复用公共能力",
+      skillOrder: "",
+      verifyOrder: "",
+      notes: "",
       skillCount: 0,
       toolCount: 0,
       refCount: 0,
       skills: [],
       tools: [],
+      refs: [],
       revision: 1,
     });
-    expect(detail.body.refs).toEqual([
-      { label: "架构设计红线的 Brief", refType: "经验", path: null },
-    ]);
     expect(detail.body.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
@@ -518,7 +518,7 @@ describe("专家 HTTP 契约", () => {
     expect(disabled.body.enabled).toBe(false);
   });
 
-  test("API-25 更新五区不覆盖已装配的 Skill/工具", async () => {
+  test("API-25 更新五区不覆盖已装配的 Skill，工具装配不再返回", async () => {
     const created = await createExpert("assembled-expert");
     await ctx.expertService.setSkills(created.id, 1, skillIds);
     await ctx.expertService.setTools(created.id, 2, toolIds);
@@ -533,11 +533,11 @@ describe("专家 HTTP 契约", () => {
       persona: [],
       refs: [],
       skillCount: 2,
-      toolCount: 2,
+      toolCount: 0,
       revision: 4,
     });
     expect(updated.body.skills.map((skill: any) => skill.id)).toEqual(skillIds);
-    expect(updated.body.tools.map((tool: any) => tool.id)).toEqual(toolIds);
+    expect(updated.body.tools).toEqual([]);
   });
 
   test("API-26 可重新启用；缺少 If-Match 428；资源不存在 404", async () => {
@@ -638,13 +638,15 @@ describe("专家 HTTP 契约", () => {
     expect(missingPrecondition.status).toBe(428);
   });
 
-  test("API-29 装配可清空；重复工具与不存在目标返回 400；缺 If-Match 428", async () => {
+  test("API-29 工具装配过渡期只校验形状，不再校验目标也不落库", async () => {
     const created = await createExpert("tool-assembly");
     const first = await call(ctx.app, "PUT", `/api/v1/experts/${created.id}/tools`, {
       body: { items: toolIds.map((toolId) => ({ toolId })) },
       headers: withRevision(1),
     });
-    expect(first.body.toolCount).toBe(2);
+    expect(first.status).toBe(200);
+    expect(first.body.toolCount).toBe(0);
+    expect(first.body.tools).toEqual([]);
 
     const cleared = await call(ctx.app, "PUT", `/api/v1/experts/${created.id}/tools`, {
       body: { items: [] },
@@ -660,12 +662,13 @@ describe("专家 HTTP 契约", () => {
     expect(duplicate.status).toBe(400);
     expect(duplicate.body.error.details.field).toBe("items");
 
+    // 工具装配已停用：不存在的工具也不再报错，请求被接受但不落库。
     const missingTarget = await call(ctx.app, "PUT", `/api/v1/experts/${created.id}/tools`, {
       body: { items: [{ toolId: "0191f2f0-0000-7000-8000-000000000000" }] },
       headers: withRevision(3),
     });
-    expect(missingTarget.status).toBe(400);
-    expect(missingTarget.body.error.code).toBe("validation_error");
+    expect(missingTarget.status).toBe(200);
+    expect(missingTarget.body.tools).toEqual([]);
 
     const missingPrecondition = await call(
       ctx.app,
@@ -681,6 +684,6 @@ describe("专家 HTTP 契约", () => {
     });
     expect(stale.status).toBe(409);
     expect(stale.body.error.code).toBe("revision_conflict");
-    expect(stale.body.error.details.currentRevision).toBe(3);
+    expect(stale.body.error.details.currentRevision).toBe(4);
   });
 });

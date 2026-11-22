@@ -48,7 +48,7 @@ describe("数据库结构", () => {
     expect(names).toEqual([...BUSINESS_TABLES, "schema_migrations"].sort());
   });
 
-  test("14 个迁移按顺序记录，分类参考数据为 6 条", async () => {
+  test("15 个迁移按顺序记录，分类参考数据为 6 条", async () => {
     const migrations = await db.query<{ version: string }>(
       "select version from schema_migrations order by version",
     );
@@ -67,6 +67,7 @@ describe("数据库结构", () => {
       "0012_run_timeout_resume.sql",
       "0013_run_asset_snapshot.sql",
       "0014_run_input.sql",
+      "0015_expert_duty_markdown.sql",
     ]);
 
     const categories = await db.query<{ code: string; position: number }>(

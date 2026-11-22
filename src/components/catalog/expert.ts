@@ -8,7 +8,6 @@ import type {
   ExpertListQuery,
   ExpertSkillPreviewView,
   ExpertSkillSummaryView,
-  ExpertToolSummaryView,
 } from "./types.ts";
 import { categoryMap, requireCategoryLabel } from "./skill.ts";
 
@@ -73,18 +72,6 @@ async function skillSummaries(
   return skills;
 }
 
-async function toolSummaries(
-  ctx: CatalogDeps,
-  toolIds: string[],
-): Promise<ExpertToolSummaryView[]> {
-  const tools: ExpertToolSummaryView[] = [];
-  for (const toolId of toolIds) {
-    const tool = await ctx.toolRead.getSummary(toolId);
-    tools.push({ id: tool.id, name: tool.name, kind: tool.kind, status: tool.status });
-  }
-  return tools;
-}
-
 export async function listExperts(
   ctx: CatalogDeps,
   query: ExpertListQuery,
@@ -127,7 +114,6 @@ export async function getExpert(ctx: CatalogDeps, id: string): Promise<ExpertDet
   ]);
   const labels = categoryMap(categories);
   const skills = await skillSummaries(ctx, labels, expert.skillIds);
-  const tools = await toolSummaries(ctx, expert.toolIds);
   return {
     ...projectExpertCore(expert, counts[id] ?? 0),
     revision: expert.revision,
@@ -137,12 +123,9 @@ export async function getExpert(ctx: CatalogDeps, id: string): Promise<ExpertDet
     verifyOrder: expert.verifyOrder,
     notes: expert.notes,
     skills,
-    tools,
-    refs: expert.refs.map((ref) => ({
-      label: ref.label,
-      refType: ref.refType,
-      path: ref.path ?? null,
-    })),
+    // 过渡期：工具装配与参考知识已停用，接口恒返回空，UI 改造后移除。
+    tools: [],
+    refs: [],
     createdAt: expert.createdAt,
   };
 }

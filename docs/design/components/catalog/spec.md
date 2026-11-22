@@ -3,7 +3,7 @@ layer: design
 module: catalog
 status: current
 component: CMP-catalog
-updated: 2026-11-10
+updated: 2026-11-22
 ---
 
 # `CMP-catalog` 组件规格
@@ -191,12 +191,18 @@ type ExpertListItem = {
 };
 
 type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
+  /** Markdown 职责范围。 */
   duty: string;
+  /** @deprecated 恒为空；UI 改造后移除。 */
   skillOrder: string;
+  /** @deprecated 恒为空；UI 改造后移除。 */
   verifyOrder: string;
+  /** @deprecated 恒为空；UI 改造后移除。 */
   notes: string;
   skills: ExpertSkillSummaryView[];
+  /** @deprecated 恒为空数组；工具装配已停用。 */
   tools: ExpertToolSummaryView[];
+  /** @deprecated 恒为空数组；参考知识已停用。 */
   refs: { label: string; refType: string; path: string | null }[];
   createdAt: string;
 };
@@ -204,7 +210,8 @@ type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
 
 - `ReferenceGuard` 的定义侧由本组件实现；未终态 run 引用由 `CMP-run` 的 `RunReferenceReader` 实现，组合根合成后注入领域删除服务。本组件不读 run 表。
 - 视图类型（`HarnessListItem`、`ToolListItem`、`ExpertDetailView` 等）由本组件定义；`http-gateway` 只做字段映射。
-- `ReferenceGuard.check` 对 Harness 返回引用工具，对工具/Skill 返回引用专家，对专家返回引用工作流，对工作流返回 `[]`（工作流没有定义侧引用页）；无引用返回 `[]`。未终态 run 的引用由组合根叠加。
+- `ReferenceGuard.check` 对 Harness 返回引用工具，对工具/Skill 返回引用专家，对专家返回引用工作流，对工作流返回 `[]`（工作流没有定义侧引用页）；无引用返回 `[]`。未终态 run 的引用由组合根叠加。工具装配停用后，工具方向不再产生专家引用。
+- 专家详情中的 `tools` / `refs` 恒为空数组，`toolCount` 恒为 0；这是过渡期口径，UI 改造完成后删除字段。
 - 读投影是组件层视图；`http-gateway` 负责映射 REST DTO，不重新定义读模型语义。
 - 不存在抛 `NotFoundError`；不返回半成品对象。
 - `listToolsByHarness` / `listExpertsUsing*` 只返回引用摘要，不返回内部行。
@@ -225,7 +232,7 @@ type ExpertDetailView = Omit<ExpertListItem, "skills"> & {
 | `listSkillCategories` | 分类参考数据 | 无 | `SkillCategoryView[]` | 无 | `SkillRead.listCategories` |
 | `listExpertsUsingSkill` | Skill 的引用专家 | `skillId` | `Reference[]` | 无 | `ExpertRead.listExpertsUsingSkill` |
 | `listExperts` | 专家列表 | `ExpertListQuery` | `Page<ExpertListItem>` | `ValidationError` | `ExpertRead.list` + `SkillRead.getSummary`（前 3 个预览）+ `WorkflowRead.listExpertIdsByWorkflows`（有 `workflowIds` 时） |
-| `getExpert` | 专家详情 | `id` | `ExpertDetailView` | `NotFoundError` | `ExpertRead.get` + `SkillRead.getSummary` + `ToolRead.getSummary` |
+| `getExpert` | 专家详情 | `id` | `ExpertDetailView` | `NotFoundError` | `ExpertRead.get` + `SkillRead.getSummary`；工具/参考知识为常量空值 |
 | `listExpertsUsingTool` | 工具的引用专家 | `toolId` | `Reference[]` | 无 | `ExpertRead.listExpertsUsingTool` |
 | `listWorkflows` | 工作流列表 | `WorkflowQuery` | `Page<WorkflowSummary>` | `ValidationError` | `WorkflowRead.list` |
 | `getWorkflow` | 工作流详情 | `id` | `WorkflowDetail` | `NotFoundError` | `WorkflowRead.get` |

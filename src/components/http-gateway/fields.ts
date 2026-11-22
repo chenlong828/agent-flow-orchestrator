@@ -27,6 +27,7 @@ export const SKILL_SAVE_FIELDS = [
   "tags",
   "body",
 ] as const;
+/** `skillOrder` / `verifyOrder` / `notes` / `refs` 为过渡期弃用字段：接受但忽略，UI 改造后移除。 */
 export const EXPERT_WRITE_FIELDS = [
   "name",
   "color",

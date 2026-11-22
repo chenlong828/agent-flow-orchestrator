@@ -3,7 +3,7 @@ layer: design
 module: http-gateway
 status: current
 component: CMP-http-gateway
-updated: 2026-11-12
+updated: 2026-11-22
 ---
 
 # `CMP-http-gateway` 组件规格与 REST API 契约
@@ -159,7 +159,7 @@ updated: 2026-11-12
 | `API-27` | DELETE | `/experts/{id}` | `UC-B1-04` | 删除；被工作流或未终态 run 引用则 409，终态 run 不阻止 | 204 |
 | `API-28` | PUT | `/experts/{id}/skills` | `UC-B1-05` | 整体替换有序 Skill | 200 专家详情 |
 | `API-29` | PUT | `/experts/{id}/tools` | `UC-B1-05` | 整体替换有序工具 | 200 专家详情 |
-| `API-30` | PATCH | `/experts/{id}` | `UC-B1-04` / `UC-B1-05` | 聚合部分更新五区、引用与装配；一次事务 | 200 专家详情 |
+| `API-30` | PATCH | `/experts/{id}` | `UC-B1-04` / `UC-B1-05` | 聚合部分更新职责范围、人设与 Skill 装配；弃用字段忽略；一次事务 | 200 专家详情 |
 | `API-31` | GET | `/workflows` | `UC-B3-01` | 工作流列表/检索 | 200 列表 |
 | `API-32` | POST | `/workflows` | `UC-B3-01` | 创建工作流并同时写入合法图 | 201 `{id,revision,warnings}` + Location |
 | `API-33` | GET | `/workflows/{id}` | `UC-B3-01` | 工作流详情（含 graph） | 200 详情 |
@@ -518,13 +518,13 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 | `enabled` | boolean | 启停 |
 | `persona` | string[] | 性格/视角标签，有序 |
 | `skillCount` | number | 装配 Skill 数 |
-| `toolCount` | number | 装配工具数 |
+| `toolCount` | number | 过渡期恒为 0；工具装配已停用 |
 | `refCount` | number | 引用该专家的去重工作流数；B3 起由 `workflow_expert_ref` 计算 |
 | `skills` | `ExpertSkillPreview[]` | 前 3 个装配 Skill 预览，按装配顺序；无装配为空数组 |
 | `revision` | number | 乐观锁 |
 | `updatedAt` | string | ISO-8601 |
 
-**详情 `ExpertDetail`**：共享字段 + `duty`、`skillOrder`、`verifyOrder`、`notes`、`skills: ExpertSkillSummary[]`、`tools: ExpertToolSummary[]`、`refs: ExpertRef[]`、`createdAt`。
+**详情 `ExpertDetail`**：共享字段 + `duty`（Markdown 职责范围）、`skillOrder`、`verifyOrder`、`notes`（三者过渡期恒为 `""`）、`skills: ExpertSkillSummary[]`、`tools: ExpertToolSummary[]`（恒为空数组）、`refs: ExpertRef[]`（恒为空数组）、`createdAt`。
 
 **`ExpertSkillPreview`**：`{id,name}`，仅用于列表选择/导航。
 **`ExpertSkillSummary`**：`{id,name,categoryCode,categoryLabel,description}`。
@@ -542,21 +542,21 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 | `role` | string | 是 | 1–200 字 |
 | `enabled` | boolean | 否 | POST 默认 true；PUT 不使用 |
 | `persona` | string[] | 否 | 有序 |
-| `duty` | string | 否 | 主要职责/工作内容 |
-| `skillOrder` | string | 否 | Skill 配合顺序说明 |
-| `verifyOrder` | string | 否 | 验证顺序说明 |
-| `notes` | string | 否 | 任务解读/备注 |
-| `refs` | `ExpertRef[]` | 否 | 有序 |
+| `duty` | string | 否 | 职责范围，Markdown |
+| `skillOrder` | string | 否 | 已弃用：已并入 `duty`，接受但忽略 |
+| `verifyOrder` | string | 否 | 已弃用：已并入 `duty`，接受但忽略 |
+| `notes` | string | 否 | 已弃用：已并入 `duty`，接受但忽略 |
+| `refs` | `ExpertRef[]` | 否 | 已弃用：接受但忽略 |
 | `skillIds` | string[] | 否 | 创建时可选的有序 Skill ID；同事务写入；同一专家内 Skill 的 `slug` 必须唯一 |
-| `toolIds` | string[] | 否 | 创建时可选的有序工具 ID；同事务写入 |
+| `toolIds` | string[] | 否 | 已弃用：接受但忽略，不落库 |
 
-- `POST` 可带初始有序装配；`PUT` 只更新五区/人设/引用，不接收 `skills`/`tools`/`skillIds`/`toolIds`。
+- `POST` 可带初始有序 Skill 装配；`PUT` 只更新职责范围/人设/角色定位，不接收 `skills`/`tools`/`skillIds`/`toolIds`；弃用字段（`skillOrder`/`verifyOrder`/`notes`/`refs`/`toolIds`）接受但忽略。
 - `PATCH /experts/{id}` 是聚合部分更新：省略字段不变，数组字段传入即整体替换，空数组清空；一次事务、一次递增 `revision`。独立装配端点 `API-28`/`API-29` 保留。
 - `API-24` / `API-28` / `API-30` 的 Skill 装配带有入口断言：同一专家内 Skill 的系统标识（`slug`，客户端据此建技能目录）重复时返回 `400 validation_error`，`details.field` 分别为 `skillIds` / `items` / `skillIds`，整批不写、`revision` 不变。
 - `GET /experts` 的 `skills` 只返回前 3 个 `{id,name}`，避免把详情摘要塞进列表；`GET /experts/{id}` 返回完整装配摘要。
 - `GET /experts` 的 `workflowId` 可重复传，多个工作流取并集；只返回这些工作流节点绑定过的专家，同一专家只出现一次。未绑定任何流程的专家只在未传 `workflowId` 时出现；格式合法但不存在的 `workflowId` 返回空列表，不返回 404。
 - `workflowId` 必须是 UUID；非法值返回 `400 validation_error`，`details.field="workflowId"`；重复的同一 ID 去重后按一次处理。`refCount` 仍按全部工作流计数，不随筛选收窄。
-- `skillCount` / `toolCount` 由装配关系派生。
+- `skillCount` 由 Skill 装配派生；`toolCount` 过渡期恒为 0。
 
 **装配请求/响应**：
 
@@ -568,7 +568,7 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 - `items` 内 Skill 的系统标识（`slug`）必须唯一；重复返回 400，不写装配。
 
 - 成功 200，返回更新后的 `ExpertDetail`（同 `API-23`）；调用方可直接刷新详情，不需要额外的装配摘要 DTO。
-- 工具装配同构，请求字段为 `toolId`。
+- 工具装配入口过渡期保留：请求字段为 `toolId`，只校验形状（数组、去重）并接受，不写库、不校验目标存在；响应中的 `tools` 恒为空、`toolCount` 恒为 0。
 - HTTP 层在领域服务写入成功后调用 `catalog` 组合详情；不在路由层拼 Skill/工具名称。
 
 ### 5.5 引用页
@@ -700,7 +700,7 @@ DTO 是传输契约，不是领域方法定义；字段语义以对应组件规�
 | `EXE-03` | `SkillPackageSource.describe` + `SkillPackageSource.open` |
 
 - 写端点由 `http-gateway` 调用领域写方法，再用 `catalog` 回读详情；路由层不拼字段。`SKP-15` 例外：保存返回 `SaveSkillResult`，不回读整包。
-- `API-28/29` 的请求体只表达装配顺序；`API-30` 的请求体可同时表达五区、引用与两类装配顺序；`catalog` 负责把 `skillIds`/`toolIds` 解析为摘要。
+- `API-28/29` 的请求体只表达装配顺序；`API-29` 过渡期只校验形状、不落库；`API-30` 的请求体可同时表达职责范围、人设与 Skill 装配顺序；`catalog` 负责把 `skillIds` 解析为摘要。
 - 领域方法表见各组件规格的「方法契约」章节。
 
 ### 5.8 执行面 DTO
@@ -771,7 +771,7 @@ type PollRequest = {
 | `harnesses.html` / `CMP-harnesses` | `API-01`～`API-07` | 列表、详情、注册、编辑、启停、删除、工具引用 |
 | `tools.html` / `CMP-tools` | `API-08`～`API-13` | 列表、详情、注册、编辑、删除、专家引用；无启停/调试 |
 | `skills.html` / `CMP-skills` | `SKP-01`～`SKP-15` | 列表、详情、整包下载、启停、删除、专家引用、分类、草稿与保存 |
-| `experts.html` / `CMP-experts` | `API-22`～`API-30` | 列表、详情、五区、启停、删除、Skill/工具装配、聚合保存 |
+| `experts.html` / `CMP-experts` | `API-22`～`API-30` | 列表、详情、职责范围、启停、删除、Skill 装配、聚合保存（工具装配过渡期只接受） |
 | 工作流定义页 | `API-31`～`API-40` | 列表、创建、详情、编辑、删除、复制、图保存/校验、DSL 导入导出 |
 | 其他页面 | 无端点 | Key/工作区、B4 实例/运行、看板不在本仓库 |
 
@@ -789,7 +789,7 @@ B1/B3 不提供的页面动作：Harness 连接测试/心跳刷新、工具调�
 4. 用 Skill 草稿验证：建草稿、上传附件、改名、删除、保存、成功后草稿 404、过期 410。
 5. 用 Skill 保存验证 `version` 递增与 `SKILL.md` 16 KiB；客户端不传 `version`/`enabled`。
 6. 用整包下载验证 zip、`Content-Disposition`、`ETag`/304；不提供单文件下载。
-7. 用专家装配验证顺序与 `revision`；Skill/工具列表整体替换；一次保存五区与两类装配时使用 `PATCH /experts/{id}`，确认只递增一次 `revision`。
+7. 用专家 Skill 装配验证顺序与 `revision`；一次保存职责范围与 Skill 装配时使用 `PATCH /experts/{id}`，确认只递增一次 `revision`；工具装配入口接受但不落库。
 8. 工作流验证：创建必须带合法图；保存结构/拓扑/绑定错误 400，停用专家 warning；DSL 导入允许空专家并清空缺失专家后 warning；复制/导出拒绝空图或非法图；专家删除被工作流引用 409。
 9. 忽略未知字段；遇到契约缺口先改本文，不跨项目改代码。
 
@@ -832,7 +832,7 @@ B1/B3 不提供的页面动作：Harness 连接测试/心跳刷新、工具调�
 ## 10 B1/B3 实现口径与剩余问题
 
 - `SKP-05` 保留为独立只读资源 `GET /skill-categories`，便于外部客户端下拉直接消费。
-- `API-28` / `API-29` 保持分开，避免一次保存两类装配关系时互相覆盖；`API-30` 提供一次保存五区、引用与两类装配的聚合入口，领域内仍是单事务、单 `revision`。
+- `API-28` / `API-29` 保持分开，避免一次保存两类装配关系时互相覆盖；`API-29` 过渡期只接受、不落库；`API-30` 提供一次保存职责范围、人设与 Skill 装配的聚合入口，领域内仍是单事务、单 `revision`。
 - `SKP-15` 的保存结果只返回 `{id,revision,version,updatedAt}`；需要详情时再 `GET /skills/{id}`，不在保存路由里回读整包。
 - 错误体不新增顶层 `fieldErrors`，字段级错误仍放在 `details`：单字段为 `details.field` / `details.reason`，多字段为 `details.fieldErrors` 数组。
 - 本仓库不配置 CORS；外部浏览器若跨源调用，由部署层同源代理或调用方处理，不在本仓库范围。

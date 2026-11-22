@@ -232,11 +232,14 @@ describe("B1 全链路旅程（仅通过 HTTP）", () => {
       headers: withRevision(5),
     });
     expect(boundTools.status).toBe(200);
-    expect(boundTools.body.tools.map((tool: any) => tool.id)).toEqual([toolId]);
+    expect(boundTools.body.tools).toEqual([]);
 
     const expertDetail = await call(ctx.app, "GET", `/api/v1/experts/${expertId}`);
-    expect(expertDetail.body).toMatchObject({ skillCount: 1, toolCount: 1 });
+    expect(expertDetail.body).toMatchObject({ skillCount: 1, toolCount: 0 });
     expect(expertDetail.body.persona).toEqual([]);
+    expect(expertDetail.body.skillOrder).toBe("");
+    expect(expertDetail.body.verifyOrder).toBe("");
+    expect(expertDetail.body.notes).toBe("");
 
     const harnessRefs = await call(ctx.app, "GET", `/api/v1/harnesses/${harnessId}/references`);
     expect(harnessRefs.body.items).toEqual([{ type: "tool", id: toolId, name: "journey-tool" }]);
@@ -245,22 +248,23 @@ describe("B1 全链路旅程（仅通过 HTTP）", () => {
       { type: "expert", id: expertId, name: "journey-expert" },
     ]);
     const toolRefs = await call(ctx.app, "GET", `/api/v1/tools/${toolId}/references`);
-    expect(toolRefs.body.items).toEqual([
-      { type: "expert", id: expertId, name: "journey-expert" },
-    ]);
+    expect(toolRefs.body.items).toEqual([]);
 
     const expertList = await call(ctx.app, "GET", "/api/v1/experts?enabled=true");
     expect(expertList.body.items[0].refCount).toBe(0);
 
+    // 工具装配已停用：工具不再被专家引用，可直接删除；Harness 与 Skill 仍被引用。
     for (const [path, revision] of [
       [`/api/v1/harnesses/${harnessId}`, 4],
-      [`/api/v1/tools/${toolId}`, 2],
       [`/api/v1/skills/${skillId}`, 4],
     ] as const) {
       const blocked = await call(ctx.app, "DELETE", path, { headers: withRevision(revision) });
       expect(blocked.status).toBe(409);
       expect(blocked.body.error.code).toBe("referenced");
     }
+    expect(
+      (await call(ctx.app, "DELETE", `/api/v1/tools/${toolId}`, { headers: withRevision(2) })).status,
+    ).toBe(204);
 
     const clearedSkills = await call(ctx.app, "PUT", `/api/v1/experts/${expertId}/skills`, {
       body: { items: [] },
@@ -277,9 +281,6 @@ describe("B1 全链路旅程（仅通过 HTTP）", () => {
       headers: withRevision(8),
     });
     expect(expertDeleted.status).toBe(204);
-    expect(
-      (await call(ctx.app, "DELETE", `/api/v1/tools/${toolId}`, { headers: withRevision(2) })).status,
-    ).toBe(204);
     expect(
       (await call(ctx.app, "DELETE", `/api/v1/skills/${skillId}`, { headers: withRevision(4) })).status,
     ).toBe(204);

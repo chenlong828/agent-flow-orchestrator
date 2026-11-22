@@ -9,7 +9,6 @@ import {
 import {
   createExpertService,
   SkillNotFoundError,
-  ToolNotFoundError,
 } from "../../../src/components/expert/index.ts";
 import { systemClock, uuidv7Ids } from "../../../src/core/platform/index.ts";
 import { closeTestDb, resetBusinessData } from "../../helpers/test-db.ts";
@@ -84,7 +83,7 @@ afterAll(async () => {
 });
 
 describe("专家写入规则", () => {
-  test("创建后 revision=1，五区与人设/引用按序回读，装配为空", async () => {
+  test("创建后 revision=1，职责范围按 Markdown 回读，弃用字段为空", async () => {
     const created = await ctx.expertService.create(expertBody());
     expect(created.revision).toBe(1);
     const detail = await ctx.catalog.getExpert(created.id);
@@ -94,16 +93,16 @@ describe("专家写入规则", () => {
       enabled: true,
       persona: ["全局观", "谨慎"],
       duty: "输出技术方案与任务拆分",
-      skillOrder: "先检索现状，再设计",
-      verifyOrder: "完整性对照",
-      notes: "优先复用公共能力",
+      skillOrder: "",
+      verifyOrder: "",
+      notes: "",
       skillCount: 0,
       toolCount: 0,
       refCount: 0,
     });
     expect(detail.skills).toEqual([]);
     expect(detail.tools).toEqual([]);
-    expect(detail.refs).toEqual([{ label: "架构设计红线的 Brief", refType: "经验", path: null }]);
+    expect(detail.refs).toEqual([]);
   });
 
   test("名称唯一、颜色格式、角色非空被校验", async () => {
@@ -186,7 +185,7 @@ describe("专家写入规则", () => {
     expect(stale.details.currentRevision).toBe(1);
   });
 
-  test("更新整体替换人设与引用并递增 revision，旧 revision 冲突", async () => {
+  test("更新整体替换人设并递增 revision，弃用的引用字段被忽略", async () => {
     const created = await ctx.expertService.create(expertBody());
     const updated = await ctx.expertService.update(created.id, 1, {
       ...expertBody("方案设计专家 v2"),
@@ -204,7 +203,7 @@ describe("专家写入规则", () => {
     expect(stale.details.currentRevision).toBe(2);
   });
 
-  test("装配整体替换并保持顺序，重复目标被拒绝", async () => {
+  test("Skill 装配整体替换并保持顺序，工具装配接受但不再落库", async () => {
     const created = await ctx.expertService.create(expertBody());
     const first = await ctx.expertService.setSkills(created.id, 1, skillIds);
     expect(first.revision).toBe(2);
@@ -213,9 +212,9 @@ describe("专家写入规则", () => {
 
     const detail = await ctx.catalog.getExpert(created.id);
     expect(detail.skills.map((skill) => skill.id)).toEqual(skillIds);
-    expect(detail.tools.map((tool) => tool.id)).toEqual([...toolIds].reverse());
+    expect(detail.tools).toEqual([]);
     expect(detail.skillCount).toBe(2);
-    expect(detail.toolCount).toBe(2);
+    expect(detail.toolCount).toBe(0);
 
     const duplicate = await ctx.expertService
       .setSkills(created.id, 3, [skillIds[0]!, skillIds[0]!])
@@ -287,13 +286,12 @@ describe("专家写入规则", () => {
     expect(after.skillCount).toBe(0);
     expect(after.revision).toBe(1);
 
-    const toolError = await ctx.expertService
-      .setTools(created.id, 1, [missing])
-      .catch((e) => e);
-    expect(toolError).toBeInstanceOf(ToolNotFoundError);
+    // 工具装配已停用：目标不存在也接受，但不写库、不改变工具视图。
+    const toolResult = await ctx.expertService.setTools(created.id, 1, [missing]);
+    expect(toolResult.revision).toBe(2);
     const afterToolError = await ctx.catalog.getExpert(created.id);
     expect(afterToolError.toolCount).toBe(0);
-    expect(afterToolError.revision).toBe(1);
+    expect(afterToolError.tools).toEqual([]);
   });
 
   test("创建可带有序装配，revision=1 且一次回读完整", async () => {
@@ -305,9 +303,9 @@ describe("专家写入规则", () => {
     expect(created.revision).toBe(1);
     const detail = await ctx.catalog.getExpert(created.id);
     expect(detail.skills.map((skill) => skill.id)).toEqual([...skillIds].reverse());
-    expect(detail.tools.map((tool) => tool.id)).toEqual(toolIds);
+    expect(detail.tools).toEqual([]);
     expect(detail.skillCount).toBe(2);
-    expect(detail.toolCount).toBe(2);
+    expect(detail.toolCount).toBe(0);
   });
 
   test("创建装配目标不存在时整批回滚，专家根也不留下", async () => {
@@ -352,27 +350,24 @@ describe("专家写入规则", () => {
     expect(stale.details.currentRevision).toBe(2);
   });
 
-  test("聚合更新任一装配目标无效时主体、另一类装配与 revision 全部回滚", async () => {
+  test("聚合更新忽略弃用的工具装配，主体与 Skill 装配照常写入", async () => {
     const created = await ctx.expertService.create({
-      ...expertBody("聚合回滚专家"),
+      ...expertBody("聚合写入专家"),
       skillIds: [skillIds[0]!],
     });
     const missing = "0191f2f0-0000-7000-8000-000000000000";
-    const error = await ctx.expertService
-      .updateAggregate(created.id, 1, {
-        duty: "不应写入",
-        skillIds: [skillIds[1]!],
-        toolIds: [missing],
-      })
-      .catch((e) => e);
-    expect(error).toBeInstanceOf(ToolNotFoundError);
-    expect(error.details.field).toBe("toolIds");
+    const updated = await ctx.expertService.updateAggregate(created.id, 1, {
+      duty: "改为新职责",
+      skillIds: [skillIds[1]!],
+      toolIds: [missing],
+    });
+    expect(updated.revision).toBe(2);
 
     const detail = await ctx.catalog.getExpert(created.id);
-    expect(detail.duty).toBe("输出技术方案与任务拆分");
-    expect(detail.skills.map((skill) => skill.id)).toEqual([skillIds[0]!]);
+    expect(detail.duty).toBe("改为新职责");
+    expect(detail.skills.map((skill) => skill.id)).toEqual([skillIds[1]!]);
     expect(detail.tools).toEqual([]);
-    expect(detail.revision).toBe(1);
+    expect(detail.revision).toBe(2);
   });
 
   test("聚合更新空对象被拒绝，不产生写入", async () => {
@@ -476,7 +471,7 @@ describe("专家读契约", () => {
     expect(page.items.map((item) => item.name)).toEqual(["expert-b"]);
   });
 
-  test("引用查询返回使用该 Skill/工具的专家", async () => {
+  test("引用查询只反映 Skill 装配，工具装配已无引用可查", async () => {
     const created = await ctx.expertService.create(expertBody());
     await ctx.expertService.setSkills(created.id, 1, [skillIds[0]!]);
     await ctx.expertService.setTools(created.id, 2, [toolIds[0]!]);
@@ -484,6 +479,6 @@ describe("专家读契约", () => {
     const bySkill = await ctx.expertRead.listExpertsUsingSkill(skillIds[0]!);
     expect(bySkill).toEqual([{ id: created.id, name: "方案设计专家" }]);
     const byTool = await ctx.expertRead.listExpertsUsingTool(toolIds[0]!);
-    expect(byTool).toEqual([{ id: created.id, name: "方案设计专家" }]);
+    expect(byTool).toEqual([]);
   });
 });

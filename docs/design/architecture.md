@@ -2,7 +2,7 @@
 layer: design
 module: global
 status: current
-updated: 2026-11-12
+updated: 2026-11-22
 ---
 
 # B1+B3 架构与契约边界
@@ -54,7 +54,7 @@ updated: 2026-11-12
 | `CMP-harness` | 维护 Harness 聚合的生命周期、标签与不变量；作为执行节点目录（`client_id` 绑定、`client_token` 凭据、`NodeDirectory` 与 `ExecutorAuthenticator` 端口实现） | `harness`、`harness_tag` | `platform`、`kernel` |
 | `CMP-tool` | 维护工具聚合、参数与 Harness 归属 | `tool`、`tool_param` | `platform`、`kernel` |
 | `CMP-skill` | 维护 Skill brief、包指针、草稿生命周期、`SKILL.md` 与整包读取；实现 `SkillPackageSource` 与 `SkillSlugReader` 端口 | `skill_category`（只读种子）、`skill`、`skill_tag`、`skill_draft`；`packages/`、`drafts/` | `platform`、`kernel` |
-| `CMP-expert` | 维护专家聚合、五区、有序装配与引用 | `expert`、`expert_persona`、`expert_skill`、`expert_tool`、`expert_ref` | `platform`、`kernel`（`SkillSlugReader` 端口） |
+| `CMP-expert` | 维护专家聚合、职责范围、人设与有序 Skill 装配 | `expert`、`expert_persona`、`expert_skill`（`expert_tool`/`expert_ref` 过渡保留，不再写入） | `platform`、`kernel`（`SkillSlugReader` 端口） |
 | `CMP-workflow` | 维护工作流聚合、唯一当前定义、图校验与专家引用投影 | `workflow`、`workflow_definition`、`workflow_expert_ref` | `platform`、`kernel` |
 | `CMP-catalog` | 组合跨资产的列表/详情/文档/整包/引用只读投影，并实现 `ReferenceGuard` 的定义侧；Harness 节点状态按调度器 presence 派生 | 无 | 四类资产与工作流的公开读契约、`scheduler` 的 presence 读、`kernel` |
 | `CMP-scheduler` | 维护执行面任务列表（`queued`/`dispatched`/`done`）、派发裁决、重派与结果接受 | `task`、`task_attempt` | `instance`（读）、`kernel`（`SkillPackageSource` 端口）、`platform` |

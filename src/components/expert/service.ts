@@ -12,7 +12,7 @@ import {
 } from "./write.ts";
 
 export type { ExpertDeps } from "./types.ts";
-export { SkillNotFoundError, ToolNotFoundError } from "./errors.ts";
+export { SkillNotFoundError } from "./errors.ts";
 export { createExpertRead } from "./read.ts";
 
 export function createExpertService(deps: ExpertDeps): ExpertService {

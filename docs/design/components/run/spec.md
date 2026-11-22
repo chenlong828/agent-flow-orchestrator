@@ -3,7 +3,7 @@ layer: design
 module: run
 status: active
 component: CMP-run
-updated: 2026-11-19
+updated: 2026-11-22
 ---
 
 # `CMP-run` 组件规格
@@ -375,9 +375,8 @@ waiting_resume ──cancel / 无 sessionId──▶ failed(cancelled / timeout)
 名称：<expert.name>
 角色：<expert.role>
 性格：<expert.persona 按序用「、」连接>
-职责：<expert.duty>
-验证顺序：<expert.verifyOrder>
-注意事项：<expert.notes>
+职责范围：
+<expert.duty（Markdown，含分节标题）>
 ```
 
 - start 节点把中间那句换成「把下面的诉求原文写入 `<taskSpacePath>/intent.md`，再开始执行」，并追加 `[启动诉求原文]`（受 `maxPromptBytes` 约束）。
@@ -386,7 +385,7 @@ waiting_resume ──cancel / 无 sessionId──▶ failed(cancelled / timeout)
 - `[确认通道]` 按节点类型输出，两段文案互斥：
   - `agent`：`仅严重场景调用 mcp__agentflow__confirm：契约变更、规则突破、不可逆/外部副作用、P0/P1、用户意图冲突、关键信息缺失；普通决策按 auto-confirm §2 默认确认，不打断人。`
   - `review`：`评审节点仅在「必须澄清已 accepted 需求/契约口径，且该口径直接决定 verdict」时调用 mcp__agentflow__confirm；不得把评审判断本身交给人，不得用 confirm 代替 review_verdict；一次一个问题；回答后仍须自行提交 verdict。`
-- 专家块空字段整行省略；技能清单与使用顺序不进 prompt（清单由 DSH 技能目录注入，顺序只作人工查看）。
+- 专家块空字段整行省略；`职责范围` 单独起行后原样输出 Markdown，不再拆成「职责 / 验证顺序 / 注意事项」三行。技能清单与使用顺序不进 prompt（清单由 DSH 技能目录注入，顺序只作人工查看）。
 - `[本次进入]` 块只在回退重跑时出现：`run_node.enter_reason` 只存指针 `{kind, from, fromVisit}`，理由正文按指针回查被驳回行的 `verdict`，不复制第二份；confirm 驳回渲染成「人工在「<节点>」节点驳回」+「驳回意见」。
 
 - 不注入上游节点的消息正文；跨节点上下文靠 task-space 文件。

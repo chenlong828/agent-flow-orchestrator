@@ -10,6 +10,6 @@ export type {
   UpdateExpert,
   UpdateExpertAggregate,
 } from "./types.ts";
-export { SkillNotFoundError, ToolNotFoundError, createExpertRead, createExpertService } from "./service.ts";
+export { SkillNotFoundError, createExpertRead, createExpertService } from "./service.ts";
 export type { ExpertDeps } from "./service.ts";
 export type { ExpertRootRow } from "./store.ts";

@@ -6,9 +6,8 @@ export type PromptExpert = {
   name: string;
   role: string;
   persona: string[];
+  /** 职责范围，Markdown；技能配合顺序与验证顺序已并入其中。 */
   duty: string;
-  verifyOrder: string;
-  notes: string;
 };
 
 /** 回退进入信息：节点名与驳回理由（理由正文来自被驳回行的 verdict）。 */
@@ -46,16 +45,13 @@ const ENTRY_REASON_LIMIT = 300;
 /** 专家块：只写身份、性格与职责边界；具体做法由技能承载，空字段整行省略。 */
 function expertBlock(expert: PromptExpert): string[] {
   const lines = ["[专家]", `名称：${expert.name}`];
-  const fields: [string, string][] = [
-    ["角色", expert.role],
-    ["性格", expert.persona.join("、")],
-    ["职责", expert.duty],
-    ["验证顺序", expert.verifyOrder],
-    ["注意事项", expert.notes],
-  ];
-  for (const [label, value] of fields) {
-    if (value.trim() !== "") lines.push(`${label}：${value.trim()}`);
-  }
+  const role = expert.role.trim();
+  if (role !== "") lines.push(`角色：${role}`);
+  const persona = expert.persona.join("、").trim();
+  if (persona !== "") lines.push(`性格：${persona}`);
+  const duty = expert.duty.trim();
+  // 职责范围是 Markdown，单独起行，避免标题挤在「职责范围：」同一行。
+  if (duty !== "") lines.push("职责范围：", duty);
   return lines;
 }
 

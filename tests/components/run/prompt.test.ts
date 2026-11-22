@@ -6,9 +6,7 @@ const expert: PromptExpert = {
   name: "执行专家",
   role: "实现",
   persona: ["严谨"],
-  duty: "完成任务",
-  verifyOrder: "先读后写",
-  notes: "不越界",
+  duty: "## 主要职责\n完成任务\n\n## 重点验证顺序\n先读后写",
 };
 
 function node(type: WorkflowNode["type"]): WorkflowNode {
@@ -51,5 +49,15 @@ describe("节点 prompt 的确认通道", () => {
     expect(prompt).toContain("本次任务执行相关记录的 task-space：/work/task-space");
     expect(prompt).toContain("[专家]");
     expect(prompt).toContain("名称：执行专家");
+  });
+
+  test("专家块输出 Markdown 职责范围，不再输出已并入的旧标签", () => {
+    const prompt = promptFor("agent");
+    expect(prompt).toContain("角色：实现");
+    expect(prompt).toContain("性格：严谨");
+    expect(prompt).toContain("职责范围：\n## 主要职责\n完成任务");
+    expect(prompt).not.toContain("职责：");
+    expect(prompt).not.toContain("验证顺序：");
+    expect(prompt).not.toContain("注意事项：");
   });
 });

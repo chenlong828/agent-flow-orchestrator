@@ -108,6 +108,7 @@ describe("catalog 只读组合", () => {
     const harness = await createHarness();
     const tool = await createTool(harness.id);
     const expert = await createExpert();
+    // 工具装配已停用：接受写入但不建立引用，usedByCount 恒为 0。
     await ctx.expertService.setTools(expert.id, 1, [tool.id]);
 
     const list = await ctx.catalog.listTools({ page: normalizePageQuery() });
@@ -117,7 +118,7 @@ describe("catalog 只读组合", () => {
       harnessName: "catalog-harness",
       description: "",
       paramCount: 1,
-      usedByCount: 1,
+      usedByCount: 0,
       status: "unverified",
       lastDebugAt: null,
     });
@@ -155,7 +156,7 @@ describe("catalog 只读组合", () => {
     });
   });
 
-  test("专家投影组合 Skill/工具摘要、计数与 refCount=0", async () => {
+  test("专家投影组合 Skill 摘要与计数，工具与参考知识恒为空", async () => {
     const harness = await createHarness();
     const skill = await createSkill("skill-a", "retrieval");
     const tool = await createTool(harness.id);
@@ -171,7 +172,7 @@ describe("catalog 只读组合", () => {
       name: "expert-a",
       persona: ["全局观"],
       skillCount: 1,
-      toolCount: 1,
+      toolCount: 0,
       refCount: 0,
       skills: [{ id: skill.id, name: "skill-a" }],
     });
@@ -186,9 +187,7 @@ describe("catalog 只读组合", () => {
         description: "skill-a 描述",
       },
     ]);
-    expect(detail.tools).toEqual([
-      { id: tool.id, name: "catalog-tool", kind: "cli", status: "unverified" },
-    ]);
+    expect(detail.tools).toEqual([]);
     expect(detail.refs).toEqual([]);
     expect(detail.refCount).toBe(0);
   });
@@ -255,11 +254,12 @@ describe("catalog 只读组合", () => {
       items: [{ type: "tool", id: tool.id, name: "catalog-tool" }],
     });
 
+    // 工具装配已停用，工具不再有专家引用。
     const toolRefs = await ctx.catalog.referencesForTool(tool.id);
     expect(toolRefs).toEqual({
       asset: { type: "tool", id: tool.id, name: "catalog-tool" },
-      total: 1,
-      items: [{ type: "expert", id: expert.id, name: "catalog-expert" }],
+      total: 0,
+      items: [],
     });
 
     const skillRefs = await ctx.catalog.referencesForSkill(skill.id);
@@ -279,9 +279,7 @@ describe("catalog 只读组合", () => {
 
     const emptyHarness = await createHarness("empty-harness");
     expect(await ctx.catalog.check("harness", emptyHarness.id)).toEqual([]);
-    expect(await ctx.catalog.check("tool", tool.id)).toEqual([
-      { type: "expert", id: expert.id, name: "catalog-expert" },
-    ]);
+    expect(await ctx.catalog.check("tool", tool.id)).toEqual([]);
     expect(await ctx.catalog.check("skill", skill.id)).toEqual([
       { type: "expert", id: expert.id, name: "catalog-expert" },
     ]);
@@ -296,9 +294,7 @@ describe("catalog 只读组合", () => {
     expect(await ctx.catalog.listToolsByHarness(harness.id)).toEqual([
       { type: "tool", id: tool.id, name: "z-tool" },
     ]);
-    expect(await ctx.catalog.listExpertsUsingTool(tool.id)).toEqual([
-      { type: "expert", id: expert.id, name: "catalog-expert" },
-    ]);
+    expect(await ctx.catalog.listExpertsUsingTool(tool.id)).toEqual([]);
 
     const skill = await createSkill();
     await ctx.expertService.setSkills(expert.id, 2, [skill.id]);
