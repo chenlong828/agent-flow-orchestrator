@@ -2,7 +2,7 @@
 openapi: 3.0.3
 info:
   title: AgentFlow B1+B3+B4 编排服务 API
-  version: 0.6.3
+  version: 0.6.4
   description: |
     AgentFlow B1+B3+B4 控制面的 HTTP JSON 契约，覆盖 Harness、工具、Skill、专家、
     工作流定义、运行编排、引用页与健康检查。业务端点统一以 `/api/v1` 为前缀，`/healthz` 不参与版本。
