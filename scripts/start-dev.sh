@@ -42,4 +42,18 @@ if ! BUN_BIN_PATH="$(find_bun)"; then
   exit 1
 fi
 
+# 本机 dev 环境使用 3101；未显式给 --url 时用它做健康检查。
+# 换端口时可用 START_DEV_URL=... 或显式 --url 覆盖。
+default_url="${START_DEV_URL:-http://127.0.0.1:3101}"
+has_url=false
+for arg in "$@"; do
+  if [ "$arg" = "--url" ]; then
+    has_url=true
+    break
+  fi
+done
+if [ "$has_url" = false ]; then
+  set -- "$@" --url "$default_url"
+fi
+
 exec "$BUN_BIN_PATH" run scripts/start-bg.ts "$@"
