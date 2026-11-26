@@ -43,7 +43,7 @@ describe("Skill 读路径", () => {
     for (const file of packages) await store.delete(file.key);
 
     const page = await reader.list({ page: { limit: 5, offset: 0 } });
-    expect(page.total).toBe(15);
+    expect(page.total).toBe(16);
     expect(page.items).toHaveLength(5);
     expect(page.items[0]).toMatchObject({
       id: expect.any(String),
@@ -97,7 +97,7 @@ describe("Skill 读路径", () => {
     await store.delete(`packages/${row!.package_key}`);
 
     expect((await reader.getSummary(row!.id)).name).toBe("架构设计规格");
-    expect((await reader.list({ page: { limit: 50, offset: 0 } })).total).toBe(15);
+    expect((await reader.list({ page: { limit: 50, offset: 0 } })).total).toBe(16);
     for (const operation of [
       () => reader.get(row!.id),
       () => reader.getDocument(row!.id),

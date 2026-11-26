@@ -1,7 +1,7 @@
 ---
 name: "af-flow-rule"
 description: "AF 流程公共规则：证据分级 L1–L4、确认与自动决策、状态翻转与提交、任务边界与越权、证据与结论口径。所有 AF 工作流节点共享；与领域技能冲突时，安全与人工确认以本规则为准，方法步骤以领域技能为准。触发：设计、拆分、开发、评审、验证、鉴定任意节点"
-version: "v1.13"
+version: "v1.14"
 ---
 
 # AF 流程公共规则（跨技能）
@@ -149,6 +149,7 @@ version: "v1.13"
 | 新场景 `draft → designed` | 设计 | 设计落卡 |
 | `designed → verified` | 收尾 | 评审 pass + 证据 |
 | `verified → designed`（重开） | 收尾 | 人工/需求确认后 |
+| 需求 `draft → accepted` | 收尾 | 需求分析流程 n7 人工确认 pass |
 | `accepted → delivered` | 收尾 | 场景 verified |
 | 任务完成 | 收尾 | 评审/鉴定 pass |
 

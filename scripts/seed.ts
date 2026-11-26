@@ -47,6 +47,7 @@ type WorkflowSeed = {
 const SKILLS: SkillSeed[] = [
   { slug: "workflow-init", name: "工作流初始化", category: "process", tags: ["初始化", "诉求落盘"], enabled: true, updatedM: 30 },
   { slug: "req-scenario-spec", name: "需求到场景", category: "process", tags: ["需求", "场景", "验收"], enabled: true, updatedM: 60 },
+  { slug: "req-decomposition", name: "需求拆解", category: "process", tags: ["需求", "拆解", "意图"], enabled: true, updatedM: 75 },
   { slug: "design-before-coding", name: "先设计后编码", category: "process", tags: ["设计", "组件"], enabled: true, updatedM: 90 },
   { slug: "arch-design-spec", name: "架构设计规格", category: "process", tags: ["架构", "契约", "定级"], enabled: true, updatedM: 120 },
   { slug: "dev-execution-spec", name: "开发执行纪律", category: "coding", tags: ["执行", "验收", "提交"], enabled: true, updatedM: 150 },
@@ -99,7 +100,7 @@ const EXPERTS: ExpertSeed[] = [
       "索引/项目文档已读 → 需求可观察 → 现状与连接点有证据 → 验收可追溯到价值 → 约束来源已标 → 场景四元素齐 → 文档就位",
       "",
       "## 对承担任务的解读",
-      "追问到可实施粒度；把现状和连接点交清楚；设计选择与状态交设计与 af-flow-rule；用户原话的数字/样例默认是示例，不写成硬契约；非目标必须标来源，自设约束不得排除用户明确要的效果；需求阶段只读文档/代码/截图，不编译、不测量；续跑只做增量，写 briefN.md 并串索引；无人值守时普通决策按推荐/默认自动确认并记录「默认确认（未经人工）」，严重场景（契约变更/规则突破/用户意图冲突/缺失与内部矛盾）按 af-flow-rule §8 与 auto-confirm §3 调 mcp__agentflow__confirm，不停下等待",
+      "追问到可实施粒度；把现状和连接点交清楚；设计选择与状态交设计与 af-flow-rule；用户原话的数字/样例默认是示例，不写成硬契约；非目标必须标来源，自设约束不得排除用户明确要的效果；需求阶段只读文档/代码/截图，不编译、不测量；续跑只做增量，写 briefN.md 并串索引；无人值守时普通决策按推荐/默认自动确认并记录「默认确认（未经人工）」，严重场景（契约变更/规则突破/用户意图冲突/缺失与内部矛盾）按 af-flow-rule §8 与 auto-confirm §3 调 mcp__agentflow__confirm，不停下等待；需求分析流程中写卡先 draft，人工确认后由收尾翻 accepted，本流程不写设计",
     ].join("\n"),
     enabled: true,
   },
@@ -280,6 +281,46 @@ const EXPERTS: ExpertSeed[] = [
       "",
       "## 对承担任务的解读",
       "只定位不修；根因要有代码/证据；发现是新结果/新场景，标出并建议转需求分析场景 workflow；不扩大范围。",
+    ].join("\n"),
+    enabled: true,
+  },
+  {
+    id: "req-decomposer", name: "需求拆解专家", color: "#1d4ed8",
+    role: "只针对描述拆解需求，识别真实意图",
+    persona: ["克制", "回到原话"],
+    skills: ["req-decomposition", "af-flow-rule"],
+    duty: [
+      "## 主要职责",
+      "只读 intent.md 的用户描述，把描述拆成可判断的需求点，识别真实意图、歧义、缺失信息、假设与待定；写 decompose.md（回退 decomposeN.md）；不读项目文档/代码、不写场景/需求卡、不做设计。",
+      "",
+      "## 技能配合顺序",
+      "需求拆解 → AF 流程公共规则",
+      "",
+      "## 重点验证顺序",
+      "只基于描述 → 需求点可判断 → 意图明确 → 歧义/假设/待定齐全 → 未写场景/卡/设计",
+      "",
+      "## 对承担任务的解读",
+      "不提前进入场景规划；不把用户示例数字升级为契约；不猜缺失信息，标待定；不改仓库。",
+    ].join("\n"),
+    enabled: true,
+  },
+  {
+    id: "scenario-planner", name: "场景规划专家", color: "#0e7490",
+    role: "根据事实判断哪些场景修改、哪些新增",
+    persona: ["事实优先", "边界清楚"],
+    skills: ["req-scenario-spec", "doc-layout-spec", "af-flow-rule"],
+    duty: [
+      "## 主要职责",
+      "读已确认的 decompose.md、index.md、项目文档与现有场景，判断哪些场景要修改、哪些要新增、哪些不动，并给出事实依据、影响/回归面与待定；写 scenario-plan.md（回退 scenario-planN.md）；不写场景卡/需求卡、不做设计。",
+      "",
+      "## 技能配合顺序",
+      "需求到场景 → 文档布局 → AF 流程公共规则",
+      "",
+      "## 重点验证顺序",
+      "拆解已确认 → 现有场景已核对 → 改/增/不动有依据 → 影响/回归面清楚 → 未写卡/设计",
+      "",
+      "## 对承担任务的解读",
+      "根据事实，不凭印象；不改已验证场景的承诺；发现要改结果/验收，标出交人工确认；不扩大范围。",
     ].join("\n"),
     enabled: true,
   },
@@ -472,6 +513,25 @@ function defectFlowGraph(): WorkflowGraph {
   };
 }
 
+/** 设计流程：启动 → 方案设计 → 人工确认（设计可开发）→ 收尾；只产出 design/spec，不写代码。 */
+function designFlowGraph(): WorkflowGraph {
+  return {
+    stages: [],
+    nodes: [
+      flowNode("n1", "启动", "start", "start-node", 0, 0),
+      flowNode("n2", "方案设计", "agent", "solution-designer", 160, 0),
+      flowNode("n3", "人工确认：设计可开发", "confirm", null, 320, 0),
+      flowNode("n4", "收尾", "end", "summarizer", 480, 0),
+    ],
+    edges: [
+      { id: "e1", from: "n1", to: "n2", kind: "seq" },
+      { id: "e2", from: "n2", to: "n3", kind: "seq" },
+      { id: "e3", from: "n3", to: "n4", kind: "seq" },
+      { id: "e4", from: "n3", to: "n2", kind: "rollback" },
+    ],
+  };
+}
+
 /** 工作区接入流程：扫描 → 确认范围 → 初始化/校准 → 确认配置 → 收尾提交。 */
 function workspaceFlowGraph(): WorkflowGraph {
   return {
@@ -514,6 +574,13 @@ const WORKFLOWS: WorkflowSeed[] = [
     type: "研发",
     description: "故障修复：启动 → 故障复现 → 故障定位与报告 → 人工确认（问题定位）→ 代码修复 → 测试和验证 → 代码评审 → 人工确认（修复记录与实际测试）→ 收尾；人工确认与代码评审回退到对应修复/定位节点",
     graph: defectFlowGraph(),
+  },
+  {
+    id: "design-flow-01",
+    name: "设计流程",
+    type: "研发",
+    description: "设计：启动 → 方案设计 → 人工确认（设计可开发）→ 收尾；只产出 design/spec，不写代码；确认不通过回到方案设计",
+    graph: designFlowGraph(),
   },
   {
     id: "workspace-flow-01",

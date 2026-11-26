@@ -36,13 +36,13 @@ afterAll(async () => {
 });
 
 describe("演示种子", () => {
-  test("首轮写入 15 个 Skill / 15 个专家 / 4 条流程与 60 条技能装配边，不预置 Harness 与工具", async () => {
+  test("首轮写入 16 个 Skill / 17 个专家 / 5 条流程与 65 条技能装配边，不预置 Harness 与工具", async () => {
     const result = await seedAll(db, store);
     expect(result).toEqual({
-      skills: 15,
-      experts: 15,
-      workflows: 4,
-      expertSkills: 60,
+      skills: 16,
+      experts: 17,
+      workflows: 5,
+      expertSkills: 65,
     });
     const counts = await db.one<{
       harnesses: number;
@@ -65,14 +65,14 @@ describe("演示种子", () => {
     expect(counts).toEqual({
       harnesses: 0,
       tools: 0,
-      skills: 15,
-      experts: 15,
-      workflows: 4,
+      skills: 16,
+      experts: 17,
+      workflows: 5,
       toolEdges: 0,
       missingPackages: 0,
     });
 
-    expect(await store.list("packages/")).toHaveLength(15);
+    expect(await store.list("packages/")).toHaveLength(16);
     const arch = await db.one<{ package_key: string }>(
       "select package_key from skill where slug = 'arch-design-spec'",
     );
@@ -107,8 +107,8 @@ describe("演示种子", () => {
         (select count(*)::int from workflow) as workflows,
         (select count(*)::int from expert_skill) as "skillEdges"`,
     );
-    expect(counts).toEqual({ skills: 15, experts: 15, workflows: 4, skillEdges: 60 });
-    expect(await store.list("packages/")).toHaveLength(15);
+    expect(counts).toEqual({ skills: 16, experts: 17, workflows: 5, skillEdges: 65 });
+    expect(await store.list("packages/")).toHaveLength(16);
 
     const requirements = await db.one<{ version: string; tags: number }>(
       `select s.version,
@@ -154,7 +154,7 @@ describe("演示种子", () => {
     expect(categories).toEqual([
       { category_code: "coding", count: 1 },
       { category_code: "docs", count: 1 },
-      { category_code: "process", count: 8 },
+      { category_code: "process", count: 9 },
       { category_code: "review", count: 3 },
       { category_code: "testing", count: 2 },
     ]);
@@ -248,5 +248,37 @@ describe("演示种子", () => {
        where w.name = '故障修复流程'`,
     );
     expect(defectRefs).toHaveLength(7);
+
+    const design = await db.one<{
+      graph: {
+        nodes: { id: string; type: string; expertId: string | null }[];
+        edges: { from: string; to: string; kind: string }[];
+      };
+    }>(
+      `select d.graph from workflow_definition d
+       join workflow w on w.id = d.workflow_id
+       where w.name = '设计流程'`,
+    );
+    expect(design).not.toBeNull();
+    expect(design!.graph.nodes.map((node) => node.type)).toEqual([
+      "start",
+      "agent",
+      "confirm",
+      "end",
+    ]);
+    expect(design!.graph.nodes).toHaveLength(4);
+    expect(design!.graph.nodes.filter((node) => node.expertId === null).map((node) => node.id)).toEqual([
+      "n3",
+    ]);
+    expect(
+      design!.graph.edges.filter((edge) => edge.kind === "rollback").map((edge) => `${edge.from}->${edge.to}`),
+    ).toEqual(["n3->n2"]);
+
+    const designRefs = await db.query(
+      `select 1 from workflow_expert_ref r
+       join workflow w on w.id = r.workflow_id
+       where w.name = '设计流程'`,
+    );
+    expect(designRefs).toHaveLength(3);
   });
 });
